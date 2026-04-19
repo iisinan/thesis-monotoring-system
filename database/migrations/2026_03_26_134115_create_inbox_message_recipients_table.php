@@ -32,7 +32,9 @@ return new class extends Migration
         Schema::table('inbox_messages', function (Blueprint $table) {
             if (Schema::hasColumn('inbox_messages', 'recipient_id')) {
                 // IMPORTANT: Drop foreign key before dropping column to avoid constraint violations
-                $table->dropForeign(['recipient_id']); 
+                $table->dropForeign(['recipient_id']);
+                // Drop index referencing recipient_id before dropping the column
+                $table->dropIndex('inbox_messages_recipient_id_read_at_index');
                 $table->dropColumn(['recipient_id', 'read_at', 'starred_by_recipient', 'archived_by_recipient']);
             }
         });
