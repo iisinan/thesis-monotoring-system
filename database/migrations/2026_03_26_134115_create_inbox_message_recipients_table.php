@@ -11,24 +11,28 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. Create the recipients pivot table
-        Schema::create('inbox_message_recipients', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignUuid('inbox_message_id')->constrained()->onDelete('cascade');
-            $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
-            $table->string('recipient_type')->default('to'); // to, cc, bcc
-            $table->timestamp('read_at')->nullable();
-            $table->boolean('is_starred')->default(false);
-            $table->boolean('is_archived')->default(false);
-            $table->timestamps();
+        // 1. Create the recipients pivot table (only if it doesn't exist)
+        if (!Schema::hasTable('inbox_message_recipients')) {
+            Schema::create('inbox_message_recipients', function (Blueprint $table) {
+                $table->uuid('id')->primary();
+                $table->foreignUuid('inbox_message_id')->constrained()->onDelete('cascade');
+                $table->foreignUuid('user_id')->constrained()->onDelete('cascade');
+                $table->string('recipient_type')->default('to'); // to, cc, bcc
+                $table->timestamp('read_at')->nullable();
+                $table->boolean('is_starred')->default(false);
+                $table->boolean('is_archived')->default(false);
+                $table->timestamps();
 
-            $table->index(['user_id', 'is_archived']);
-            $table->index(['inbox_message_id', 'recipient_type']);
-        });
+                $table->index(['user_id', 'is_archived']);
+                $table->index(['inbox_message_id', 'recipient_type']);
+            });
+        }
 
-        // 2. Remove legacy columns from inbox_messages
+        // 2. Remove legacy columns from inbox_messages (only if they exist)
         Schema::table('inbox_messages', function (Blueprint $table) {
-            $table->dropColumn(['recipient_id', 'read_at', 'starred_by_recipient', 'archived_by_recipient']);
+            if (Schema::hasColumn('inbox_messages', 'recipient_id')) {
+                $table->dropColumn(['recipient_id', 'read_at', 'starred_by_recipient', 'archived_by_recipient']);
+            }
         });
     }
 
