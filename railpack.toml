@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["...", "libatomic1"]
+
+[phases.build]
+cmds = ["composer install --optimize-autoloader --no-scripts --no-interaction", "npm install", "npm run build"]
+
+[phases.deploy]
+cmds = ["php artisan migrate --force", "php artisan route:cache", "php artisan config:cache", "php artisan view:cache", "php artisan serve --host 0.0.0.0 --port $PORT"]
