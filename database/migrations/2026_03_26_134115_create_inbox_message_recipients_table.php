@@ -31,6 +31,8 @@ return new class extends Migration
         // 2. Remove legacy columns from inbox_messages (only if they exist)
         Schema::table('inbox_messages', function (Blueprint $table) {
             if (Schema::hasColumn('inbox_messages', 'recipient_id')) {
+                // IMPORTANT: Drop foreign key before dropping column to avoid constraint violations
+                $table->dropForeign(['recipient_id']); 
                 $table->dropColumn(['recipient_id', 'read_at', 'starred_by_recipient', 'archived_by_recipient']);
             }
         });
