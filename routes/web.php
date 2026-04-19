@@ -14,11 +14,19 @@ Route::get('/', function () {
     });
 
     $stats = \Illuminate\Support\Facades\Cache::remember('institutional_stats', 60 * 60, function() {
-        return [
-            'projects_count' => \App\Models\ThesisProject::count(),
-            'students_count' => \App\Models\User::role('Student')->count(),
-            'archived_count' => \App\Models\ThesisProject::publiclyVisible()->count(),
-        ];
+        try {
+            return [
+                'projects_count' => \App\Models\ThesisProject::count(),
+                'students_count' => \App\Models\User::role('Student')->count(),
+                'archived_count' => \App\Models\ThesisProject::publiclyVisible()->count(),
+            ];
+        } catch (\Exception $e) {
+            return [
+                'projects_count' => 0,
+                'students_count' => 0,
+                'archived_count' => 0,
+            ];
+        }
     });
     
     return view('welcome', compact('announcements', 'stats'));
