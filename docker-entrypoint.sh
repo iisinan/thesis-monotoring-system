@@ -9,6 +9,9 @@ fi
 # Run database migrations (NOT seeders)
 php artisan migrate --force
 
+# Ensure required directories exist
+mkdir -p resources/views storage/framework/views storage/framework/cache storage/framework/sessions
+
 # Cache configuration, routes, and views for performance
 php artisan config:cache
 php artisan route:cache

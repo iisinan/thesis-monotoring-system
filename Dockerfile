@@ -59,9 +59,9 @@ RUN composer run-script post-autoload-dump || true
 # Build frontend assets
 RUN npm run build
 
-# Set permissions for Laravel storage and cache directories
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache \
-    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+# Set permissions for Laravel storage, cache, and database directories
+RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache /var/www/database \
+    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache /var/www/database
 
 # Copy and set up the entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
