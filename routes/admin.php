@@ -48,7 +48,16 @@ Route::get('/templates/{template}/download', [DocumentTemplateController::class,
 Route::resource('templates', DocumentTemplateController::class);
 
 use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\AuditController;
+
 Route::resource('audit-logs', AuditLogController::class)->only(['index', 'show']);
+Route::resource('activity-logs', ActivityLogController::class)->only(['index']);
+Route::get('activity-logs/user/{user}', [ActivityLogController::class, 'userActivity'])->name('activity-logs.user');
+
+// Administrative Audit Hub
+Route::get('/audit-hub', [AuditController::class, 'index'])->name('audit.index');
+Route::get('/audit-hub/{thesis}', [AuditController::class, 'show'])->name('audit.show');
 
 use App\Http\Controllers\Admin\SystemOperationController;
 Route::get('/operations', [SystemOperationController::class, 'index'])->name('operations.index');

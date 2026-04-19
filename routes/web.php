@@ -74,18 +74,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['role:Admin|Director'])->group(function () {
         
         // specific admin only
-        Route::middleware('role:Admin|Director')->group(function() {
-            // These routes are now handled in routes/admin.php and routes/coordinator.php
-            // Recommended: Use the prefixed routes (admin/users, admin/announcements, etc.)
+        // Note: Admin-only routes are now handled in routes/admin.php
 
-            Route::resource('audit-logs', App\Http\Controllers\Admin\AuditLogController::class, ['as' => 'admin']);
-            Route::resource('activity-logs', App\Http\Controllers\Admin\ActivityLogController::class, ['as' => 'admin'])->only(['index']);
-            Route::get('activity-logs/user/{user}', [App\Http\Controllers\Admin\ActivityLogController::class, 'userActivity'])->name('admin.activity-logs.user');
-
-            // Administrative Audit Hub
-            Route::get('/audit-hub', [App\Http\Controllers\Admin\AuditController::class, 'index'])->name('admin.audit.index');
-            Route::get('/audit-hub/{thesis}', [App\Http\Controllers\Admin\AuditController::class, 'show'])->name('admin.audit.show');
-        });
     });
 
     // Program Coordinator & Admin/Director (Event Management)
