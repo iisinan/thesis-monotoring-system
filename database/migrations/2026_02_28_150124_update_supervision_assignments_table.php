@@ -12,7 +12,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        if (config('database.default') === 'pgsql') {
+        if (DB::getDriverName() === 'pgsql') {
             DB::statement('ALTER TABLE supervision_assignments DROP CONSTRAINT IF EXISTS supervision_assignments_role_check');
         }
 
