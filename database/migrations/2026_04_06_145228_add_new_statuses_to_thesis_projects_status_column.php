@@ -12,21 +12,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // 1. Drop the existing check constraint on 'status' from pgsql
-        // The error confirmed the constraint name is 'thesis_projects_status_check'
-        DB::statement('ALTER TABLE thesis_projects DROP CONSTRAINT IF EXISTS thesis_projects_status_check');
-
-        // 2. Expand the status list to include intermediate milestone states
         $statuses = [
             'proposed', 'active', 'submitted', 'completed', 'archived',
             'cleared_for_proposal', 'proposal_passed', 'cleared_for_internal',
-            'internal_passed', 'cleared_for_external', 'cleared_for_final'
+            'internal_passed', 'cleared_for_external', 'cleared_for_final',
         ];
-        
-        $statusStr = "'" . implode("', '", $statuses) . "'";
-        
-        // 3. Update the constraint to allow the new institutional lifecycle states
-        DB::statement("ALTER TABLE thesis_projects ADD CONSTRAINT thesis_projects_status_check CHECK (status IN ($statusStr))");
+
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite does not support ALTER CONSTRAINT — redefine the column via Schema builder
+            Schema::table('thesis_projects', function (Blueprint $table) use ($statuses) {
+                $table->enum('status', $statuses)->default('proposed')->change();
+            });
+        } else {
+            // PostgreSQL: drop the old check constraint and add a new one with the expanded list
+            DB::statement('ALTER TABLE thesis_projects DROP CONSTRAINT IF EXISTS thesis_projects_status_check');
+
+            $statusStr = "'" . implode("', '", $statuses) . "'";
+            DB::statement("ALTER TABLE thesis_projects ADD CONSTRAINT thesis_projects_status_check CHECK (status IN ($statusStr))");
+        }
     }
 
     /**
@@ -34,9 +37,21 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement('ALTER TABLE thesis_projects DROP CONSTRAINT IF EXISTS thesis_projects_status_check');
-        
-        $originalStatuses = "'proposed', 'active', 'submitted', 'completed', 'archived'";
-        DB::statement("ALTER TABLE thesis_projects ADD CONSTRAINT thesis_projects_status_check CHECK (status IN ($originalStatuses))");
+        $originalStatuses = [
+            'proposed', 'active', 'submitted', 'completed', 'archived',
+        ];
+
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite: revert the column back to the original status values
+            Schema::table('thesis_projects', function (Blueprint $table) use ($originalStatuses) {
+                $table->enum('status', $originalStatuses)->default('proposed')->change();
+            });
+        } else {
+            // PostgreSQL: restore the original check constraint
+            DB::statement('ALTER TABLE thesis_projects DROP CONSTRAINT IF EXISTS thesis_projects_status_check');
+
+            $statusStr = "'" . implode("', '", $originalStatuses) . "'";
+            DB::statement("ALTER TABLE thesis_projects ADD CONSTRAINT thesis_projects_status_check CHECK (status IN ($statusStr))");
+        }
     }
 };
