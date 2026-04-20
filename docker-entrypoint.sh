@@ -5,6 +5,11 @@ echo "=== Docker Entrypoint Starting ==="
 echo "APP_ENV: ${APP_ENV}"
 echo "DB_CONNECTION: ${DB_CONNECTION}"
 echo "LOG_CHANNEL: ${LOG_CHANNEL}"
+echo "APP_KEY set: $([ -n "$APP_KEY" ] && echo YES || echo NO)"
+echo "DB_URL set: $([ -n "$DB_URL" ] && echo YES || echo NO)"
+
+# TEMPORARY: Force debug so we can see real errors in browser
+export APP_DEBUG=true
 
 # Generate application key if not set
 if [ -z "$APP_KEY" ]; then
