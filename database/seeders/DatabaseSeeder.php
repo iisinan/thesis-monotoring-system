@@ -41,10 +41,11 @@ class DatabaseSeeder extends Seeder
         // 3. Create Users
 
         // Admin
-        $admin = User::factory()->create([
-            'name' => 'System Admin', 
-            'email' => 'admin@acetel.edu',
-            'password' => bcrypt('password')
+        $admin = User::firstOrCreate([
+            'email' => 'admin@acetel.nou.edu.ng',
+        ], [
+            'name' => 'ACETEL Admin', 
+            'password' => bcrypt('12345678')
         ]);
         $admin->assignRole('Admin');
 
