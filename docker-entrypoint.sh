@@ -3,6 +3,9 @@ set -e
 
 echo "=== Docker Entrypoint Starting ==="
 
+# TEMPORARY: Force debug so we can see real errors in browser
+export APP_DEBUG=true
+
 # Generate application key if not set
 if [ -z "$APP_KEY" ]; then
     echo "WARNING: APP_KEY is not set! Generating a temporary one..."
