@@ -47,8 +47,7 @@
         
         <!-- Sidebar Navigation -->
         <aside class="fixed inset-y-0 left-0 z-50 w-72 light-sidebar transition-all duration-500 transform md:translate-x-0 md:relative flex flex-col group"
-               :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
-               x-cloak>
+               :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
             
             <div class="flex items-center px-8 h-24 shrink-0 border-b border-green-100">
                 <div class="flex items-center gap-4 cursor-pointer">
