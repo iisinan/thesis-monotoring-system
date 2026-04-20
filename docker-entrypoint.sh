@@ -12,18 +12,26 @@ chown -R www-data:www-data storage bootstrap/cache
 # Delete .env to ensure Railway variables take priority
 rm -f .env || true
 
+# NUCLEAR CACHE CLEAR: Manually delete cache files before Laravel starts
+echo "=== Nuking Cache Files ==="
+rm -f bootstrap/cache/config.php bootstrap/cache/routes.php bootstrap/cache/services.php bootstrap/cache/packages.php || true
+
 # Print Key Diagnostic (Sanitized)
 if [ -n "$APP_KEY" ]; then
     echo "DEBUG: APP_KEY found in ENV. Length: ${#APP_KEY}"
+    case "$APP_KEY" in
+        base64:*) echo "DEBUG: Key format looks correct (base64 prefix found)" ;;
+        *) echo "WARNING: APP_KEY is missing 'base64:' prefix!" ;;
+    esac
 else
     echo "DEBUG: APP_KEY is MISSING in ENV."
 fi
 
-# Clear all cached configurations
-echo "=== Clearing Caches ==="
-php artisan config:clear || echo "Config clear skipped"
-php artisan route:clear || echo "Route clear skipped"
-php artisan view:clear || echo "View clear skipped"
+# Clear all cached configurations via Artisan
+echo "=== Clearing Caches via Artisan ==="
+php artisan config:clear || true
+php artisan route:clear || true
+php artisan view:clear || true
 
 # Generate application key if still not set
 if [ -z "$APP_KEY" ]; then
