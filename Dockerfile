@@ -36,6 +36,12 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
+# Default environment - Railway will override these via its Variables tab
+ENV APP_ENV=production \
+    APP_DEBUG=false \
+    LOG_CHANNEL=stderr \
+    LOG_LEVEL=error
+
 # Copy composer files first for layer caching
 COPY composer.json composer.lock ./
 
