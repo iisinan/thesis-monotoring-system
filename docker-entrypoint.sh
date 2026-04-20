@@ -2,13 +2,26 @@
 set -e
 
 echo "=== Docker Entrypoint Starting ==="
-
-# TEMPORARY: Force debug so we can see real errors in browser
 export APP_DEBUG=true
 
-# Generate application key if not set
+# Delete .env to ensure Railway variables take priority
+rm -f .env
+
+# Print Key Diagnostic (Sanitized)
+if [ -n "$APP_KEY" ]; then
+    echo "APP_KEY detected. Length: ${#APP_KEY} characters."
+else
+    echo "APP_KEY is MISSING in environment variables."
+fi
+
+# Clear all cached configurations
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+
+# Generate application key if still not set
 if [ -z "$APP_KEY" ]; then
-    echo "WARNING: APP_KEY is not set! Generating a temporary one..."
+    echo "WARNING: APP_KEY is still not set! Generating a temporary one..."
     php artisan key:generate --force
 fi
 
