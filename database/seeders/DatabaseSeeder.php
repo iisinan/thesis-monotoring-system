@@ -42,12 +42,13 @@ class DatabaseSeeder extends Seeder
 
         // Admin
         $admin = User::firstOrCreate([
-            'email' => 'admin@acetel.nou.edu.ng',
+            'email' => 'admin@acetel.noun.edu.ng',
         ], [
-            'name' => 'ACETEL Admin', 
-            'password' => bcrypt('12345678')
+            'name' => 'ACETEL Administrator', 
+            'password' => bcrypt('12345678'),
+            'is_active' => true
         ]);
-        $admin->assignRole('Admin');
+        $admin->syncRoles(['Admin']);
 
     }
 
