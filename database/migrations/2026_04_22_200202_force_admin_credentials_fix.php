@@ -11,8 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Ensure the Admin role exists for the web guard
-        $role = \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'Admin', 'guard_name' => 'web']);
+        // Ensure all required roles exist for the web guard
+        $roles = ['Admin', 'Director', 'Program Coordinator', 'Supervisor', 'Student', 'Internal Examiner', 'External Examiner'];
+        foreach ($roles as $roleName) {
+            \Spatie\Permission\Models\Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+        }
 
         $user = \App\Models\User::updateOrCreate([
             'email' => 'admin@acetel.noun.edu.ng',
@@ -23,7 +26,7 @@ return new class extends Migration
             'must_change_password' => false,
         ]);
 
-        $user->syncRoles([$role]);
+        $user->syncRoles(['Admin']);
     }
 
     /**
