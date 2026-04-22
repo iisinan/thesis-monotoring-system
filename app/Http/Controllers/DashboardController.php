@@ -48,7 +48,15 @@ class DashboardController extends Controller
 
         // Fallback for other roles or unassigned
         return view('dashboard', ['stats' => []]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => 'Diagnostic Mode',
+            'message' => $e->getMessage(),
+            'file' => $e->getFile(),
+            'line' => $e->getLine()
+        ], 500);
     }
+}
 
     private function getUnreadMessagesCount($user)
     {
