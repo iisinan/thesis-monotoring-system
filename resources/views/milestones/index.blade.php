@@ -13,28 +13,39 @@
     <script>
         window.refreshMilestone = async (id) => {
             const container = document.getElementById('milestone-container-' + id);
+            const listContainer = document.getElementById('milestones-list');
+            const roadmapContainer = document.querySelector('.ResearchRoadmapContainer');
+
             if (!container) return;
             
-            container.classList.add('opacity-40', 'pointer-events-none');
+            // Visual feedback
+            if(listContainer) listContainer.classList.add('opacity-40', 'pointer-events-none');
+            if(roadmapContainer) roadmapContainer.classList.add('opacity-40', 'pointer-events-none');
 
             try {
-                const response = await fetch(window.location.href, {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                const url = new URL(window.location.href);
+                url.searchParams.set('refresh_id', id);
+
+                const response = await fetch(url.toString(), {
+                    headers: { 
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'text/html'
+                    }
                 });
                 const html = await response.text();
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                const targetId = 'milestone-container-' + id;
-                const newEl = doc.getElementById(targetId);
                 
-                if (newEl) {
-                    container.innerHTML = newEl.innerHTML;
-                    // Copy any dynamic attributes from the new element to the existing container
-                    Array.from(newEl.attributes).forEach(attr => {
-                        if (attr.name !== 'id' && attr.name !== 'class') {
-                            container.setAttribute(attr.name, attr.value);
-                        }
-                    });
+                // 1. Refresh the Roadmap
+                const newRoadmap = doc.querySelector('.ResearchRoadmapContainer');
+                if (newRoadmap && roadmapContainer) {
+                    roadmapContainer.innerHTML = newRoadmap.innerHTML;
+                }
+
+                // 2. Refresh the whole List (Better than single panel because approval may unlock next milestone)
+                const newList = doc.getElementById('milestones-list');
+                if (newList && listContainer) {
+                    listContainer.innerHTML = newList.innerHTML;
                     
                     // Re-initialize Alpine.js for the new content
                     if (window.Alpine) {
@@ -43,13 +54,22 @@
                         });
                     }
                 } else {
-                    window.location.reload();
+                    // Fallback to single element update if list refresh fails
+                    const targetId = 'milestone-container-' + id;
+                    const newEl = doc.getElementById(targetId);
+                    if (newEl) {
+                        container.innerHTML = newEl.innerHTML;
+                        if (window.Alpine) window.Alpine.initTree(container);
+                    } else {
+                        window.location.reload();
+                    }
                 }
             } catch (e) {
                 console.error('Refresh failed:', e);
                 window.location.reload();
             } finally {
-                container.classList.remove('opacity-40', 'pointer-events-none');
+                if(listContainer) listContainer.classList.remove('opacity-40', 'pointer-events-none');
+                if(roadmapContainer) roadmapContainer.classList.remove('opacity-40', 'pointer-events-none');
             }
         };
     </script>
@@ -76,7 +96,7 @@
     </div>
 
     <!-- Visual Research Roadmap (Timeline) -->
-    <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
+    <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm ResearchRoadmapContainer">
         <div class="flex items-center gap-4 mb-10">
             <div class="w-1.5 h-8 bg-brand-500 rounded-full"></div>
             <h3 class="text-xl font-bold text-gray-900 tracking-tight">Research Roadmap</h3>
@@ -129,7 +149,7 @@
     </div>
 
     <!-- Milestones List -->
-    <div class="space-y-6">
+    <div id="milestones-list" class="space-y-6">
         @php $foundActive = false; @endphp
         @foreach($milestones as $index => $milestone)
             @php
@@ -346,9 +366,13 @@
                                                 
                                                 <form action="{{ route('theses.assign_supervisor', $thesis) }}" method="POST" class="space-y-4">
                                                     @csrf
-                                                    <p class="text-xs font-bold text-brand-700 mb-4 uppercase tracking-widest">Select Panel Members (Institutional Target: 3)</p>
+                                                    @php
+                                                        $levelName = strtoupper($thesis->student->level->name ?? '');
+                                                        $targetCount = str_contains($levelName, 'PHD') ? 3 : 2;
+                                                    @endphp
+                                                    <p class="text-xs font-bold text-brand-700 mb-4 uppercase tracking-widest">Select Panel Members (Institutional Target: {{ $targetCount }})</p>
                                                     
-                                                    @for($i=0; $i < 3; $i++)
+                                                    @for($i=0; $i < $targetCount; $i++)
                                                         <div class="space-y-1">
                                                             <label class="text-xs font-bold text-gray-400 uppercase tracking-widest">
                                                                 {{ $i == 0 ? 'Lead (Professor Required)' : ($i == 1 ? 'Secondary Member' : 'Associate Member') }}
@@ -961,10 +985,13 @@
                                                     method: 'POST',
                                                     body: new FormData($event.target),
                                                     headers: {
-                                                        'Accept': 'text/html'
+                                                        'Accept': 'application/json',
+                                                        'X-Requested-With': 'XMLHttpRequest'
                                                     }
-                                                }).then(res => res.text()).then(html => {
-                                                    window.refreshMilestone('{{ $milestone->id }}');
+                                                }).then(res => res.json()).then(data => {
+                                                    if (data.success) {
+                                                        window.refreshMilestone('{{ $milestone->id }}');
+                                                    }
                                                 }).finally(() => {
                                                     approving = false;
                                                 })

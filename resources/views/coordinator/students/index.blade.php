@@ -16,7 +16,42 @@
             <h1 class="text-4xl font-black text-slate-900 tracking-tight">Student List</h1>
             <p class="mt-2 text-sm font-medium text-slate-500">List of all students and their supervision status.</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
+            <form method="GET" action="{{ route('coordinator.students.index') }}" class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                <div class="relative w-full sm:w-80">
+                    <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, matric, thesis..." class="w-full bg-white border border-slate-200 rounded-2xl pl-11 pr-4 py-2.5 placeholder-slate-400 text-sm focus:ring-2 focus:ring-acetel-500/20 focus:border-acetel-500 text-slate-900 font-medium shadow-sm transition-all outline-none">
+                </div>
+
+                @if(isset($programs) && count($programs) > 1)
+                    <div class="px-5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-2 hover:border-acetel-300 transition-colors">
+                        <select name="program_id" onchange="this.form.submit()" class="bg-transparent border-none text-xs font-bold uppercase tracking-widest text-slate-500 focus:ring-0 cursor-pointer">
+                            <option value="">All Programs</option>
+                            @foreach($programs as $prog)
+                                <option value="{{ $prog->id }}" {{ request('program_id') == $prog->id ? 'selected' : '' }}>{{ $prog->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if(isset($levels) && count($levels) > 1)
+                    <div class="px-5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-2 hover:border-acetel-300 transition-colors">
+                        <select name="level_id" onchange="this.form.submit()" class="bg-transparent border-none text-xs font-bold uppercase tracking-widest text-slate-500 focus:ring-0 cursor-pointer">
+                            <option value="">All Levels</option>
+                            @foreach($levels as $lvl)
+                                <option value="{{ $lvl->id }}" {{ request('level_id') == $lvl->id ? 'selected' : '' }}>{{ $lvl->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                @if(request('search') || request('program_id') || request('level_id'))
+                    <a href="{{ route('coordinator.students.index') }}" class="p-2.5 text-slate-400 hover:text-rose-500 bg-white border border-slate-200 rounded-2xl transition-all shadow-sm" title="Reset Filters">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </a>
+                @endif
+                <button type="submit" class="hidden"></button>
+            </form>
             <div class="px-5 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3">
                 <span class="text-xs font-bold text-slate-600">Total: {{ number_format($students->total()) }}</span>
             </div>

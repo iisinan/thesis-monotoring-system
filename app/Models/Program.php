@@ -10,8 +10,22 @@ class Program extends Model
 {
     /** @use HasFactory<\Database\Factories\ProgramFactory> */
     use HasFactory, HasUuids;
+    
+    protected static function booted()
+    {
+        static::creating(function ($program) {
+            if (empty($program->serial_number)) {
+                $lastProgram = static::whereNotNull('serial_number')
+                    ->orderByRaw('CAST(serial_number AS UNSIGNED) DESC')
+                    ->first();
+                $nextNumber = $lastProgram ? (intval($lastProgram->serial_number) + 1) : 1;
+                // Save without zero-padding
+                $program->serial_number = (string) $nextNumber;
+            }
+        });
+    }
 
-    protected $fillable = ['name', 'code', 'degree_type'];
+    protected $fillable = ['name', 'code', 'degree_type', 'serial_number'];
 
     public function cohorts()
     {

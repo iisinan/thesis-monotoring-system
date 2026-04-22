@@ -34,6 +34,12 @@
                     </div>
 
                     <div class="col-span-6 sm:col-span-2">
+                        <label for="serial_number" class="block text-sm font-semibold text-black mb-1">Serial Number</label>
+                        <input type="text" name="serial_number" id="serial_number" class="bg-slate-50 block w-full shadow-sm sm:text-sm border-slate-300 rounded-xl px-4 py-2.5 cursor-not-allowed" value="{{ $program->serial_number }}" readonly>
+                        <p class="mt-2 text-xs text-slate-500 font-medium italic">Automatically generated. Used for CSV student uploads.</p>
+                    </div>
+
+                    <div class="col-span-6 sm:col-span-2">
                         <label for="degree_type" class="block text-sm font-semibold text-black mb-1">Degree Level</label>
                         <select name="degree_type" id="degree_type" class="focus:ring-acetel-500 focus:border-acetel-500 block w-full shadow-sm sm:text-sm border-slate-300 rounded-xl px-4 py-2.5 transition-colors" required>
                             <option value="MSc" {{ old('degree_type', $program->degree_type) == 'MSc' ? 'selected' : '' }}>Master of Science (MSc)</option>

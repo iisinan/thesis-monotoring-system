@@ -31,6 +31,15 @@
                 <h3 class="text-xl font-black text-slate-900 tracking-tight">Validation Feed</h3>
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Live Submission Matrix</p>
             </div>
+            @if(request('thesis_id'))
+                <div class="flex items-center gap-3">
+                    <div class="px-4 py-2 rounded-xl bg-acetel-50 border border-acetel-100 flex items-center gap-2">
+                        <div class="w-1.5 h-1.5 rounded-full bg-acetel-500"></div>
+                        <span class="text-[10px] font-black text-acetel-700 uppercase tracking-widest">Identity Filter Active</span>
+                    </div>
+                    <a href="{{ route('coordinator.milestones.index') }}" class="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Reset View</a>
+                </div>
+            @endif
         </div>
 
         <div class="flex-1">
@@ -97,7 +106,7 @@
                                         </span>
                                     </td>
                                     <td class="px-10 py-6 text-right">
-                                        <a href="{{ route('milestones.show', $milestone) }}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-acetel-600 text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-slate-900/10 hover:shadow-acetel-500/20 translate-y-0 hover:-translate-y-1">
+                                        <a href="{{ route('milestones.review', $milestone) }}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-acetel-600 text-white text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-slate-900/10 hover:shadow-acetel-500/20 translate-y-0 hover:-translate-y-1">
                                             Review Protocol
                                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                                         </a>

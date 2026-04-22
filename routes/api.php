@@ -35,4 +35,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     
     Route::post('/events', [EventController::class, 'schedule']);
     Route::post('/events/{event}/evaluate', [EventController::class, 'evaluate']);
+    
+    Route::post('/messages', [App\Http\Controllers\MessageController::class, 'store']);
 });

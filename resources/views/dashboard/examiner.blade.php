@@ -267,6 +267,29 @@
                 </div>
             </div>
 
+            {{-- Institutional Resource Center --}}
+            @if(isset($document_templates) && $document_templates->count() > 0)
+            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
+                <div class="px-6 py-5 border-b border-slate-50 flex items-center justify-between">
+                    <h3 class="text-xs font-black text-slate-800 tracking-widest uppercase">Institutional Resources</h3>
+                </div>
+                <div class="p-2 space-y-1">
+                    @foreach($document_templates as $template)
+                    <a href="{{ route('templates.download', $template) }}" class="flex items-center gap-3 p-3 hover:bg-green-50 rounded-2xl transition-all group">
+                        <div class="w-8 h-8 rounded-xl bg-green-50 text-green-600 flex items-center justify-center shrink-0 group-hover:bg-green-600 group-hover:text-white transition-all">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-black text-slate-700 truncate leading-none uppercase">{{ $template->title }}</p>
+                            <p class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter italic">v{{ $template->version }} • {{ strtoupper($template->type) }}</p>
+                        </div>
+                        <svg class="w-3 h-3 ml-auto text-slate-300 group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    </a>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
             {{-- Quick Protocol --}}
             <div class="bg-green-800 rounded-3xl p-8 text-white relative overflow-hidden group">
                 <div class="absolute top-0 right-0 w-32 h-32 bg-green-500 rounded-full -mr-16 -mt-16 opacity-20 group-hover:scale-110 transition-transform duration-700"></div>

@@ -17,6 +17,9 @@ class StudentProfile extends Model
         'level_id',
         'cohort_id',
         'student_id_number',
+        'gender',
+        'phone_number',
+        'nationality',
         'enrollment_status',
         'current_semester'
     ];
@@ -74,5 +77,24 @@ class StudentProfile extends Model
     public function thesis()
     {
         return $this->hasOne(ThesisProject::class, 'student_profile_id');
+    }
+
+    /**
+     * Handle cascade deletions.
+     */
+    protected static function booted()
+    {
+        static::deleting(function ($studentProfile) {
+            // Delete associated thesis project (triggers further cascade)
+            if ($studentProfile->thesis) {
+                $studentProfile->thesis->delete();
+            }
+
+            // Delete the user account associated with the student
+            // Use withoutEvents to avoid accidental loops if user was deleting student
+            if ($studentProfile->user) {
+                $studentProfile->user->delete();
+            }
+        });
     }
 }

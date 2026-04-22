@@ -38,4 +38,17 @@ class Cohort extends Model
     {
         return $this->hasMany(StudentProfile::class);
     }
+
+    /**
+     * Handle cascade deletions.
+     */
+    protected static function booted()
+    {
+        static::deleting(function ($cohort) {
+            $cohort->students->each(function ($student) {
+                // We delete the student profile which will trigger further cascades
+                $student->delete();
+            });
+        });
+    }
 }

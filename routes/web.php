@@ -46,6 +46,10 @@ Route::middleware('guest')->group(function () {
     
     Route::post('/login', [AuthController::class, 'login']);
     
+    // Forgot Password
+    Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
+    Route::post('/forgot-password', [AuthController::class, 'processForgotPassword'])->name('password.email');
+    
     // Registration disabled - created by admin only
 });
 
@@ -141,6 +145,30 @@ Route::middleware('auth')->group(function () {
     // Action Items
     Route::post('/action-items/{actionItem}/complete', [\App\Http\Controllers\ActionItemController::class, 'complete'])->name('action-items.complete');
     Route::post('/action-items/{actionItem}/verify', [\App\Http\Controllers\ActionItemController::class, 'verify'])->name('action-items.verify');
+    // Document Templates (Resource Center)
+    Route::get('/templates/{template}/download', [App\Http\Controllers\Admin\DocumentTemplateController::class, 'download'])->name('templates.download');
+    Route::get('/resources', [DashboardController::class, 'resources'])->name('resources.index');
 });
+
+Route::get('/debug/send-test-email', function() {
+    $user = auth()->user();
+    if (!$user) return response()->json(['error' => 'Please login to the Trajectory Hub first.'], 401);
+    
+    $project = \App\Models\ThesisProject::first();
+    if (!$project) return response()->json(['error' => 'No thesis project found in database to run this test.'], 404);
+    
+    try {
+        $user->notify(new \App\Notifications\SupervisorAssigned($project));
+        return response()->json([
+            'success' => true,
+            'message' => 'Institutional Branded Email has been dispatched!',
+            'recipient' => $user->email,
+            'branding' => 'Templated: supervisor_assigned',
+            'note' => 'If using SMTP, check your inbox. If using log driver, check storage/logs/laravel.log'
+        ]);
+    } catch (\Exception $e) {
+        return response()->json(['error' => 'Failed to send email: ' . $e->getMessage()], 500);
+    }
+})->middleware(['auth']);
 
 

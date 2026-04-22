@@ -58,6 +58,21 @@ class DirectorAnalyticsService
         foreach ($programs as $program) {
             $programFilters = array_merge($filters, ['program_id' => $program->id]);
             
+            // Completion time logic: Average days between registration (Milestone 1 approval) 
+            // and Final Submission/Approval (Milestone 10)
+            $avgCompletionDays = StudentProfile::where('program_id', $program->id)
+                ->where('enrollment_status', 'graduated')
+                ->whereHas('thesis.milestones', fn($q) => $q->where('status', 'approved')->whereHas('template', fn($t) => $t->where('order', 1)))
+                ->get()
+                ->map(function($student) {
+                    $m1 = $student->thesis->milestones->first(fn($m) => $m->template->order == 1);
+                    $m10 = $student->thesis->milestones->first(fn($m) => $m->template->order == 10 || $m->template->is_final_archival);
+                    if ($m1 && $m10 && $m1->approved_at && $m10->approved_at) {
+                        return $m1->approved_at->diffInDays($m10->approved_at);
+                    }
+                    return null;
+                })->filter()->avg() ?: 0;
+
             $performance[] = [
                 'id' => $program->id,
                 'name' => $program->name,
@@ -75,7 +90,7 @@ class DirectorAnalyticsService
                 'cleared_external' => $this->applyFilters(StudentProfile::where('program_id', $program->id)->whereHas('thesis', function($q) {
                     $q->whereNotNull('cleared_for_internal_at');
                 }), $filters)->count(),
-                'avg_completion_time' => 'N/A', // Placeholder for complex calc
+                'avg_completion_time' => $avgCompletionDays > 0 ? round($avgCompletionDays / 30, 1) . ' months' : 'N/A',
                 'delayed_students' => $this->getDelayedStudents($programFilters)->count(),
             ];
         }
@@ -190,8 +205,25 @@ class DirectorAnalyticsService
         $totalThreads = \App\Models\CommunicationChannel::count();
         $inactiveThreads = \App\Models\CommunicationChannel::where('updated_at', '<', now()->subDays(14))->count();
         
-        // Average supervisor response time (simplified logic)
-        $avgResponseTime = '2.4 days'; // Placeholder
+        // Calculate average supervisor response time
+        // Heuristic: Time between a student message and the subsequent teacher/supervisor reply in the same channel
+        $avgResponseHours = DB::table('messages as m1')
+            ->join('messages as m2', function($join) {
+                $join->on('m1.channel_id', '=', 'm2.channel_id')
+                    ->whereColumn('m2.created_at', '>', 'm1.created_at');
+            })
+            ->join('model_has_roles as mhr1', function($join) {
+                $join->on('m1.user_id', '=', 'mhr1.model_id')->where('mhr1.model_type', 'App\Models\User');
+            })
+            ->join('roles as r1', 'mhr1.role_id', '=', 'r1.id')
+            ->join('model_has_roles as mhr2', function($join) {
+                $join->on('m2.user_id', '=', 'mhr2.model_id')->where('mhr2.model_type', 'App\Models\User');
+            })
+            ->join('roles as r2', 'mhr2.role_id', '=', 'r2.id')
+            ->where('r1.name', 'Student')
+            ->whereIn('r2.name', ['Supervisor', 'Program Coordinator'])
+            ->select(DB::raw('AVG(EXTRACT(EPOCH FROM (m2.created_at - m1.created_at))/3600) as avg_hours'))
+            ->value('avg_hours') ?: 0;
 
         $waitingForFeedback = StudentMilestone::where('status', 'submitted')
             ->whereHas('thesis.student', function($q) use ($filters) {
@@ -201,7 +233,9 @@ class DirectorAnalyticsService
         return [
             'active_threads' => $totalThreads - $inactiveThreads,
             'inactive_threads' => $inactiveThreads,
-            'avg_response_time' => $avgResponseTime,
+            'avg_response_time' => $avgResponseHours > 0 
+                ? ($avgResponseHours > 24 ? round($avgResponseHours/24, 1) . ' days' : round($avgResponseHours, 1) . ' hours')
+                : 'N/A',
             'waiting_for_feedback' => $waitingForFeedback,
             'health_score' => $totalThreads > 0 ? round((($totalThreads - $inactiveThreads) / $totalThreads) * 100) : 100,
         ];
@@ -251,6 +285,68 @@ class DirectorAnalyticsService
             ->latest();
 
         return $query->take(15)->get();
+    }
+
+    /**
+     * Get Section 11: Stalled Students (Milestone Grace Periods)
+     * Identifies students who have been stuck on a milestone for too long.
+     */
+    public function getStalledStudents($filters = [])
+    {
+        $gracePeriodDays = 14; 
+        
+        $query = StudentMilestone::with(['thesis.student.user', 'thesis.student.program', 'template', 'thesis.assignments.supervisor.user'])
+            ->where('status', '!=', 'approved')
+            ->where('updated_at', '<', now()->subDays($gracePeriodDays))
+            ->whereHas('thesis.student', function($q) {
+                $q->where('enrollment_status', 'active');
+            });
+
+        return $this->applyFilters($query, $filters, 'student_milestone')->orderBy('updated_at', 'asc');
+    }
+
+    /**
+     * Get Section 12: Active Mentors (Leaderboard)
+     * Ranks supervisors by graduation rates and response speed.
+     */
+    public function getFacultyLeaderboard($filters = [])
+    {
+        $supervisors = SupervisorProfile::with(['user', 'programs'])
+            ->withCount(['assignments as total_graduated' => function($q) {
+                $q->whereHas('thesis.student', fn($sq) => $sq->where('enrollment_status', 'graduated'));
+            }])
+            ->get();
+
+        return $supervisors->map(function($s) {
+            // Get avg response time for THIS supervisor
+            $avgResponseHours = DB::table('messages as m1')
+                ->join('messages as m2', function($join) {
+                    $join->on('m1.channel_id', '=', 'm2.channel_id')
+                        ->whereColumn('m2.created_at', '>', 'm1.created_at');
+                })
+                ->where('m2.user_id', $s->user_id)
+                ->whereExists(function ($query) use ($s) {
+                    $query->select(DB::raw(1))
+                        ->from('model_has_roles')
+                        ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+                        ->whereColumn('model_has_roles.model_id', 'messages.user_id')
+                        ->where('roles.name', 'Student')
+                        ->where('messages.channel_id', 'm1.channel_id');
+                }, 'm1')
+                ->select(DB::raw('AVG(EXTRACT(EPOCH FROM (m2.created_at - m1.created_at))/3600) as avg_hours'))
+                ->value('avg_hours') ?: 0;
+
+            return [
+                'id' => $s->id,
+                'name' => $s->user->name,
+                'graduated_count' => $s->total_graduated,
+                'avg_response_hours' => round($avgResponseHours, 1),
+                'response_time_display' => $avgResponseHours > 0 
+                    ? ($avgResponseHours > 24 ? round($avgResponseHours/24, 1) . 'd' : round($avgResponseHours, 1) . 'h')
+                    : 'N/A',
+                'score' => ($s->total_graduated * 10) - ($avgResponseHours / 24), // Simple ranking score
+            ];
+        })->sortByDesc('score')->values()->take(5);
     }
 
     /**

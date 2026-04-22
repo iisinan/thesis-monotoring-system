@@ -32,23 +32,30 @@
                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">Staff Pool</p>
             </div>
             
-            @if(count($programs) > 1)
-                <div class="flex items-center gap-4">
-                    <form action="{{ route('coordinator.supervisors.index') }}" method="GET" class="flex items-center gap-2">
-                        <select name="program_id" onchange="this.form.submit()" class="bg-white border-slate-200 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-500 focus:ring-acetel-500 focus:border-acetel-500 transition-all">
+            <div class="flex items-center gap-4 flex-wrap">
+                <form action="{{ route('coordinator.supervisors.index') }}" method="GET" class="flex items-center gap-3 w-full sm:w-auto">
+                    <div class="relative w-full sm:w-64">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <input type="text" name="search" value="{{ request('search') }}" placeholder="Search name, rank, expertise..." class="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-acetel-500/20 focus:border-acetel-500 text-slate-900 font-medium transition-all shadow-sm">
+                    </div>
+                
+                    @if(count($programs) > 1)
+                        <select name="program_id" onchange="this.form.submit()" class="bg-white border-slate-200 rounded-xl text-[10px] font-bold uppercase tracking-widest text-slate-500 focus:ring-acetel-500 focus:border-acetel-500 transition-all shadow-sm">
                             <option value="">All Programs</option>
                             @foreach($programs as $prog)
                                 <option value="{{ $prog->id }}" {{ request('program_id') == $prog->id ? 'selected' : '' }}>{{ $prog->name }}</option>
                             @endforeach
                         </select>
-                        @if(request('program_id'))
-                            <a href="{{ route('coordinator.supervisors.index') }}" class="p-2 text-slate-400 hover:text-rose-500 bg-white border border-slate-200 rounded-xl transition-all" title="Clear Filter">
-                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                            </a>
-                        @endif
-                    </form>
-                </div>
-            @endif
+                    @endif
+                    
+                    @if(request('program_id') || request('search'))
+                        <a href="{{ route('coordinator.supervisors.index') }}" class="p-2 text-slate-400 hover:text-rose-500 bg-white border border-slate-200 rounded-xl transition-all shadow-sm" title="Clear Filters">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </a>
+                    @endif
+                    <button type="submit" class="hidden"></button>
+                </form>
+            </div>
         </div>
 
         <div class="flex-1">

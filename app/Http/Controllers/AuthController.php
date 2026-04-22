@@ -122,4 +122,33 @@ class AuthController extends Controller
         // Update last_login_at on user record
         $user->update(['last_login_at' => now()]);
     }
+
+    public function showForgotPassword()
+    {
+        return view('auth.forgot-password');
+    }
+
+    public function processForgotPassword(Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+        
+        $user = \App\Models\User::where('email', $request->email)->first();
+        if ($user) {
+            $password = 'ACETEL-' . rand(100000, 999999);
+            
+            $user->update([
+                'password' => \Illuminate\Support\Facades\Hash::make($password),
+                'must_change_password' => true,
+            ]);
+
+            try {
+                \Illuminate\Support\Facades\Mail::to($user->email)
+                    ->send(new \App\Mail\PasswordResetDispatched($user, $password));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error('Forgot password email failed for ' . $user->email . ': ' . $e->getMessage());
+            }
+        }
+
+        return back()->with('status', 'If this email belongs to an active institutional account, a password reset link has been dispatched to it.');
+    }
 }

@@ -74,6 +74,11 @@
                         <p class="text-sm font-bold text-slate-800 truncate">{{ Auth::user()->name }}</p>
                         <p class="text-[10px] font-semibold text-green-600 uppercase tracking-wider truncate">System Architect</p>
                     </div>
+                    <a href="{{ route('profile.edit') }}" class="p-2 text-slate-400 hover:text-brand-500 transition-all duration-300 rounded-xl hover:bg-brand-50" title="My Profile">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                    </a>
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit" class="p-2 text-slate-400 hover:text-red-500 transition-all duration-300 rounded-xl hover:bg-red-50" title="Log out">
@@ -126,12 +131,23 @@
                         </div>
                     @endif
                     
+                    @if (session('warning'))
+                        <div class="bg-amber-50 text-amber-800 px-6 py-4 rounded-2xl flex items-center gap-4 border border-amber-200 shadow-sm animate-in-up" role="alert">
+                            <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                            </div>
+                            <span class="font-semibold text-sm">{{ session('warning') }}</span>
+                        </div>
+                    @endif
+                    
                     @yield('content')
                 </div>
             </main>
         </div>
     </div>
     <x-document-preview-modal />
+    <x-toast />
+    <x-force-password-change-modal />
     @stack('scripts')
 </body>
 </html>

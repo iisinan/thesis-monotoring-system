@@ -124,47 +124,43 @@
         @endforeach
     </div>
 
-    {{-- Plagiarism / Academic Integrity Alert Banner --}}
-    @if(isset($plagiarism_alerts) && $plagiarism_alerts->count() > 0)
-    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-900 to-rose-800 p-px shadow-2xl shadow-rose-900/40">
-        <div class="bg-gradient-to-r from-rose-950 to-rose-900 rounded-3xl p-8 flex flex-col md:flex-row items-start md:items-center gap-8 relative overflow-hidden">
+    {{-- Stalled Students / Grace Period Alert Banner --}}
+    @if(isset($stalled_students) && $stalled_students->count() > 0)
+    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-600 to-amber-500 p-px shadow-2xl shadow-amber-600/30">
+        <div class="bg-gradient-to-r from-amber-700 to-amber-600 rounded-3xl p-8 flex flex-col md:flex-row items-start md:items-center gap-8 relative overflow-hidden">
             <div class="absolute inset-0 opacity-10" style="background-image: url(\"data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='white' fill-opacity='1' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='1'/%3E%3C/g%3E%3C/svg%3E\");"></div>
             <div class="flex items-center gap-5 flex-1 relative z-10">
-                <div class="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center shrink-0">
-                    <span class="relative flex h-5 w-5">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-5 w-5 bg-rose-500"></span>
-                    </span>
+                <div class="w-16 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <div>
-                    <span class="text-[9px] font-black uppercase tracking-widest text-rose-400">Academic Integrity Alert</span>
-                    <h3 class="text-2xl font-black text-white mt-1 tracking-tight">{{ $plagiarism_alerts->count() }} Flagged Submissions</h3>
-                    <p class="text-rose-300/80 text-sm font-medium mt-1">Similarity index exceeds 20% — Director review required.</p>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-amber-200">Grace Period Breach</span>
+                    <h3 class="text-2xl font-black text-white mt-1 tracking-tight">{{ $stalled_students->count() }} Stalled Candidates</h3>
+                    <p class="text-amber-100 text-sm font-medium mt-1">These students have had zero milestone activity for over 14 days.</p>
                 </div>
             </div>
-            <div class="relative z-10 group/dd" x-data="{ open: false }">
-                <button @click="open = !open" class="px-8 py-4 bg-rose-500 hover:bg-rose-400 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3 shadow-lg shadow-rose-900/50">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                    Investigate Violations
+            
+            <div class="relative z-10 group/stalled" x-data="{ open: false }">
+                <button @click="open = !open" class="px-8 py-4 bg-white text-amber-700 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-3 shadow-lg">
+                    Intervene Now
                     <svg class="w-3 h-3" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                 </button>
 
                 <div x-show="open" @click.away="open = false" x-transition class="absolute right-0 top-full mt-3 w-96 bg-white rounded-3xl shadow-2xl border border-slate-100 z-50 overflow-hidden" style="display:none">
-                    <div class="px-6 py-4 border-b border-slate-50 bg-slate-50/50">
-                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-500">High Similarity Reports</p>
-                    </div>
                     <div class="max-h-80 overflow-y-auto divide-y divide-slate-50">
-                        @foreach($plagiarism_alerts as $alert)
-                        <a href="{{ route('admin.students.show', $alert->milestone->thesis->student_profile_id) }}" class="flex items-center gap-4 px-6 py-4 hover:bg-rose-50 transition-colors">
-                            <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-black text-sm shrink-0">
-                                {{ substr($alert->milestone->thesis->student->user->name ?? '?', 0, 1) }}
+                        @foreach($stalled_students as $stalled)
+                        <div class="px-6 py-4 hover:bg-amber-50 transition-colors">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-sm font-black text-slate-800">{{ $stalled->thesis->student->user->name }}</p>
+                                <span class="text-[9px] font-black text-amber-600 bg-amber-100 px-2 py-0.5 rounded">{{ $stalled->updated_at->diffInDays() }} days stuck</span>
                             </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-black text-slate-800 truncate">{{ $alert->milestone->thesis->student->user->name ?? 'Student' }}</p>
-                                <p class="text-[10px] font-medium text-slate-400 truncate italic mt-0.5">{{ $alert->milestone->thesis->title }}</p>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">{{ $stalled->template->name }}</p>
+                            <div class="flex items-center gap-2 mt-3">
+                                <a href="{{ route('inbox.compose', ['user_id' => $stalled->thesis->student->user_id]) }}" class="text-[9px] font-black text-amber-600 hover:underline">Message Student</a>
+                                <span class="text-slate-300">|</span>
+                                <a href="{{ route('inbox.compose', ['user_id' => $stalled->thesis->assignments->first()->supervisor->user_id ?? '']) }}" class="text-[9px] font-black text-amber-600 hover:underline">Nudge Supervisor</a>
                             </div>
-                            <span class="px-2.5 py-1 bg-rose-100 text-rose-700 rounded-lg text-[9px] font-black shrink-0">{{ $alert->plagiarism_data['similarity_index'] ?? $alert->plagiarism_data['similarity_score'] ?? 'N/A' }}%</span>
-                        </a>
+                        </div>
                         @endforeach
                     </div>
                 </div>
@@ -407,6 +403,45 @@
                 </div>
             </div>
 
+            {{-- Active Mentors Leaderboard --}}
+            <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                <div class="flex items-center justify-between mb-8">
+                    <div class="flex items-center gap-3">
+                        <div class="w-1.5 h-6 bg-emerald-500 rounded-full"></div>
+                        <h3 class="text-base font-black text-slate-900 tracking-tight uppercase">Faculty Top Mentors</h3>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                    </div>
+                </div>
+                <div class="space-y-6">
+                    @forelse($faculty_leaderboard as $idx => $mentor)
+                        <div class="flex items-center gap-4 relative">
+                            <div class="w-8 h-8 rounded-full {{ $idx == 0 ? 'bg-amber-100 text-amber-700 ring-4 ring-amber-50' : 'bg-slate-50 text-slate-400' }} flex items-center justify-center text-xs font-black shrink-0">
+                                #{{ $idx + 1 }}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-black text-slate-800 truncate leading-none">{{ $mentor['name'] }}</p>
+                                <div class="flex items-center gap-3 mt-1.5">
+                                    <span class="text-[9px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-1">
+                                        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                        {{ $mentor['graduated_count'] }} Completion
+                                    </span>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                        {{ $mentor['response_time_display'] }} Response
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    @empty
+                        <p class="text-center text-slate-400 font-medium text-sm py-8">Rating data processing...</p>
+                    @endforelse
+                </div>
+                <div class="mt-8 pt-6 border-t border-slate-50">
+                    <a href="{{ route('reports.index') }}" class="block text-center text-[10px] font-black text-brand-600 uppercase tracking-widest hover:text-brand-700 transition-colors">View Faculty Full Rankings →</a>
+                </div>
+            </div>
+
             {{-- Cohort Progress --}}
             <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
                 <div class="flex items-center gap-3 mb-8">
@@ -531,7 +566,36 @@
                 {{ $students->links() }}
             </div>
         @endif
+        </div>
+
+    {{-- Institutional Resource Center --}}
+    @if(isset($document_templates) && $document_templates->count() > 0)
+    <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+        <div class="flex items-center gap-4 mb-8">
+            <div class="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            </div>
+            <div>
+                <h3 class="text-xl font-black text-slate-900 tracking-tight">Institutional Resource Center</h3>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Authorized Protocols & Guidelines</p>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            @foreach($document_templates as $template)
+            <a href="{{ route('templates.download', $template) }}" class="flex items-center gap-4 p-5 bg-slate-50 hover:bg-indigo-50 rounded-2xl border border-slate-100 hover:border-indigo-200 transition-all group">
+                <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-xs font-black text-slate-800 truncate leading-none uppercase">{{ $template->title }}</p>
+                    <p class="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-tighter italic">Version {{ $template->version }} • {{ strtoupper($template->type) }}</p>
+                </div>
+            </a>
+            @endforeach
+        </div>
     </div>
+    @endif
+</div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

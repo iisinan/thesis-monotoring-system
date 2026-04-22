@@ -50,6 +50,7 @@ class ProgramController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('programs')->ignore($program->id)],
             'code' => ['required', 'string', 'max:10', 'uppercase', Rule::unique('programs')->ignore($program->id)],
+            'serial_number' => ['required', 'string', 'max:20', 'uppercase', Rule::unique('programs')->ignore($program->id)],
             'degree_type' => ['required', 'in:MSc,PhD'],
             'coordinator_id' => ['nullable', 'exists:users,id'],
         ]);
@@ -57,6 +58,7 @@ class ProgramController extends Controller
         $program->update([
             'name' => $validated['name'],
             'code' => $validated['code'],
+            'serial_number' => $validated['serial_number'],
             'degree_type' => $validated['degree_type'],
         ]);
 

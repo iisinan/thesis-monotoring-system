@@ -40,4 +40,23 @@ class DefenceEvent extends Model
     {
         return $this->hasMany(Evaluation::class);
     }
+
+    /**
+     * Handle cascade deletions.
+     */
+    protected static function booted()
+    {
+        static::deleting(function ($event) {
+            // Delete evaluations
+            $event->evaluations()->delete();
+            
+            // Delete panel members
+            $event->panelMembers()->delete();
+            
+            // Cleanup signed outcome form if exists
+            if ($event->signed_outcome_form_url) {
+                \Illuminate\Support\Facades\Storage::delete($event->signed_outcome_form_url);
+            }
+        });
+    }
 }

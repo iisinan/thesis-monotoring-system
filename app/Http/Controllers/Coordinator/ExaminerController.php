@@ -29,8 +29,8 @@ class ExaminerController extends Controller
         try {
             DB::beginTransaction();
 
-            ExaminerAssignment::updateOrCreate(
-                ['thesis_project_id' => $thesis->id, 'type' => 'internal'],
+            $assignment = ExaminerAssignment::updateOrCreate(
+                ['thesis_project_id' => $thesis->id, 'type' => 'internal_examiner'],
                 [
                     'examiner_id' => $request->examiner_id,
                     'assigned_by' => auth()->id(),
@@ -38,9 +38,15 @@ class ExaminerController extends Controller
                 ]
             );
 
-            // Logic to link to M7 outcome if needed, OR this clears M7
+            // Backwards compatibility with the thesis->internal_examiner_profile_id
+            $profile = \App\Models\InternalExaminerProfile::where('user_id', $request->examiner_id)->first();
+            if ($profile) {
+                $thesis->update(['internal_examiner_profile_id' => $profile->id]);
+            }
+
+            // M7 clearance logic
             $m7 = $thesis->milestones()->whereHas('template', fn($q) => $q->where('order', 7))->first();
-            if ($m7) {
+            if ($m7 && $m7->status !== 'approved') {
                 $m7->update([
                     'status' => 'approved',
                     'approved_at' => now(),
@@ -50,7 +56,7 @@ class ExaminerController extends Controller
             }
 
             DB::commit();
-            return redirect()->back()->with('success', 'Internal Examiner assigned.');
+            return redirect()->back()->with('success', 'Internal Examiner assigned successfully.');
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', $e->getMessage());
@@ -64,7 +70,7 @@ class ExaminerController extends Controller
         ]);
 
         ExaminerAssignment::updateOrCreate(
-            ['thesis_project_id' => $thesis->id, 'type' => 'program'],
+            ['thesis_project_id' => $thesis->id, 'type' => 'program_examiner'],
             [
                 'examiner_id' => $request->examiner_id,
                 'assigned_by' => auth()->id(),
@@ -72,6 +78,6 @@ class ExaminerController extends Controller
             ]
         );
 
-        return redirect()->back()->with('success', 'Program Examiner assigned.');
+        return redirect()->back()->with('success', 'External/Program Examiner assigned successfully.');
     }
 }

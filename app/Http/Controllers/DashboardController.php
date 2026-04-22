@@ -21,11 +21,13 @@ class DashboardController extends Controller
         $user = Auth::user();
         $data = [];
         
-        // Fetch global active announcements
+        // Fetch global active announcements and document templates
         $data['announcements'] = \App\Models\Announcement::active()
-            ->forRole($user->getRoleNames()->first()) // Assuming 1 role per user for simplicity, or active() scope handles null target
+            ->forRole($user->getRoleNames()->first()) 
             ->latest()
             ->get();
+
+        $data['document_templates'] = \App\Models\DocumentTemplate::where('is_active', true)->latest()->get();
 
         if ($user->hasRole('Student')) {
             return $this->studentDashboard($user, $data);
@@ -52,10 +54,16 @@ class DashboardController extends Controller
             ->count();
     }
 
+    public function resources()
+    {
+        $document_templates = \App\Models\DocumentTemplate::where('is_active', true)->latest()->get();
+        return view('resources.index', compact('document_templates'));
+    }
+
     private function studentDashboard($user, $data = [])
     {
         $student = StudentProfile::where('user_id', $user->id)
-            ->with(['thesis.milestones.template', 'thesis.assignments.supervisor.user'])
+            ->with(['thesis.milestones.template', 'thesis.assignments.supervisor.user', 'program', 'cohort', 'level'])
             ->first();
         
         $data['student'] = $student;
@@ -266,6 +274,8 @@ class DashboardController extends Controller
         $data['comm_health'] = $this->analytics->getCommunicationHealth($filters);
         $data['cohort_monitoring'] = $this->analytics->getCohortMonitoring($filters);
         $data['recent_logs'] = $this->analytics->getSystemActivity();
+        $data['stalled_students'] = $this->analytics->getStalledStudents($filters)->take(5)->get();
+        $data['faculty_leaderboard'] = $this->analytics->getFacultyLeaderboard($filters);
         
         // Granular Student Registry
         $data['students'] = $this->analytics->getStudentStatusList($filters);

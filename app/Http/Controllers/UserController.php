@@ -41,28 +41,39 @@ class UserController extends Controller
             $data = array_combine($header, $row);
 
             try {
-                // Find Program & Level
-                $program = Program::where('code', strtoupper($data['program_code'] ?? ''))->first();
-                $level = Level::where('name', $data['level'] ?? '')->first();
+                // Determine headers
+                $surname = trim($data['surname'] ?? '');
+                $otherNames = trim($data['other names'] ?? '');
+                $fullName = $surname . ' ' . $otherNames;
+                $email = trim($data['email address'] ?? '');
+                $programSerial = trim($data['program'] ?? '');
+                $matricNumber = trim($data['matric number'] ?? '');
+                $gender = trim($data['gender'] ?? '');
+                $phone = trim($data['phone number'] ?? '');
+                $nationality = trim($data['nationality'] ?? '');
 
-                if (!$program || !$level) {
-                     $errors[] = "Row for {$data['email']}: Invalid Program or Level.";
+                // Find Program & Level
+                $program = Program::where('serial_number', $programSerial)->first();
+                $level = Level::where('name', $data['level'] ?? 'MSc')->first(); // Default to MSc if level not in CSV
+
+                if (!$program) {
+                     $errors[] = "Row for $email: Invalid Program Serial ($programSerial).";
                      continue;
                 }
 
                 // Create User
                 $password = 'ACETEL-' . rand(100000, 999999);
                 $user = User::firstOrCreate(
-                    ['email' => $data['email']],
+                    ['email' => $email],
                     [
-                        'name' => $data['name'],
+                        'name' => $fullName,
                         'password' => Hash::make($password),
+                        'is_active' => true,
+                        'must_change_password' => true,
                     ]
                 );
                 
-                if (!$user->wasRecentlyCreated) {
-                     // logic for existing
-                } else {
+                if ($user->wasRecentlyCreated) {
                     $user->assignRole('Student');
                     \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeUser($user, $password));
                 }
@@ -72,16 +83,19 @@ class UserController extends Controller
                     ['user_id' => $user->id],
                     [
                         'program_id' => $program->id,
-                        'level_id' => $level->id,
+                        'level_id' => $level?->id ?? $program->degree_type, // Fallback logic
                         'cohort_id' => $request->cohort_id,
-                        'student_id_number' => $data['matric_number'],
+                        'student_id_number' => $matricNumber,
+                        'gender' => $gender,
+                        'phone_number' => $phone,
+                        'nationality' => $nationality,
                         'enrollment_status' => 'active',
                     ]
                 );
 
                 $count++;
             } catch (\Exception $e) {
-                $errors[] = "Row for {$data['email']}: " . $e->getMessage();
+                $errors[] = "Row for $email: " . $e->getMessage();
             }
         }
 
@@ -132,7 +146,8 @@ class UserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($password),
-            'is_active' => $request->boolean('is_active', true)
+            'is_active' => $request->boolean('is_active', true),
+            'must_change_password' => true
         ]);
 
         \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeUser($user, $password));
@@ -216,9 +231,10 @@ class UserController extends Controller
         
         $user->update([
             'password' => Hash::make($password),
+            'must_change_password' => true,
         ]);
 
-        \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeUser($user, $password));
+        \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\PasswordResetDispatched($user, $password));
 
         return redirect()->back()->with('success', 'User password has been reset to default and credentials dispatched via email.');
     }

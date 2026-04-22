@@ -62,7 +62,7 @@
                             </td>
                             <td class="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm font-medium">
                                 <div class="flex items-center justify-end space-x-3">
-                                    <a href="{{ route('admin.templates.download', $template) }}" class="text-black hover:text-acetel-600 transition-colors flex items-center" title="Download">
+                                    <a href="{{ route('templates.download', $template) }}" class="text-black hover:text-acetel-600 transition-colors flex items-center" title="Download">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                     </a>
                                      <a href="{{ route('admin.templates.edit', $template) }}" class="text-acetel-600 hover:text-acetel-900 font-semibold flex items-center ml-2">

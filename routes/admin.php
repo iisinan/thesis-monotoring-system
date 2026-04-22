@@ -44,7 +44,7 @@ use App\Http\Controllers\Admin\AnnouncementController;
 Route::resource('announcements', AnnouncementController::class);
 
 use App\Http\Controllers\Admin\DocumentTemplateController;
-Route::get('/templates/{template}/download', [DocumentTemplateController::class, 'download'])->name('templates.download');
+// Template Download moved to web.php for universal access
 Route::resource('templates', DocumentTemplateController::class);
 
 use App\Http\Controllers\Admin\AuditLogController;
@@ -58,6 +58,9 @@ Route::get('activity-logs/user/{user}', [ActivityLogController::class, 'userActi
 // Administrative Audit Hub
 Route::get('/audit-hub', [AuditController::class, 'index'])->name('audit.index');
 Route::get('/audit-hub/{thesis}', [AuditController::class, 'show'])->name('audit.show');
+
+use App\Http\Controllers\Admin\EmailTemplateController;
+Route::resource('email-templates', EmailTemplateController::class)->only(['index', 'edit', 'update']);
 
 use App\Http\Controllers\Admin\SystemOperationController;
 Route::get('/operations', [SystemOperationController::class, 'index'])->name('operations.index');

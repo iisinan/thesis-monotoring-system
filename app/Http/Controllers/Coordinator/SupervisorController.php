@@ -36,6 +36,19 @@ class SupervisorController extends Controller
             });
         }
 
+        if ($request->has('search') && $request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function($q) use ($search) {
+                $q->where('staff_id', 'ilike', "%{$search}%")
+                  ->orWhere('specialization', 'ilike', "%{$search}%")
+                  ->orWhere('rank', 'ilike', "%{$search}%")
+                  ->orWhereHas('user', function($u) use ($search) {
+                      $u->where('name', 'ilike', "%{$search}%")
+                        ->orWhere('email', 'ilike', "%{$search}%");
+                  });
+            });
+        }
+
         $supervisors = $query->paginate(10);
             
         return view('coordinator.supervisors.index', compact('supervisors', 'programs'));
@@ -413,10 +426,11 @@ class SupervisorController extends Controller
         
         $password = 'ACETEL-' . rand(100000, 999999);
         $supervisor->user->update([
-            'password' => Hash::make($password)
+            'password' => Hash::make($password),
+            'must_change_password' => true,
         ]);
 
-        \Illuminate\Support\Facades\Mail::to($supervisor->user->email)->queue(new \App\Mail\WelcomeUser($supervisor->user, $password));
+        \Illuminate\Support\Facades\Mail::to($supervisor->user->email)->send(new \App\Mail\PasswordResetDispatched($supervisor->user, $password));
         
         return back()->with('success', "Security Protocol: Password for {$supervisor->user->name} has been reset. Credentials dispatched to institutional mailbox.");
     }

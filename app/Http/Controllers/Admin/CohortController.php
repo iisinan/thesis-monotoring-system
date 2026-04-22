@@ -26,8 +26,8 @@ class CohortController extends Controller
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%")
+                  ->orWhere('code', 'ilike', "%{$search}%");
             });
         }
         
@@ -115,9 +115,9 @@ class CohortController extends Controller
     {
         $this->authorize('delete', $cohort);
         
-        $cohort->update(['status' => 'archived']);
+        $cohort->delete();
         
-        return redirect()->route('admin.cohorts.index')->with('success', 'Cohort archived successfully.');
+        return redirect()->route('admin.cohorts.index')->with('success', 'Cohort and all associated student records have been permanently removed.');
     }
 
     public function registerStudentsForm(Cohort $cohort)
@@ -190,46 +190,58 @@ class CohortController extends Controller
         $file = $request->file('csv_file');
         $handle = fopen($file->getPathname(), "r");
         
-        $header = fgetcsv($handle); // Assuming: name, email, matrix_number, program_code
+        $header = fgetcsv($handle); // Expected: S/N, Surname, Other Names, Program (Serial), Matric Number, Gender, Email Address, Phone Number, Nationality
         
         $processedCount = 0;
+        $emailsSent = 0;
         $errors = [];
         
         DB::beginTransaction();
         try {
             while (($data = fgetcsv($handle)) !== FALSE) {
-                if (count($data) < 4) continue;
+                if (count($data) < 7) continue;
                 
-                $name = trim($data[0] ?? '');
-                $email = trim($data[1] ?? '');
-                $programSearch = trim($data[2] ?? '');
-                $matrixNumber = trim($data[3] ?? '');
+                $surname = trim($data[1] ?? '');
+                $otherNames = trim($data[2] ?? '');
+                $programSerial = trim($data[3] ?? '');
+                $matrixNumber = trim($data[4] ?? '');
+                $gender = trim($data[5] ?? '');
+                $email = trim($data[6] ?? '');
+                $phoneNumber = trim($data[7] ?? '');
+                $nationality = trim($data[8] ?? '');
                 
-                if (empty($email) || empty($programSearch)) continue;
+                if (empty($email) || empty($programSerial)) continue;
                 
-                // Find program by name or code
-                $program = Program::where('name', 'like', "%{$programSearch}%")
-                    ->orWhere('code', 'like', "%{$programSearch}%")
-                    ->first();
+                $fullName = $surname . ' ' . $otherNames;
+                
+                // Find program STRICTLY by serial_number
+                $program = Program::where('serial_number', $programSerial)->first();
                     
                 if (!$program) {
-                    $errors[] = "Unknown program identifier: {$programSearch} for {$email}";
+                    $errors[] = "Unknown program ($programSerial) for $email";
                     continue;
                 }
                 
                 // Skip if email exists
                 if (User::where('email', $email)->exists()) {
-                    $errors[] = "Identity conflict: {$email} is already in the system graph.";
+                    $errors[] = "Duplicate email ($email) skipped.";
+                    continue;
+                }
+
+                // Check for Matric Number duplication
+                if (\App\Models\StudentProfile::where('student_id_number', $matrixNumber)->exists()) {
+                    $errors[] = "Duplicate Matric Number ($matrixNumber) for $email skipped.";
                     continue;
                 }
                 
                 $password = 'ACETEL-' . rand(100000, 999999);
                 
                 $user = User::create([
-                    'name' => $name,
+                    'name' => $fullName,
                     'email' => $email,
                     'password' => Hash::make($password),
                     'is_active' => true,
+                    'must_change_password' => true,
                     'creator_id' => auth()->id()
                 ]);
                 
@@ -239,6 +251,9 @@ class CohortController extends Controller
                     'cohort_id' => $cohort->id,
                     'program_id' => $program->id,
                     'student_id_number' => $matrixNumber,
+                    'gender' => $gender,
+                    'phone_number' => $phoneNumber,
+                    'nationality' => $nationality,
                     'enrollment_status' => 'active',
                     'current_semester' => 1,
                 ]);
@@ -252,6 +267,7 @@ class CohortController extends Controller
                 
                 // Dispatch credentials notification
                 \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeUser($user, $password));
+                $emailsSent++;
                 $processedCount++;
             }
             
@@ -263,9 +279,10 @@ class CohortController extends Controller
         
         fclose($handle);
         
-        $msg = "Successfully ingested {$processedCount} academic identities into the system graph.";
+        $msg = "Bulk Registration Complete! 📊 Total Students Registered: {$processedCount} | 📧 Total Emails Sent: {$emailsSent}.";
         if (count($errors) > 0) {
-            $msg .= " Found " . count($errors) . " anomalies: " . implode(', ', array_slice($errors, 0, 3)) . (count($errors) > 3 ? '...' : '');
+            $msg .= " ⚠️ Skipped " . count($errors) . " records due to conflicts or errors: " . implode(' | ', array_slice($errors, 0, 3)) . (count($errors) > 3 ? '...' : '');
+            return redirect()->route('admin.cohorts.show', $cohort)->with('warning', $msg);
         }
         
         return redirect()->route('admin.cohorts.show', $cohort)->with('success', $msg);

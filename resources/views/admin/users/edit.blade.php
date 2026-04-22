@@ -207,14 +207,20 @@
                 </div>
 
                 <div class="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center">
-                    <div>
+                    <div class="flex gap-2">
                         @if(auth()->id() !== $user->id)
                             <button type="button" 
                                 onclick="if(confirm('Warning: Are you sure you want to permanently delete this user?')) { document.getElementById('delete-user-form').submit(); }"
                                 class="inline-flex justify-center py-2.5 px-4 border border-slate-300 shadow-sm text-sm font-bold rounded-xl text-red-600 bg-white hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
-                                Delete User Permanently
+                                Delete User
                             </button>
                         @endif
+
+                        <button type="button" 
+                            onclick="if(confirm('Securely reset password for this user? Credentials will be sent via email.')) { document.getElementById('reset-password-form').submit(); }"
+                            class="inline-flex justify-center py-2.5 px-4 border border-green-300 shadow-sm text-sm font-bold rounded-xl text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                            Reset Password
+                        </button>
                     </div>
                     
                     <button type="submit" class="inline-flex items-center justify-center rounded-xl border border-transparent bg-acetel-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-acetel-700 focus:outline-none focus:ring-2 focus:ring-acetel-500 focus:ring-offset-2 transition-colors">
@@ -229,6 +235,9 @@
                     @method('DELETE')
                 </form>
             @endif
+            <form id="reset-password-form" action="{{ route('admin.users.reset_password', $user) }}" method="POST" class="hidden">
+                @csrf
+            </form>
         </div>
     </div>
 </div>

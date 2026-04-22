@@ -307,34 +307,118 @@
             </div>
 
             <!-- Audit Board Card -->
-            <div class="bg-slate-900 rounded-[2.5rem] border border-slate-800 shadow-2xl p-10 relative overflow-hidden group">
-                <div class="absolute top-0 right-0 w-32 h-32 bg-acetel-500/10 rounded-full blur-[40px] -mr-16 -mt-16 group-hover:bg-acetel-500/20 transition-all duration-1000"></div>
+            <div class="bg-slate-900 rounded-[2.5rem] border border-slate-800 shadow-2xl relative overflow-visible group" x-data="{ openAssign: null }">
+                <div class="p-10 relative overflow-hidden rounded-t-[2.5rem]">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-acetel-500/10 rounded-full blur-[40px] -mr-16 -mt-16 group-hover:bg-acetel-500/20 transition-all duration-1000"></div>
                 
-                <h3 class="text-lg font-black text-white mb-8 tracking-tight relative z-10 flex items-center gap-3">
-                    Examination Board
-                    <span class="text-[9px] font-bold text-acetel-400 border border-acetel-500/30 px-2 py-0.5 rounded-full uppercase tracking-tighter">Status</span>
-                </h3>
+                    <h3 class="text-lg font-black text-white mb-8 tracking-tight relative z-10 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            Examination Board
+                            <span class="text-[9px] font-bold text-acetel-400 border border-acetel-500/30 px-2 py-0.5 rounded-full uppercase tracking-tighter">Status</span>
+                        </div>
+                    </h3>
 
-                @if($student->thesis && $student->thesis->internalExaminer)
-                    <div class="p-6 bg-white/5 rounded-3xl border border-white/5 relative z-10 mb-6">
-                        <div class="flex items-center gap-4">
-                            <div class="w-10 h-10 rounded-xl bg-acetel-500/20 text-acetel-400 flex items-center justify-center">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944" /></svg>
+                    @php
+                        $internalAssign = $student->thesis ? $student->thesis->examinerAssignments()->where('type', 'internal_examiner')->where('active', true)->first() : null;
+                        $externalAssign = $student->thesis ? $student->thesis->examinerAssignments()->where('type', 'program_examiner')->where('active', true)->first() : null;
+                    @endphp
+
+                    <div class="space-y-4 relative z-10">
+                        {{-- Internal Examiner Slot --}}
+                        @if($student->thesis && $internalAssign)
+                            <div class="p-5 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-xl bg-acetel-500/20 text-acetel-400 flex items-center justify-center font-black">
+                                        {{ substr($internalAssign->examiner->name ?? 'I', 0, 1) }}
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-white truncate">{{ $internalAssign->examiner->name ?? 'Unknown' }}</h4>
+                                        <p class="text-[9px] font-black text-acetel-400 uppercase tracking-widest mt-0.5">Internal Examiner</p>
+                                    </div>
+                                </div>
+                                <button type="button" @click="openAssign = openAssign === 'internal' ? null : 'internal'" class="text-xs font-black uppercase text-slate-400 hover:text-white transition-colors" title="Change">
+                                    Change
+                                </button>
                             </div>
-                            <div>
-                                <h4 class="text-xs font-black text-white truncate">{{ $student->thesis->internalExaminer->user->name }}</h4>
-                                <p class="text-[9px] font-black text-acetel-400 uppercase tracking-widest mt-0.5">Internal Examiner</p>
+                        @else
+                            <button @click="openAssign = openAssign === 'internal' ? null : 'internal'" class="w-full p-5 text-left bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 border-dashed hover:border-acetel-500/50 transition-all flex items-center justify-between group/btn">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 group-hover/btn:text-acetel-400 transition-colors">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-white">Add Internal Examiner</h4>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Select from faculty</p>
+                                    </div>
+                                </div>
+                            </button>
+                        @endif
+
+                        {{-- Forms for Internal Examiner --}}
+                        <div x-show="openAssign === 'internal'" x-collapse x-cloak class="mt-4 pb-4">
+                            <form action="{{ route('coordinator.students.assign-internal', $student->thesis->id ?? 0) }}" method="POST" class="bg-slate-800 p-5 rounded-2xl space-y-4 border border-slate-700">
+                                @csrf
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Select Internal Examiner</label>
+                                    <select name="examiner_id" required class="w-full bg-slate-900 border-slate-700 text-white rounded-xl text-xs py-3 focus:ring-acetel-500/30 focus:border-acetel-500">
+                                        <option value="">Choose...</option>
+                                        @foreach($availableInternalExaminers as $iex)
+                                            <option value="{{ $iex->user->id }}">{{ $iex->user->name }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full py-3 bg-acetel-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-acetel-700">Confirm Assignment</button>
+                            </form>
+                        </div>
+
+                        {{-- External Examiner Slot --}}
+                        @if($student->thesis && $externalAssign)
+                            <div class="p-5 bg-white/5 rounded-2xl border border-white/5 flex items-center justify-between">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-black">
+                                        {{ substr($externalAssign->examiner->name ?? 'E', 0, 1) }}
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-white truncate">{{ $externalAssign->examiner->name ?? 'Unknown' }}</h4>
+                                        <p class="text-[9px] font-black text-purple-400 uppercase tracking-widest mt-0.5">External Examiner</p>
+                                    </div>
+                                </div>
+                                <button type="button" @click="openAssign = openAssign === 'external' ? null : 'external'" class="text-xs font-black uppercase text-slate-400 hover:text-white transition-colors" title="Change">
+                                    Change
+                                </button>
                             </div>
+                        @else
+                            <button @click="openAssign = openAssign === 'external' ? null : 'external'" class="w-full p-5 text-left bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 border-dashed hover:border-purple-500/50 transition-all flex items-center justify-between group/btn">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-500 group-hover/btn:text-purple-400 transition-colors">
+                                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-black text-white">Add External/Program Examiner</h4>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Select from panel</p>
+                                    </div>
+                                </div>
+                            </button>
+                        @endif
+
+                        {{-- Forms for External Examiner --}}
+                        <div x-show="openAssign === 'external'" x-collapse x-cloak class="mt-4 pb-4">
+                            <form action="{{ route('coordinator.students.assign-program', $student->thesis->id ?? 0) }}" method="POST" class="bg-slate-800 p-5 rounded-2xl space-y-4 border border-slate-700">
+                                @csrf
+                                <div>
+                                    <label class="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">Select External Examiner</label>
+                                    <select name="examiner_id" required class="w-full bg-slate-900 border-slate-700 text-white rounded-xl text-xs py-3 focus:ring-purple-500/30 focus:border-purple-500">
+                                        <option value="">Choose...</option>
+                                        @foreach($availableExternalExaminers as $eex)
+                                            <option value="{{ $eex->user->id }}">{{ $eex->user->name }} ({{ $eex->institution }})</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <button type="submit" class="w-full py-3 bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-purple-700">Confirm Assignment</button>
+                            </form>
                         </div>
                     </div>
-                @else
-                    <div class="p-10 text-center bg-white/5 rounded-3xl border border-white/5 relative z-10 mb-6 group/audit">
-                        <svg class="w-8 h-8 text-white/10 mx-auto mb-4 group-hover/audit:text-acetel-500/50 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                        <p class="text-[10px] font-black text-white/20 uppercase tracking-widest">Examiner Not Assigned</p>
-                    </div>
-                @endif
-                
-                <p class="text-[9px] font-medium text-slate-500 leading-relaxed italic text-center relative z-10">Board members are assigned during the defense phase.</p>
+                </div>
             </div>
         </div>
     </div>

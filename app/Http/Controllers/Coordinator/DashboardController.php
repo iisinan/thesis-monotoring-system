@@ -98,8 +98,9 @@ class DashboardController extends Controller
                 if ($programId) $q->where('program_id', $programId);
                 if ($levelId) $q->where('level_id', $levelId);
             })
-            ->whereIn('status', ['submitted', 'partially_approved'])
+            ->whereIn('status', ['submitted', 'partially_approved', 'revision_required'])
             ->with(['template', 'thesis.student.user'])
+            ->latest('updated_at')
             ->get();
 
         $upcoming_events = DefenceEvent::whereHas('thesis.student', function($q) use ($user, $programId, $levelId) {
@@ -111,6 +112,22 @@ class DashboardController extends Controller
             ->orderBy('schedule_start')
             ->take(5)
             ->get();
+
+        // System Alerts: Filter to items specifically requiring Coordinator attention
+        $milestoneAlerts = $pending_reviews->filter(function($m) use ($user) {
+            $requiredRoles = $m->template->required_approvers ?? [];
+            return in_array('Program Coordinator', $requiredRoles);
+        });
+
+        $inactiveSupervisorsQuery = SupervisorProfile::whereHas('programs', function($q) use ($allProgramIds, $programId) {
+            if ($programId) {
+                $q->where('programs.id', $programId);
+            } else {
+                $q->whereIn('programs.id', $allProgramIds);
+            }
+        })->whereDoesntHave('assignments', function($q) {
+            $q->where('status', 'active');
+        })->with('user')->take(5)->get();
 
         return view('coordinator.dashboard', [
             'user' => $user,
@@ -124,6 +141,8 @@ class DashboardController extends Controller
             'programs' => $programs,
             'levels' => $levels,
             'unreadMessages' => \App\Models\MessageReadState::where('user_id', $user->id)->whereNull('read_at')->count(),
+            'milestoneAlerts' => $milestoneAlerts,
+            'inactiveSupervisors' => $inactiveSupervisorsQuery,
         ]);
     }
 }

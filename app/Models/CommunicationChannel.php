@@ -35,4 +35,15 @@ class CommunicationChannel extends Model
     {
         return $this->hasMany(Message::class, 'channel_id');
     }
+
+    /**
+     * Handle cascade deletions.
+     */
+    protected static function booted()
+    {
+        static::deleting(function ($channel) {
+            // Delete messages
+            $channel->messages()->delete();
+        });
+    }
 }

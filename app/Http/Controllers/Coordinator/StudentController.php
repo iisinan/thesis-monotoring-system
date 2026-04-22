@@ -19,19 +19,37 @@ class StudentController extends Controller
         $query = \App\Models\StudentProfile::forCoordinator($user)
             ->with(['user', 'cohort', 'thesis.assignments.supervisor.user']);
 
-        if ($request->has('search')) {
+        if ($request->filled('program_id')) {
+            $query->where('program_id', $request->program_id);
+        }
+
+        if ($request->filled('level_id')) {
+            $query->where('level_id', $request->level_id);
+        }
+
+        if ($request->has('search') && $request->filled('search')) {
             $search = $request->input('search');
             $query->where(function($q) use ($search) {
-                $q->where('student_id_number', 'like', "%{$search}%")
+                $q->where('student_id_number', 'ilike', "%{$search}%")
                   ->orWhereHas('user', function($u) use ($search) {
-                      $u->where('name', 'like', "%{$search}%");
+                      $u->where('name', 'ilike', "%{$search}%");
+                  })
+                  ->orWhereHas('program', function($p) use ($search) {
+                      $p->where('name', 'ilike', "%{$search}%")
+                        ->orWhere('code', 'ilike', "%{$search}%");
+                  })
+                  ->orWhereHas('thesis', function($t) use ($search) {
+                      $t->where('title', 'ilike', "%{$search}%");
                   });
             });
         }
 
-        $students = $query->paginate(15);
+        $students = $query->paginate(15)->withQueryString();
+        $userScopes = $user->coordinatorScopes();
+        $programs = \App\Models\Program::whereIn('id', $userScopes->pluck('program_id'))->get();
+        $levels = \App\Models\Level::whereIn('id', $userScopes->pluck('level_id'))->get();
         
-        return view('coordinator.students.index', compact('students'));
+        return view('coordinator.students.index', compact('students', 'programs', 'levels'));
     }
 
     public function show(StudentProfile $student)
@@ -48,10 +66,19 @@ class StudentController extends Controller
         $availableSupervisors = SupervisorProfile::with('user')
             ->whereHas('programs', function($q) use ($student) {
                 $q->where('programs.id', $student->program_id);
-            })
+            })->get();
+
+        $availableInternalExaminers = \App\Models\InternalExaminerProfile::with('user')
+            ->where('program_id', $student->program_id)
+            ->where('active', true)
+            ->get();
+            
+        $availableExternalExaminers = \App\Models\ExternalExaminerProfile::with('user')
+            ->where('program_id', $student->program_id)
+            ->where('active', true)
             ->get();
 
-        return view('coordinator.students.show', compact('student', 'availableSupervisors'));
+        return view('coordinator.students.show', compact('student', 'availableSupervisors', 'availableInternalExaminers', 'availableExternalExaminers'));
     }
 
     public function assignSupervisor(Request $request, StudentProfile $student)

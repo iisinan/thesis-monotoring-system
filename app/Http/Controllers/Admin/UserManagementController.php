@@ -24,11 +24,11 @@ class UserManagementController extends Controller
                 $q->where('name', 'Student');
             });
 
-        if ($request->has('search')) {
-            $search = $request->get('search');
+        if ($request->filled('search')) {
+            $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%")
+                  ->orWhere('email', 'ilike', "%{$search}%");
             });
         }
 
@@ -64,7 +64,7 @@ class UserManagementController extends Controller
         $allowedRoles = [];
 
         if ($user->hasAnyRole(['Admin', 'Director'])) {
-            $allowedRoles = ['Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
+            $allowedRoles = ['Admin', 'Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
         } elseif ($user->hasRole('Program Coordinator')) {
             $allowedRoles = ['Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
         }
@@ -85,8 +85,8 @@ class UserManagementController extends Controller
         $allowedRoles = [];
 
         if ($creator->hasAnyRole(['Admin', 'Director'])) {
-            // Admin/Director can create anything except themselves
-            $allowedRoles = ['Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
+            // Admin/Director can create everything including themselves
+            $allowedRoles = ['Admin', 'Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
         } elseif ($creator->hasRole('Program Coordinator')) {
             $allowedRoles = ['Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
         }
@@ -235,8 +235,8 @@ class UserManagementController extends Controller
         $creator = auth()->user();
         $allowedRoles = [];
 
-        if ($creator->hasRole('Admin')) {
-            $allowedRoles = ['Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
+        if ($creator->hasAnyRole(['Admin', 'Director'])) {
+            $allowedRoles = ['Admin', 'Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
         } elseif ($creator->hasRole('Program Coordinator')) {
             $allowedRoles = ['Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
         }
@@ -262,8 +262,8 @@ class UserManagementController extends Controller
         $creator = auth()->user();
         $allowedRoles = [];
 
-        if ($creator->hasRole('Admin')) {
-            $allowedRoles = ['Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
+        if ($creator->hasAnyRole(['Admin', 'Director'])) {
+            $allowedRoles = ['Admin', 'Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
         } elseif ($creator->hasRole('Program Coordinator')) {
             $allowedRoles = ['Supervisor', 'Internal Examiner', 'External Examiner', 'Student'];
         }
@@ -551,7 +551,7 @@ class UserManagementController extends Controller
             'must_change_password' => true,
         ]);
 
-        \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeUser($user, $password));
+        \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\PasswordResetDispatched($user, $password));
 
         return redirect()->back()->with('success', 'User password has been reset to default and credentials dispatched via email.');
     }

@@ -135,6 +135,79 @@
         
         <!-- Left Sidebar: Actions & Distribution (Spans 4) -->
         <div class="lg:col-span-4 space-y-8">
+            
+            <!-- Redesigned Strategic Alert Hub -->
+            <div x-data="{ activeTab: 'milestones' }" class="bg-white border border-slate-100 rounded-[2.5rem] shadow-xl shadow-slate-200/50 overflow-hidden">
+                <div class="px-8 py-6 bg-slate-900 border-b border-slate-800">
+                    <h3 class="text-sm font-black text-white tracking-widest uppercase flex items-center gap-3">
+                        <span class="relative flex h-2 w-2">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                        </span>
+                        Operational Alerts
+                    </h3>
+                </div>
+
+                <div class="flex border-b border-slate-100">
+                    <button @click="activeTab = 'milestones'" :class="activeTab === 'milestones' ? 'border-green-500 text-green-600' : 'border-transparent text-slate-400 hover:text-slate-600'" class="flex-1 py-4 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all">
+                        Milestones ({{ $milestoneAlerts->count() }})
+                    </button>
+                    <button @click="activeTab = 'supervisors'" :class="activeTab === 'supervisors' ? 'border-green-500 text-green-600' : 'border-transparent text-slate-400 hover:text-slate-600'" class="flex-1 py-4 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all">
+                        Faculty ({{ $inactiveSupervisors->count() }})
+                    </button>
+                </div>
+
+                <div class="p-6">
+                    <!-- Milestones Tab -->
+                    <div x-show="activeTab === 'milestones'" class="space-y-3">
+                        @forelse($milestoneAlerts as $alert)
+                            <a href="{{ route('milestones.index', ['thesis_id' => $alert->thesis_project_id]) }}" class="group relative z-10 flex items-center p-4 bg-white hover:bg-green-50/50 rounded-2xl border border-slate-100 hover:border-green-200 transition-all cursor-pointer shadow-sm hover:shadow-md">
+                                <div class="w-10 h-10 rounded-xl bg-white border border-slate-100 text-slate-400 group-hover:text-green-600 flex items-center justify-center shrink-0 font-black text-xs shadow-sm transition-all uppercase">
+                                    {{ substr($alert->thesis->student->user->name, 0, 1) }}
+                                </div>
+                                <div class="ml-4 flex-1">
+                                    <p class="text-xs font-black text-slate-800 leading-none group-hover:text-green-700 transition-colors">{{ $alert->thesis->student->user->name }}</p>
+                                    <p class="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-widest italic opacity-70">Pending: {{ $alert->template->name }}</p>
+                                </div>
+                                <div class="p-2 rounded-lg bg-green-500 text-white opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0 shadow-sm">
+                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                </div>
+                            </a>
+                        @empty
+                            <div class="py-10 text-center">
+                                <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                                    <svg class="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                                </div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">No Priority Milestones</p>
+                            </div>
+                        @endforelse
+                    </div>
+
+                    <!-- Inactive Supervisors Tab -->
+                    <div x-show="activeTab === 'supervisors'" class="space-y-3">
+                        @forelse($inactiveSupervisors as $sup)
+                            <a href="{{ route('coordinator.supervisors.index') }}" class="group relative z-10 flex items-center p-4 bg-white hover:bg-amber-50/50 rounded-2xl border border-slate-100 hover:border-amber-200 transition-all cursor-pointer shadow-sm hover:shadow-md">
+                                <div class="w-10 h-10 rounded-xl bg-white border border-slate-100 text-slate-400 group-hover:text-amber-600 flex items-center justify-center shrink-0 font-black text-xs shadow-sm transition-all uppercase">
+                                    {{ substr($sup->user->name, 0, 1) }}
+                                </div>
+                                <div class="ml-4 flex-1">
+                                    <p class="text-xs font-black text-slate-800 leading-none group-hover:text-amber-700 transition-colors">{{ $sup->user->name }}</p>
+                                    <span class="inline-flex mt-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[8px] font-black uppercase tracking-widest">Zero Workload</span>
+                                </div>
+                                <svg class="w-4 h-4 text-slate-300 group-hover:text-amber-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" /></svg>
+                            </a>
+                        @empty
+                            <div class="py-10 text-center">
+                                <div class="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                                    <svg class="w-8 h-8 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Faculty Optimized</p>
+                            </div>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
                 <h3 class="text-lg font-black text-slate-900 mb-6 tracking-tight uppercase border-b border-slate-50 pb-4">Quick Governance</h3>
                 
@@ -173,6 +246,27 @@
                     </a>
                 </div>
             </div>
+
+            {{-- Institutional Resource Center --}}
+            @if(isset($document_templates) && $document_templates->count() > 0)
+            <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+                <h3 class="text-lg font-black text-slate-900 mb-6 tracking-tight uppercase border-b border-slate-50 pb-4">Resource Center</h3>
+                <div class="space-y-4">
+                    @foreach($document_templates as $template)
+                    <a href="{{ route('templates.download', $template) }}" class="flex items-center gap-4 p-4 bg-slate-50 hover:bg-green-50 rounded-2xl border border-slate-100 hover:border-green-200 transition-all group">
+                        <div class="w-10 h-10 rounded-xl bg-white border border-slate-100 text-slate-400 group-hover:text-green-600 flex items-center justify-center shrink-0 transition-all shadow-sm">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-black text-slate-800 truncate leading-none uppercase">{{ $template->title }}</p>
+                            <p class="text-[9px] font-bold text-slate-400 mt-1.5 uppercase tracking-tighter italic opacity-70">Version {{ $template->version }} • {{ strtoupper($template->type) }}</p>
+                        </div>
+                        <svg class="w-4 h-4 text-slate-300 ml-auto group-hover:text-green-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    </a>
+                    @endforeach
+                </div>
+            </div>
+            @endif
 
             <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
                 <h3 class="text-lg font-black text-slate-900 mb-8 tracking-tight uppercase border-b border-slate-50 pb-4">Academic Mix</h3>
@@ -249,8 +343,10 @@
                                                     {{ substr($student->user->name, 0, 1) }}
                                                 </div>
                                                 <div>
-                                                    <p class="text-sm font-bold text-slate-900 leading-none group-hover:text-green-700 transition-colors">{{ $student->user->name }}</p>
+                                                <a href="{{ route('milestones.index', ['thesis_id' => $student->thesis?->id]) }}" class="group/name block relative z-10 cursor-pointer">
+                                                    <p class="text-sm font-bold text-slate-900 leading-none group-hover/name:text-green-700 transition-colors">{{ $student->user->name }}</p>
                                                     <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5">{{ $student->program->name ?? 'N/A' }}</p>
+                                                </a>
                                                 </div>
                                             </div>
                                         </td>
@@ -266,9 +362,9 @@
                                                             Current: M{{ $current->template->order ?? '?' }} - {{ Str::limit($current->template->name ?? 'Unknown', 25) }}
                                                         </span>
                                                     @else
-                                                        <span class="text-[8px] font-black text-emerald-600 uppercase tracking-tighter mt-1 italic">
+                                                        <a href="{{ route('milestones.index', ['thesis_id' => $student->thesis->id]) }}" class="text-[8px] font-black text-emerald-600 uppercase tracking-tighter mt-1 italic hover:underline">
                                                             COMPLETED
-                                                        </span>
+                                                        </a>
                                                     @endif
                                                 </div>
                                             @else

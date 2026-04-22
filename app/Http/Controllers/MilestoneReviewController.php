@@ -27,7 +27,7 @@ class MilestoneReviewController extends Controller
 
     public function show(StudentMilestone $milestone)
     {
-        $this->authorize('review', $milestone);
+        $this->authorize('view', $milestone);
 
         $milestone->load(['template', 'submissions.submittedBy', 'thesis.student.user', 'thesis.student.program', 'thesis.student.level']);
         $submission = $milestone->submissions()->latest()->first();

@@ -42,4 +42,16 @@ class Submission extends Model
     {
         return $this->belongsTo(User::class, 'submitted_by');
     }
+
+    /**
+     * Handle cleanup.
+     */
+    protected static function booted()
+    {
+        static::deleting(function ($submission) {
+            if ($submission->file_url) {
+                \Illuminate\Support\Facades\Storage::delete($submission->file_url);
+            }
+        });
+    }
 }

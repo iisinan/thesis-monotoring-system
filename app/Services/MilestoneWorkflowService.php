@@ -137,10 +137,17 @@ class MilestoneWorkflowService
     public function validateSupervisorAssignment(ThesisProject $project, array $supervisorIds): void
     {
         $count = count($supervisorIds);
+        $student = $project->student;
+        $levelName = strtoupper($student->level->name ?? '');
 
-        // Institutional Requirement Update: Assign 'all' three supervisors in the panel
-        if ($count !== 3) {
-            throw new Exception("The supervision panel must consist of exactly 3 authorized members (Lead, Associate, and Secondary).");
+        if (str_contains($levelName, 'PHD')) {
+             if ($count !== 3) {
+                throw new Exception("Institutional PhD Protocol: The supervision panel must consist of exactly 3 authorized members.");
+             }
+        } else {
+             if ($count !== 2) {
+                throw new Exception("Institutional MSc/Standard Protocol: The supervision panel must consist of exactly 2 authorized members.");
+             }
         }
 
         // Institutional Hierarchy Rule: Primary Supervisor (index 0) must be a Professor (MSc & PhD)

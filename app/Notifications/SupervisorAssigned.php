@@ -7,9 +7,11 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
+use App\Notifications\Traits\TemplatedNotification;
+ 
 class SupervisorAssigned extends Notification
 {
-    use Queueable;
+    use Queueable, TemplatedNotification;
 
     protected $project;
 
@@ -34,13 +36,15 @@ class SupervisorAssigned extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
-            ->subject('Institutional Supervision Panel Authorized')
-            ->greeting('Hello ' . $notifiable->name . ',')
-            ->line('Your thesis supervision panel has been authorized by the Program Coordinator.')
-            ->line('Title: ' . $this->project->title)
-            ->action('View Research Progress', route('milestones.index'))
-            ->line('You can now interact with your supervisors via the institutional protocol discussing channel.');
+        return $this->getTemplatedMail(
+            'supervisor_assigned', 
+            [
+                'notifiable_name' => $notifiable->name,
+                'project_title' => $this->project->title
+            ],
+            route('milestones.index'),
+            'View Research Progress'
+        );
     }
 
     /**

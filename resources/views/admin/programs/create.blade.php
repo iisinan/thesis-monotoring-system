@@ -32,6 +32,8 @@
                         @error('code') <p class="text-red-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
                     </div>
 
+
+
                     <div class="col-span-6 sm:col-span-2">
                         <label for="degree_type" class="block text-sm font-semibold text-black mb-1">Degree Level</label>
                         <select name="degree_type" id="degree_type" class="focus:ring-acetel-500 focus:border-acetel-500 block w-full shadow-sm sm:text-sm border-slate-300 rounded-xl px-4 py-2.5 transition-colors" required>

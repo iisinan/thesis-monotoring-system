@@ -31,11 +31,17 @@ class StudentMilestonePolicy
                 ->exists();
         }
 
-        // Program Coordinator and Director can view all (scoped by program usually, but global perms handle that logic often. 
-        // For simplified policy, allow if they have permission)
-        if ($user->can('milestones.configure_program')) { 
-            // Broad check, usually coordinators can view. 
-            // Refine this based on program scope if needed, but for now allow based on role/permission.
+        // Program Coordinator can view if assigned to the student's program
+        if ($user->hasRole('Program Coordinator')) {
+            $student = $milestone->thesis->student;
+            return $user->coordinatorProfiles()
+                ->where('active', true)
+                ->where('program_id', $student->program_id)
+                ->exists();
+        }
+
+        // Director and Admin can view all
+        if ($user->hasAnyRole(['Admin', 'Director']) || $user->can('milestones.configure_program')) { 
             return true; 
         }
 

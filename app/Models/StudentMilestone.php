@@ -236,4 +236,18 @@ class StudentMilestone extends Model
             'is_fully_complete' => $percentage == 100,
         ];
     }
+
+    /**
+     * Handle cascade deletions.
+     */
+    protected static function booted()
+    {
+        static::deleting(function ($milestone) {
+            // Delete submissions (each will trigger file cleanup)
+            $milestone->submissions->each->delete();
+            
+            // Delete messages
+            $milestone->messages()->delete();
+        });
+    }
 }

@@ -105,10 +105,13 @@ class ThesisService
         return DB::transaction(function () use ($project, $supervisorIds) {
             $student = $project->student;
             $levelName = $student->level->name ?? '';
+            $isPhD = $levelName && stripos($levelName, 'PhD') !== false;
+            $requiredCount = $isPhD ? 3 : 2;
 
-            // 1. Enforce Count Rules (Updated to 3 for all Institutional Panels)
-            if (count($supervisorIds) !== 3) {
-                throw new Exception("The supervision panel must consist of exactly 3 authorized members.");
+            // 1. Enforce Count Rules (MSc=2, PhD=3)
+            if (count($supervisorIds) !== $requiredCount) {
+                $msg = $isPhD ? "PhD panels must consist of exactly 3 authorized members." : "MSc panels must consist of exactly 2 authorized members.";
+                throw new Exception($msg);
             }
 
             // 2. End Existing Assignments
@@ -191,8 +194,8 @@ class ThesisService
     {
         $student = $project->student;
         $levelName = $student->level->name ?? '';
-        $isPhD = stripos($levelName, 'PhD') !== false;
-        $count = 3; // Institutional Requirement Update: Assign 'all' three supervisors in the panel
+        $isPhD = $levelName && stripos($levelName, 'PhD') !== false;
+        $count = $isPhD ? 3 : 2; // Institutional Requirement Update: PhD=3, MSc=2
 
         $proposedSupervisors = [];
 

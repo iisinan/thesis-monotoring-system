@@ -65,7 +65,7 @@
 
                         <div>
                             <label for="matrix_number" class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 ml-1">Matric Number <span class="text-rose-500">*</span></label>
-                            <input type="text" name="matrix_number" id="matrix_number" value="{{ old('matrix_number') }}" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-acetel-500/10 focus:border-acetel-300 transition-all outline-none" placeholder="MAT/2026/XXXX" required>
+                            <input type="text" name="matrix_number" id="matrix_number" value="{{ old('matrix_number') }}" class="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-acetel-500/10 focus:border-acetel-300 transition-all outline-none" placeholder="e.g. ACE24210001" required>
                             @error('matrix_number') <p class="text-rose-500 text-[10px] mt-2 font-black uppercase tracking-widest">{{ $message }}</p> @enderror
                         </div>
 
@@ -100,7 +100,7 @@
                         <div>
                             <div class="flex items-center justify-between mb-4">
                                 <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">CSV File <span class="text-rose-500">*</span></label>
-                                <a href="{{ route('admin.templates.download', ['template' => 'student_import']) }}" class="text-[10px] font-black uppercase tracking-widest text-acetel-600 border-b border-acetel-200 hover:text-emerald-600 hover:border-emerald-200 transition-all">
+                                <a href="{{ asset('templates/student_import_format.csv') }}" download class="text-[10px] font-black uppercase tracking-widest text-acetel-600 border-b border-acetel-200 hover:text-emerald-600 hover:border-emerald-200 transition-all">
                                     Download Template
                                 </a>
                             </div>
@@ -118,18 +118,53 @@
                             </div>
                         </div>
                         
-                        <div class="bg-slate-900 rounded-[2rem] p-10 relative overflow-hidden">
-                            <div class="absolute top-0 right-0 w-32 h-32 bg-acetel-500/10 blur-[40px] -mr-16 -mt-16"></div>
-                            <div>
-                                <p class="text-white text-xs font-black uppercase tracking-[0.2em] mb-6">Required Columns</p>
-                                <div class="flex flex-wrap gap-3">
-                                    @foreach(['name', 'email', 'program', 'matric_number'] as $col)
-                                        <span class="px-4 py-1.5 rounded-lg bg-white/5 border border-white/10 text-[9px] font-black text-acetel-400 uppercase tracking-widest">{{ $col }}</span>
-                                    @endforeach
+                        <div class="bg-white border border-slate-200 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] rounded-[2rem] p-8 md:p-10">
+                            <h3 class="text-xl font-black text-slate-900 mb-6 tracking-tight">Import Guide</h3>
+                            <div class="space-y-8">
+                                <div>
+                                    <h4 class="text-[10px] font-black text-slate-400 border-b border-slate-100 pb-2 uppercase tracking-widest mb-4">Required CSV Headers</h4>
+                                    <div class="flex flex-wrap gap-2.5">
+                                        @foreach(['S/N', 'Surname', 'Other Names', 'Program', 'Matric Number', 'Gender', 'Email Address', 'Phone Number', 'Nationality'] as $col)
+                                            <span class="px-3.5 py-1.5 rounded-[0.5rem] bg-slate-50 border border-slate-200 text-[10px] font-black text-slate-600 uppercase tracking-widest shadow-sm">{{ $col }}</span>
+                                        @endforeach
+                                    </div>
                                 </div>
-                                <p class="mt-8 text-white/50 text-[10px] font-medium italic">
-                                    Levels and sessions are automatically assigned.
-                                </p>
+                                <div class="grid md:grid-cols-2 gap-10">
+                                    <div>
+                                        <h4 class="text-[10px] font-black text-slate-400 border-b border-slate-100 pb-2 uppercase tracking-widest mb-4 text-rose-500">Critical Field Rules</h4>
+                                        <ul class="space-y-4 text-sm text-slate-600 font-medium">
+                                            <li class="flex items-start gap-3">
+                                                <div class="w-5 h-5 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                                </div>
+                                                <span class="leading-relaxed"><strong>Program:</strong> Must contain exactly the <span class="text-acetel-600 font-bold bg-acetel-50 px-1 py-0.5 rounded">Serial Number</span> of the program (e.g. 1, 2, 3). See Programs directory for mapping.</span>
+                                            </li>
+                                            <li class="flex items-start gap-3">
+                                                <div class="w-5 h-5 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 mt-0.5">
+                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"/></svg>
+                                                </div>
+                                                <span class="leading-relaxed"><strong>Email Address:</strong> Will be used as login ID. Passwords are auto-generated and emailed.</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-[10px] font-black text-slate-400 border-b border-slate-100 pb-2 uppercase tracking-widest mb-4">Formatting & Default Stats</h4>
+                                        <ul class="space-y-4 text-sm text-slate-600 font-medium">
+                                            <li class="flex items-start gap-3">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0"></span>
+                                                <span class="leading-relaxed">Keep the provided header row intact; the processor skips the first line.</span>
+                                            </li>
+                                            <li class="flex items-start gap-3">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0"></span>
+                                                <span class="leading-relaxed">Empty names/emails will omit the row seamlessly.</span>
+                                            </li>
+                                            <li class="flex items-start gap-3">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0"></span>
+                                                <span class="leading-relaxed">Enrollment starts dynamically at 'active', Semester 1.</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
