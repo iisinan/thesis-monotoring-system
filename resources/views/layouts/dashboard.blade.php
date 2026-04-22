@@ -116,7 +116,12 @@
                     <div class="relative">
                         <button class="p-2.5 bg-green-50 text-green-700 hover:bg-green-100 rounded-xl transition-all border border-green-200 relative group">
                             <svg class="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                            @php $ncount = Auth::user()->unreadNotifications->count(); @endphp
+                            @php 
+                                $ncount = 0;
+                                if (\Illuminate\Support\Facades\Schema::hasTable('notifications')) {
+                                    $ncount = Auth::user()->unreadNotifications->count();
+                                }
+                            @endphp
                             @if($ncount > 0)
                                 <span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center bg-red-500 text-white text-[8px] font-bold rounded-full border-2 border-white shadow-sm">{{ $ncount }}</span>
                             @endif
@@ -159,11 +164,14 @@
         <a href="{{ route('inbox.index') }}" class="flex flex-col items-center gap-1 relative {{ request()->routeIs('inbox.*') ? 'text-green-600 font-bold' : 'text-slate-400' }}">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="{{ request()->routeIs('inbox.*') ? '2.5' : '2' }}"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
             @php 
-                $mcount = \Illuminate\Support\Facades\DB::table('inbox_message_recipients')
-                    ->where('user_id', auth()->id())
-                    ->whereNull('read_at')
-                    ->where('is_archived', false)
-                    ->count(); 
+                $mcount = 0;
+                if (\Illuminate\Support\Facades\Schema::hasTable('inbox_message_recipients')) {
+                    $mcount = \Illuminate\Support\Facades\DB::table('inbox_message_recipients')
+                        ->where('user_id', auth()->id())
+                        ->whereNull('read_at')
+                        ->where('is_archived', false)
+                        ->count(); 
+                }
             @endphp
             @if($mcount > 0)
                 <span class="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center bg-red-500 text-white text-[8px] font-bold rounded-full border-2 border-white shadow-sm">{{ $mcount }}</span>
