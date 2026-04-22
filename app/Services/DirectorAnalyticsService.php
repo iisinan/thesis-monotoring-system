@@ -22,29 +22,44 @@ class DirectorAnalyticsService
      */
     public function getInstitutionalMetrics($filters = [])
     {
-        return [
-            'total_students' => $this->applyFilters(StudentProfile::query(), $filters)->count(),
-            'active_students' => $this->applyFilters(StudentProfile::where('enrollment_status', 'active'), $filters)->count(),
-            'graduated_students' => $this->applyFilters(StudentProfile::where('enrollment_status', 'graduated'), $filters)->count(),
-            'proposal_stage' => $this->applyFilters(StudentProfile::whereHas('thesis.currentMilestone.template', function($q) {
-                $q->where('name', 'ilike', '%proposal%');
-            }), $filters)->count(),
-            'internal_defence' => $this->applyFilters(StudentProfile::whereHas('thesis.currentMilestone.template', function($q) {
-                $q->where('name', 'ilike', '%internal%');
-            }), $filters)->count(),
-            'cleared_for_external' => $this->applyFilters(StudentProfile::whereHas('thesis', function($q) {
-                $q->whereNotNull('cleared_for_internal_at'); // Supporting old logic or specific flag
-            }), $filters)->count(),
-            
-            'total_msc_students' => $this->applyFilters(StudentProfile::whereHas('level', function($q) {
-                $q->where('name', 'MSc');
-            }), $filters)->count(),
-            'total_phd_students' => $this->applyFilters(StudentProfile::whereHas('level', function($q) {
-                $q->where('name', 'PhD');
-            }), $filters)->count(),
-            'total_supervisors' => $this->applyFilters(SupervisorProfile::query(), $filters, 'supervisor')->count(),
-            'active_cohorts' => $this->applyFilters(Cohort::where('status', 'active'), $filters, 'cohort')->count(),
-        ];
+        try {
+            return [
+                'total_students' => $this->applyFilters(StudentProfile::query(), $filters)->count(),
+                'active_students' => $this->applyFilters(StudentProfile::where('enrollment_status', 'active'), $filters)->count(),
+                'graduated_students' => $this->applyFilters(StudentProfile::where('enrollment_status', 'graduated'), $filters)->count(),
+                'proposal_stage' => $this->applyFilters(StudentProfile::whereHas('thesis.currentMilestone.template', function($q) {
+                    $q->where('name', 'ilike', '%proposal%');
+                }), $filters)->count(),
+                'internal_defence' => $this->applyFilters(StudentProfile::whereHas('thesis.currentMilestone.template', function($q) {
+                    $q->where('name', 'ilike', '%internal%');
+                }), $filters)->count(),
+                'cleared_for_external' => $this->applyFilters(StudentProfile::whereHas('thesis', function($q) {
+                    $q->whereNotNull('cleared_for_internal_at'); 
+                }), $filters)->count(),
+                
+                'total_msc_students' => $this->applyFilters(StudentProfile::whereHas('level', function($q) {
+                    $q->where('name', 'MSc');
+                }), $filters)->count(),
+                'total_phd_students' => $this->applyFilters(StudentProfile::whereHas('level', function($q) {
+                    $q->where('name', 'PhD');
+                }), $filters)->count(),
+                'total_supervisors' => $this->applyFilters(SupervisorProfile::query(), $filters, 'supervisor')->count(),
+                'active_cohorts' => $this->applyFilters(Cohort::where('status', 'active'), $filters, 'cohort')->count(),
+            ];
+        } catch (\Exception $e) {
+            return [
+                'total_students' => 0,
+                'active_students' => 0,
+                'graduated_students' => 0,
+                'proposal_stage' => 0,
+                'internal_defence' => 0,
+                'cleared_for_external' => 0,
+                'total_msc_students' => 0,
+                'total_phd_students' => 0,
+                'total_supervisors' => 0,
+                'active_cohorts' => 0
+            ];
+        }
     }
 
     /**
