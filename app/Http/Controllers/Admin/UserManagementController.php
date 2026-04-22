@@ -208,7 +208,8 @@ class UserManagementController extends Controller
 
         // Handle Student Profile
         if ($validated['role'] === 'Student') {
-            $user->studentProfile()->create([
+            $profile = \App\Models\StudentProfile::create([
+                'user_id' => $user->id,
                 'cohort_id' => $validated['cohort_id'],
                 'program_id' => $validated['program_id'],
                 'level_id' => $validated['level_id'],
@@ -217,12 +218,14 @@ class UserManagementController extends Controller
                 'current_semester' => 1,
             ]);
 
-            // Create initial thesis project for each student
-            $user->studentProfile->thesis()->create([
-                'title' => 'Pending Project Initiation',
-                'abstract' => 'Student has not yet submitted their project proposal details.',
-                'status' => 'proposed',
-            ]);
+            // Create initial thesis project for each student safely
+            if ($profile) {
+                $profile->thesis()->create([
+                    'title' => 'Pending Project Initiation',
+                    'abstract' => 'Student has not yet submitted their project proposal details.',
+                    'status' => 'proposed',
+                ]);
+            }
         }        
         return redirect()->route('admin.users.index')->with('success', 'User created successfully.');
     }
