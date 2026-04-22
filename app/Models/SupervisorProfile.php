@@ -20,6 +20,15 @@ class SupervisorProfile extends Model
         'rank'
     ];
 
+    protected static function booted()
+    {
+        static::creating(function ($profile) {
+            if (empty($profile->staff_id)) {
+                $profile->staff_id = 'STF-' . strtoupper(\Illuminate\Support\Str::random(8));
+            }
+        });
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
