@@ -15,11 +15,13 @@ class Program extends Model
     {
         static::creating(function ($program) {
             if (empty($program->serial_number)) {
+                // PostgreSQL compatible numeric ordering
                 $lastProgram = static::whereNotNull('serial_number')
-                    ->orderByRaw('CAST(serial_number AS UNSIGNED) DESC')
+                    ->whereRaw("serial_number ~ '^[0-9]+$'") // Ensure numeric only
+                    ->orderByRaw('CAST(serial_number AS INTEGER) DESC')
                     ->first();
+                    
                 $nextNumber = $lastProgram ? (intval($lastProgram->serial_number) + 1) : 1;
-                // Save without zero-padding
                 $program->serial_number = (string) $nextNumber;
             }
         });

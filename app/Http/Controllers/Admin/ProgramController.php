@@ -28,6 +28,7 @@ class ProgramController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:programs',
             'code' => 'required|string|max:10|unique:programs|uppercase',
+            'serial_number' => 'nullable|string|max:20|unique:programs',
             'degree_type' => 'required|in:MSc,PhD',
         ]);
 
