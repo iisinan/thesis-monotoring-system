@@ -11,15 +11,18 @@ class DashboardController extends Controller
 {
     protected $analytics;
 
-    public function __construct(\App\Services\DirectorAnalyticsService $analytics)
-    {
-        $this->analytics = $analytics;
-    }
-
     public function index(Request $request)
     {
-        $user = Auth::user();
-        $data = [];
+        try {
+            $user = Auth::user();
+            $data = [];
+
+            // Instantiate analytics safely
+            try {
+                $this->analytics = app(\App\Services\DirectorAnalyticsService::class);
+            } catch (\Exception $e) {
+                $this->analytics = null;
+            }
         
         // Fetch global active announcements and document templates
         $data['announcements'] = \App\Models\Announcement::active()
