@@ -22,21 +22,23 @@ class DatabaseSeeder extends Seeder
         ]);
         
         // 2. Setup Academic Structure
-        $mscLevel = \App\Models\Level::create(['name' => 'MSc']);
-        $phdLevel = \App\Models\Level::create(['name' => 'PhD']);
+        $mscLevel = \App\Models\Level::firstOrCreate(['name' => 'MSc']);
+        $phdLevel = \App\Models\Level::firstOrCreate(['name' => 'PhD']);
 
-        $progAI = \App\Models\Program::create(['name' => 'Artificial Intelligence', 'code' => 'AI']);
-        $progCyber = \App\Models\Program::create(['name' => 'Cybersecurity', 'code' => 'CYBER']);
-        $progMIS = \App\Models\Program::create(['name' => 'MIS', 'code' => 'MIS']);
+        $progAI = \App\Models\Program::updateOrCreate(['code' => 'AI'], ['name' => 'Artificial Intelligence']);
+        $progCyber = \App\Models\Program::updateOrCreate(['code' => 'CYBER'], ['name' => 'Cybersecurity']);
+        $progMIS = \App\Models\Program::updateOrCreate(['code' => 'MIS'], ['name' => 'MIS']);
 
-        $cohort = \App\Models\Cohort::create([
-            'name' => '2025/2026',
+        $cohort = \App\Models\Cohort::firstOrCreate([
             'code' => '2025/2026',
+        ], [
+            'name' => '2025/2026',
             'intake_year' => 2025,
             'status' => 'active',
             'start_date' => now(),
             'end_date' => now()->addYear()
         ]);
+
 
         // 3. Create Users
 
