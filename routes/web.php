@@ -173,13 +173,6 @@ Route::get('/debug/send-test-email', function() {
     }
 })->middleware(['auth']);
 
-Route::get('/student-diag', function() {
-    $results = [];
-    $results['notifications_table'] = Schema::hasTable('notifications');
-    $results['student_count'] = \App\Models\User::role('Student')->count();
-    $results['milestones_templates'] = \App\Models\MilestoneTemplate::count();
-    return response()->json($results);
-});
 
 
 
