@@ -209,8 +209,9 @@ Route::get('/system-diag-check', function () {
                 $results['database']['jsonb_support'] = 'FAILED: ' . $je->getMessage();
             }
 
+
             // check critical tables
-            $tables = ['users', 'roles', 'student_profiles', 'thesis_projects', 'student_milestones', 'milestone_templates'];
+            $tables = ['users', 'roles', 'student_profiles', 'thesis_projects', 'student_milestones', 'milestone_templates', 'programs', 'announcements', 'sessions', 'audit_logs'];
             $results['tables'] = [];
             foreach ($tables as $table) {
                 try {
@@ -220,6 +221,9 @@ Route::get('/system-diag-check', function () {
                     $results['tables'][$table] = "MISSING OR ERROR: " . $te->getMessage();
                 }
             }
+            
+            $results['session_driver'] = config('session.driver');
+
 
             // Check if Admin exists
             $results['admin_check'] = \App\Models\User::role('Admin')->count() . " Admins found.";
