@@ -170,7 +170,7 @@
                         
                         <!-- WhatsApp Context Chevron (Hover) -->
                         <div class="absolute top-0.5 right-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-30">
-                            <button @click="replyingTo = { id: '{{ $message->id }}', name: '{{ addslashes($message->sender->name) }}', content: '{{ addslashes(Str::limit($message->content, 50)) }}' }" 
+                            <button @click="replyingTo = { id: '{{ $message->id }}', name: '{{ addslashes($message->sender?->name ?? 'User') }}', content: '{{ addslashes(Str::limit($message->content, 50)) }}' }" 
                                     class="p-0.5 hover:bg-black/5 rounded text-slate-400">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                             </button>
@@ -179,13 +179,13 @@
                         <!-- Quoted Message (if reply) -->
                         @if($message->replyTo)
                             <div @click="scrollToMessage('{{ $message->reply_to_id }}')" class="cursor-pointer mb-2 p-2 bg-black/5 rounded-lg border-l-4 border-emerald-500 text-xs">
-                                <p class="font-black text-emerald-700 uppercase tracking-tighter text-[9px]">{{ $message->replyTo->sender->name }}</p>
+                                <p class="font-black text-emerald-700 uppercase tracking-tighter text-[9px]">{{ $message->replyTo->sender?->name ?? 'User' }}</p>
                                 <p class="text-slate-600 truncate">{{ $message->replyTo->content }}</p>
                             </div>
                         @endif
 
                         @if(!$isMine)
-                            <p class="text-[10px] font-black text-emerald-600 border-b border-emerald-50 mb-1 pb-1 tracking-tight">{{ $message->sender->name }}</p>
+                            <p class="text-[10px] font-black text-emerald-600 border-b border-emerald-50 mb-1 pb-1 tracking-tight">{{ $message->sender?->name ?? 'User' }}</p>
                         @endif
 
                         <!-- Message Type: File -->

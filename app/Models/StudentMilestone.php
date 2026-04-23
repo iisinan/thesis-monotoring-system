@@ -142,7 +142,7 @@ class StudentMilestone extends Model
         }
 
         // 6. Date Authorization
-        if ($this->template->allow_defence_date) {
+        if ($this->template?->allow_defence_date) {
             $isDateApproved = !is_null($this->date_approved_at);
             $tasks[] = [
                 'id' => 'date_authorization',
@@ -155,7 +155,7 @@ class StudentMilestone extends Model
         }
 
         // 7. Clearance Approvals
-        $requiredRoles = collect($this->template->required_approvers ?? []);
+        $requiredRoles = collect($this->template?->required_approvers ?? []);
         if ($requiredRoles->isNotEmpty()) {
             $userApprovals = collect($this->approvals ?? []);
             
@@ -199,7 +199,7 @@ class StudentMilestone extends Model
                 }
             }
         } else {
-            if ($this->template->requires_approval) {
+            if ($this->template?->requires_approval) {
                 $isApproved = $this->status === 'approved';
                 $tasks[] = [
                     'id' => 'general_approval',

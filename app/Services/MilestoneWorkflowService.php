@@ -26,10 +26,11 @@ class MilestoneWorkflowService
     public function getApprovalBlockReason(StudentMilestone $milestone, $user, ?string $role = null): ?string
     {
         $template = $milestone->template;
+        if (!$template) return null;
 
         // 0. Sequence Enforcement
-        $prevMilestone = $milestone->thesis->milestones()
-            ->select('student_milestones.*')
+        $prevMilestone = $milestone->thesis?->milestones()
+            ?->select('student_milestones.*')
             ->join('milestone_templates', 'student_milestones.milestone_template_id', '=', 'milestone_templates.id')
             ->where('milestone_templates.order', '<', $template->order)
             ->orderBy('milestone_templates.order', 'desc')
@@ -37,7 +38,7 @@ class MilestoneWorkflowService
 
         if ($prevMilestone && !$prevMilestone->progress_track['is_fully_complete']) {
             if (!$user->hasRole('Admin')) {
-                return "Sequence Blocked: Milestone " . $prevMilestone->template->order . " (" . $prevMilestone->template->name . ") must be 100% complete first.";
+                return "Sequence Blocked: Milestone " . ($prevMilestone->template?->order ?? '?') . " (" . ($prevMilestone->template?->name ?? 'Previous') . ") must be 100% complete first.";
             }
         }
 
