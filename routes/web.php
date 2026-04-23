@@ -191,6 +191,7 @@ Route::get('/system-diag-check', function () {
         ]
     ];
 
+
     try {
         $pdo = DB::connection()->getPdo();
         $results['database']['status'] = 'CONNECTED';
@@ -207,8 +208,24 @@ Route::get('/system-diag-check', function () {
             } catch (\Exception $je) {
                 $results['database']['jsonb_support'] = 'FAILED: ' . $je->getMessage();
             }
+
+            // check critical tables
+            $tables = ['users', 'roles', 'student_profiles', 'thesis_projects', 'student_milestones', 'milestone_templates'];
+            $results['tables'] = [];
+            foreach ($tables as $table) {
+                try {
+                    $count = DB::table($table)->count();
+                    $results['tables'][$table] = "EXISTS ($count rows)";
+                } catch (\Exception $te) {
+                    $results['tables'][$table] = "MISSING OR ERROR: " . $te->getMessage();
+                }
+            }
+
+            // Check if Admin exists
+            $results['admin_check'] = \App\Models\User::role('Admin')->count() . " Admins found.";
         }
     } catch (\Exception $e) {
+
         $results['database']['status'] = 'CONNECTION FAILED';
         $results['database']['error'] = $e->getMessage();
     }
