@@ -163,9 +163,12 @@ class CohortController extends Controller
             
             $user->assignRole('Student');
             
+            $program = Program::findOrFail($request->program_id);
+            
             $profile = $user->studentProfile()->create([
                 'cohort_id' => $cohort->id,
                 'program_id' => $request->program_id,
+                'level_id' => $program->level_id,
                 'student_id_number' => $request->matrix_number,
                 'enrollment_status' => 'active',
                 'current_semester' => 1,
