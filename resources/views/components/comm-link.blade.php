@@ -141,7 +141,7 @@
         </div>
     </div>
 
-    <div x-show="!isMinimized" x-collapse x-cloak class="flex-1 flex flex-col bg-[#efeae2] relative overflow-hidden" style="min-h: {{ $height }}; max-h: {{ $maxHeight }};">
+    <div x-show="!isMinimized" x-cloak class="flex-1 flex flex-col bg-[#efeae2] relative overflow-hidden" style="min-h: {{ $height }}; max-h: {{ $maxHeight }};">
         <!-- Chat Background Pattern -->
         <div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: url('https://www.transparenttextures.com/patterns/cubes.png');"></div>
 

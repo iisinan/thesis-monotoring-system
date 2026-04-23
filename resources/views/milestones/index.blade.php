@@ -223,7 +223,7 @@
                 </button>
 
                 <!-- Milestone Body -->
-                <div x-show="expanded === '{{ $milestone->id }}'" x-collapse x-cloak class="relative z-10 w-full bg-gray-50/50">
+                <div x-show="expanded === '{{ $milestone->id }}'" x-cloak class="relative z-10 w-full bg-gray-50/50">
                     <div class="px-6 md:px-10 py-12 border-t border-gray-50 w-full relative">
                         @php
                             $progressData = $milestone->progress_track;
