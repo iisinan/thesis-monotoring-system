@@ -223,7 +223,11 @@ Route::get('/system-diag-check', function () {
                 }
             }
             
+
             $results['session_driver'] = config('session.driver');
+            $results['queue_connection'] = config('queue.default');
+            $results['mail_mailer'] = config('mail.default');
+
 
 
             // Check if Admin exists
