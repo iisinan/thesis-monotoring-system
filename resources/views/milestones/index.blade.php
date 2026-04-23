@@ -178,9 +178,7 @@
             <div id="milestone-container-{{ $milestone->id }}" class="group/milestone relative bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md hover:border-gray-200">
                 <!-- Milestone Header -->
                 <button type="button" 
-                        @if($conf['label'] !== 'Locked' || auth()->user()->hasAnyRole(['Admin', 'Director', 'Program Coordinator', 'Supervisor']))
-                            @click="expanded = expanded === '{{ $milestone->id }}' ? null : '{{ $milestone->id }}'" 
-                        @endif
+                        @click="console.log('Clicking milestone: {{ $milestone->id }}'); expanded = expanded === '{{ $milestone->id }}' ? null : '{{ $milestone->id }}'" 
                         class="w-full text-left flex items-center justify-between px-10 py-10 transition-all duration-300 {{ ($conf['label'] === 'Locked' && !auth()->user()->hasAnyRole(['Admin', 'Director', 'Program Coordinator', 'Supervisor'])) ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:bg-gray-50/30' }}">
                     <div class="flex items-center gap-6">
                         <div class="relative">
