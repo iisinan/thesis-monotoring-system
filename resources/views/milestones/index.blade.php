@@ -9,7 +9,40 @@
 @endsection
 
 @section('content')
-<div class="space-y-8 pb-20" x-data="{ expanded: '{{ request('expanded', $ongoingMilestoneId) }}' }">
+<div class="space-y-8 pb-20" id="milestones-page">
+<script>
+    var _expandedMilestone = '{{ $ongoingMilestoneId }}';
+    function toggleMilestone(id) {
+        var all = document.querySelectorAll('.milestone-body');
+        all.forEach(function(el) {
+            if (el.id !== 'milestone-body-' + id) {
+                el.style.display = 'none';
+                var btn = document.getElementById('milestone-chevron-' + el.id.replace('milestone-body-',''));
+                if (btn) btn.style.transform = '';
+            }
+        });
+        var panel = document.getElementById('milestone-body-' + id);
+        var chevron = document.getElementById('milestone-chevron-' + id);
+        if (panel) {
+            if (panel.style.display === 'block') {
+                panel.style.display = 'none';
+                if (chevron) chevron.style.transform = '';
+            } else {
+                panel.style.display = 'block';
+                if (chevron) chevron.style.transform = 'rotate(180deg)';
+                panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+        if (_expandedMilestone) {
+            var el = document.getElementById('milestone-body-' + _expandedMilestone);
+            var chevron = document.getElementById('milestone-chevron-' + _expandedMilestone);
+            if (el) { el.style.display = 'block'; }
+            if (chevron) chevron.style.transform = 'rotate(180deg)';
+        }
+    });
+</script>
     <script>
         window.refreshMilestone = async (id) => {
             const container = document.getElementById('milestone-container-' + id);
@@ -178,9 +211,9 @@
             
             <div id="milestone-container-{{ $milestone->id }}" class="group/milestone relative bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md hover:border-gray-200">
                 <!-- Milestone Header -->
-                <button type="button" 
-                        @click="console.log('Clicking milestone: {{ $milestone->id }}'); expanded = expanded === '{{ $milestone->id }}' ? null : '{{ $milestone->id }}'" 
-                        class="w-full text-left flex items-center justify-between px-10 py-10 transition-all duration-300 {{ ($conf['label'] === 'Locked' && !auth()->user()->hasAnyRole(['Admin', 'Director', 'Program Coordinator', 'Supervisor'])) ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:bg-gray-50/30' }}">
+                <button type="button"
+                        onclick="toggleMilestone('{{ $milestone->id }}')"
+                        class="w-full text-left flex items-center justify-between px-10 py-10 transition-all duration-300 cursor-pointer hover:bg-gray-50/30">
                     <div class="flex items-center gap-6">
                         <div class="relative">
                             <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg shadow-{{ $conf['color'] }}-500/10 border {{ $isCompleted ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-white border-gray-100 text-gray-900' }}">
@@ -222,7 +255,7 @@
                 </button>
 
                 <!-- Milestone Body -->
-                <div x-show="expanded === '{{ $milestone->id }}'" x-cloak class="relative z-10 w-full bg-gray-50/50">
+                <div id="milestone-body-{{ $milestone->id }}" class="milestone-body relative z-10 w-full bg-gray-50/50" style="display:none;">
                     <div class="px-6 md:px-10 py-12 border-t border-gray-50 w-full relative">
                         @php
                             $progressData = $milestone->progress_track;
