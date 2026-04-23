@@ -57,6 +57,58 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MilestoneController;
 
 Route::middleware('auth')->group(function () {
+    // === TEMPORARY DIAGNOSTIC ROUTE - REMOVE AFTER DEBUGGING ===
+    Route::get('/debug-milestones', function () {
+        try {
+            $user = Auth::user();
+            $student = $user->studentProfile;
+            if (!$student) return response()->json(['error' => 'No student profile found', 'user_id' => $user->id]);
+            
+            $thesis = $student->thesis;
+            if (!$thesis) return response()->json(['error' => 'No thesis found', 'student_id' => $student->id]);
+
+            $thesis->load(['student.user', 'assignments.supervisor.user', 'internalExaminer.user']);
+
+            $milestones = $thesis->milestones()
+                ->with(['template', 'submissions.submittedBy', 'messages.sender', 'unlockedBy'])
+                ->get()
+                ->sortBy('template.order');
+
+            if ($milestones->isEmpty()) {
+                $thesis->syncMilestones();
+                $milestones = $thesis->milestones()
+                    ->with(['template', 'submissions.submittedBy', 'messages.sender', 'unlockedBy'])
+                    ->get()
+                    ->sortBy('template.order');
+            }
+
+            $results = [];
+            foreach ($milestones as $m) {
+                try {
+                    $pt = $m->progress_track;
+                    $results[] = ['id' => $m->id, 'template' => $m->template?->name, 'progress_track_ok' => true];
+                } catch (\Throwable $e) {
+                    $results[] = ['id' => $m->id, 'template' => $m->template?->name, 'progress_track_error' => $e->getMessage(), 'line' => $e->getLine(), 'file' => $e->getFile()];
+                }
+            }
+
+            return response()->json([
+                'thesis_id' => $thesis->id,
+                'milestone_count' => $milestones->count(),
+                'student_level' => $student->level?->name ?? 'NULL LEVEL',
+                'milestones' => $results,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'exception' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ], 500);
+        }
+    })->name('debug.milestones');
+    // === END DIAGNOSTIC ROUTE ===
+
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     
     // Shared Dashboard (Content varies by role via Controller)
