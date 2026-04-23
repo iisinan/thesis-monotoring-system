@@ -211,7 +211,8 @@ Route::get('/system-diag-check', function () {
 
 
             // check critical tables
-            $tables = ['users', 'roles', 'student_profiles', 'thesis_projects', 'student_milestones', 'milestone_templates', 'programs', 'announcements', 'sessions', 'audit_logs'];
+            $tables = ['users', 'roles', 'student_profiles', 'thesis_projects', 'student_milestones', 'milestone_templates', 'programs', 'announcements', 'sessions', 'audit_logs', 'jobs'];
+
             $results['tables'] = [];
             foreach ($tables as $table) {
                 try {
