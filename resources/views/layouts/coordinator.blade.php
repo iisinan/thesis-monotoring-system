@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" 
-      x-data="{ 
-          darkMode: false, 
-          get sidebarOpen() { return this.$store.sidebar.open }
-      }"
+      x-data="{ darkMode: false }"
       class="h-full bg-slate-50">
 <head>
     <meta charset="utf-8">
@@ -47,7 +44,7 @@
         
         <!-- Sidebar Navigation -->
         <aside class="fixed inset-y-0 left-0 z-50 w-72 light-sidebar transition-all duration-500 transform md:translate-x-0 md:relative flex flex-col group"
-               :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+               :class="$store.sidebar.open ? 'translate-x-0' : '-translate-x-full'"
                x-cloak>
             
             <div class="flex items-center px-8 h-24 shrink-0 border-b border-green-100">
