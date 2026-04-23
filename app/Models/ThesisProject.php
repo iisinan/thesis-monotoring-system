@@ -31,6 +31,39 @@ class ThesisProject extends Model
         'proposed_supervisors' => 'array',
     ];
 
+    protected static function booted()
+    {
+        static::creating(function ($thesis) {
+            if (empty($thesis->status)) {
+                $thesis->status = 'proposed';
+            }
+        });
+
+        static::deleting(function ($thesis) {
+            // Delete milestones (each will trigger further cascade if needed)
+            $thesis->milestones->each->delete();
+            
+            // Delete assignments
+            $thesis->assignments()->delete();
+            
+            // Delete examiner assignments
+            $thesis->examinerAssignments()->delete();
+            
+            // Delete defence events
+            $thesis->defenceEvents->each->delete();
+            
+            // Delete communication channels
+            $thesis->communicationChannels->each->delete();
+            
+            // Delete direct messages
+            $thesis->messages()->delete();
+            
+            // Delete action items
+            $thesis->actionItems()->delete();
+        });
+    }
+
+
     public function student()
     {
         return $this->belongsTo(StudentProfile::class, 'student_profile_id');
@@ -186,34 +219,6 @@ class ThesisProject extends Model
             
         return round(($approved / $total) * 100);
     }
-
-    /**
-     * Handle cascade deletions.
-     */
-    protected static function booted()
-    {
-        static::deleting(function ($thesis) {
-            // Delete milestones (each will trigger further cascade if needed)
-            $thesis->milestones->each->delete();
-            
-            // Delete assignments
-            $thesis->assignments()->delete();
-            
-            // Delete examiner assignments
-            $thesis->examinerAssignments()->delete();
-            
-            // Delete defence events
-            $thesis->defenceEvents->each->delete();
-            
-            // Delete communication channels
-            $thesis->communicationChannels->each->delete();
-            
-            // Delete direct messages
-            $thesis->messages()->delete();
-            
-            // Delete action items
-            $thesis->actionItems()->delete();
-        });
-    }
 }
+
 

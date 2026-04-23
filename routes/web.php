@@ -166,9 +166,55 @@ Route::get('/debug/send-test-email', function() {
             'branding' => 'Templated: supervisor_assigned',
             'note' => 'If using SMTP, check your inbox. If using log driver, check storage/logs/laravel.log'
         ]);
+
     } catch (\Exception $e) {
         return response()->json(['error' => 'Failed to send email: ' . $e->getMessage()], 500);
     }
 })->middleware(['auth']);
+
+// Diagnostic Route for debugging 500 errors on Cloud
+Route::get('/system-diag-check', function () {
+    if (request('key') !== 'acetel_debug_2024') {
+        abort(403, 'Unauthorized diagnostic request.');
+    }
+
+    $results = [
+        'php_version' => PHP_VERSION,
+        'environment' => app()->environment(),
+        'debug_mode' => config('app.debug'),
+        'database' => [
+            'default_connection' => config('database.default'),
+            'driver' => null,
+            'status' => 'Testing...',
+            'postgresql_version' => null,
+            'jsonb_support' => 'Testing...',
+        ]
+    ];
+
+    try {
+        $pdo = DB::connection()->getPdo();
+        $results['database']['status'] = 'CONNECTED';
+        $results['database']['driver'] = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        
+        if ($results['database']['driver'] === 'pgsql') {
+            $version = DB::select('SELECT version()');
+            $results['database']['postgresql_version'] = $version[0]->version ?? 'Unknown';
+            
+            // Test JSONB capability
+            try {
+                $testJson = DB::select("SELECT '{\"test\": true}'::jsonb as json_test");
+                $results['database']['jsonb_support'] = 'SUCCESS';
+            } catch (\Exception $je) {
+                $results['database']['jsonb_support'] = 'FAILED: ' . $je->getMessage();
+            }
+        }
+    } catch (\Exception $e) {
+        $results['database']['status'] = 'CONNECTION FAILED';
+        $results['database']['error'] = $e->getMessage();
+    }
+
+    return response()->json($results);
+});
+
 
 
