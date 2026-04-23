@@ -367,7 +367,7 @@
                                                 <form action="{{ route('theses.assign_supervisor', $thesis) }}" method="POST" class="space-y-4">
                                                     @csrf
                                                     @php
-                                                        $levelName = strtoupper($thesis->student->level->name ?? '');
+                                                        $levelName = strtoupper($thesis->student->level?->name ?? '');
                                                         $targetCount = str_contains($levelName, 'PHD') ? 3 : 2;
                                                     @endphp
                                                     <p class="text-xs font-bold text-brand-700 mb-4 uppercase tracking-widest">Select Panel Members (Institutional Target: {{ $targetCount }})</p>

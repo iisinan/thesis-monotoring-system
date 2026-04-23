@@ -75,8 +75,8 @@ class StudentMilestone extends Model
         $completedTasks = 0;
         
         // 1. Supervisor Assignment
-        if ($this->template->show_supervisor_assignment) {
-            $hasAssignments = $this->thesis->assignments()->whereIn('status', ['active', 'ended'])->count() > 0;
+        if ($this->template?->show_supervisor_assignment) {
+            $hasAssignments = $this->thesis?->assignments()->whereIn('status', ['active', 'ended'])->count() > 0;
             $tasks[] = [
                 'id' => 'supervisor_allocation',
                 'name' => 'Supervisor Allocation',
@@ -89,7 +89,7 @@ class StudentMilestone extends Model
         }
 
         // 2. Submit Authorization (Unlock)
-        if ($this->template->submission_requires_approval) {
+        if ($this->template?->submission_requires_approval) {
             $tasks[] = [
                 'id' => 'submission_authorization',
                 'name' => 'Submission Authorization',
@@ -101,7 +101,7 @@ class StudentMilestone extends Model
         }
 
         // 3. Student Submission
-        if ($this->template->requires_submission) {
+        if ($this->template?->requires_submission) {
             $hasSubmission = $this->submissions()->count() > 0;
             $tasks[] = [
                 'id' => 'student_submission',
@@ -114,7 +114,7 @@ class StudentMilestone extends Model
         }
         
         // 4. Set Defence Date
-        if ($this->template->allow_defence_date) {
+        if ($this->template?->allow_defence_date) {
             $hasDate = !empty($this->defence_date);
             $tasks[] = [
                 'id' => 'schedule_defence',
@@ -128,8 +128,8 @@ class StudentMilestone extends Model
         }
 
         // 5. Internal Examiner Assignment
-        if ($this->template->show_internal_examiner_assignment) {
-            $hasExaminer = !empty($this->thesis->internal_examiner_profile_id);
+        if ($this->template?->show_internal_examiner_assignment) {
+            $hasExaminer = !empty($this->thesis?->internal_examiner_profile_id);
             $tasks[] = [
                 'id' => 'assign_examiner',
                 'name' => 'Assign Internal Examiner',
@@ -165,14 +165,14 @@ class StudentMilestone extends Model
 
                     if ($activeSupervisors->count() > 0) {
                         foreach ($activeSupervisors as $assignment) {
-                            $isApproved = $userApprovals->where('user_id', $assignment->supervisor->user_id)->isNotEmpty() || $this->status === 'approved';
+                            $isApproved = $userApprovals->where('user_id', $assignment->supervisor?->user_id)->isNotEmpty() || $this->status === 'approved';
                             $tasks[] = [
                                 'id' => 'supervisor_clearance_' . $assignment->id,
-                                'name' => "Clearance: " . ($assignment->supervisor->user->name ?? 'Supervisor'),
+                                'name' => "Clearance: " . ($assignment->supervisor?->user?->name ?? 'Supervisor'),
                                 'completed' => $isApproved,
                                 'details' => 'Supervisor Approval',
                                 'action_type' => 'clear_supervisor',
-                                'action_data' => ['user_id' => $assignment->supervisor->user_id]
+                                'action_data' => ['user_id' => $assignment->supervisor?->user_id]
                             ];
                             if ($isApproved) $completedTasks++;
                         }
