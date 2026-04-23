@@ -86,7 +86,7 @@
                 @if(auth()->user()->hasRole('Student'))
                     Research Progress
                 @else
-                    {{ $thesis->student->user->name }}'s Progress
+                    {{ $thesis->student?->user?->name ?? 'Student' }}'s Progress
                 @endif
             </h1>
             <p class="mt-2 text-sm font-medium text-gray-500 italic max-w-2xl">
@@ -125,10 +125,10 @@
                         <div class="mt-6 text-center max-w-[120px]">
                             <p class="text-[10px] font-bold uppercase tracking-widest leading-none mb-1.5"
                                class="{{ $m->status === 'approved' ? 'text-green-600' : ($m->id == $ongoingMilestoneId ? 'text-brand-600' : 'text-gray-400') }}">
-                                Milestone {{ $m->template->order }}
+                                Milestone {{ $m->template?->order }}
                             </p>
                             <h4 class="text-xs font-bold text-gray-900 leading-tight group-hover:text-brand-600 transition-colors line-clamp-2">
-                                {{ $m->template->name }}
+                                {{ $m->template?->name }}
                             </h4>
                             
                             @if($m->status === 'approved' && $m->approved_at)
@@ -185,7 +185,7 @@
                     <div class="flex items-center gap-6">
                         <div class="relative">
                             <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg shadow-{{ $conf['color'] }}-500/10 border {{ $isCompleted ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-white border-gray-100 text-gray-900' }}">
-                                {{ $milestone->template->order }}
+                                {{ $milestone->template?->order }}
                             </div>
                             @if($conf['pulse'])
                                 <span class="absolute -top-1 -right-1 flex h-4 w-4">
@@ -195,8 +195,8 @@
                             @endif
                         </div>
                         <div>
-                            <p class="text-lg font-bold text-gray-900 group-hover/milestone:text-brand-600 transition-colors tracking-tight">{{ $milestone->template->name }}</p>
-                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1.5">{{ $milestone->template->description }}</p>
+                            <p class="text-lg font-bold text-gray-900 group-hover/milestone:text-brand-600 transition-colors tracking-tight">{{ $milestone->template?->name }}</p>
+                            <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1.5">{{ $milestone->template?->description }}</p>
                         </div>
                     </div>
                     
@@ -236,7 +236,7 @@
                         <div class="flex flex-col lg:flex-row gap-10 items-start">
                             <!-- Left: Institutional Clearance Dashboard (Consistent Sidebar) -->
 
-                            <div class="w-full lg:w-[350px] {{ $milestone->template->order == 9 ? 'xl:w-[680px]' : '' }} shrink-0 space-y-6">
+                            <div class="w-full lg:w-[350px] {{ $milestone->template?->order == 9 ? 'xl:w-[680px]' : '' }} shrink-0 space-y-6">
                                 <div class="p-8 bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/40 relative overflow-hidden">
                                     <div class="absolute top-0 right-0 w-32 h-32 bg-brand-50 rounded-full -mr-16 -mt-16 opacity-40"></div>
                                     
@@ -298,7 +298,7 @@
                                 </div>
 
                                 <!-- Supervisor Assignment Logic -->
-                                @if($milestone->template->show_supervisor_assignment)
+                                @if($milestone->template?->show_supervisor_assignment)
                                     @php $hasAssignments = $thesis->assignments->where('status', 'active')->count() > 0; @endphp
                                     
                                     @if(auth()->user()->hasRole('Student') && !$hasAssignments)
@@ -401,7 +401,7 @@
                                 @endif
 
                                 <!-- Supervisor Details Card (conditionally shown) -->
-                                @if($milestone->template->show_supervisor_details && $thesis->assignments->where('status', 'active')->count() > 0)
+                                @if($milestone->template?->show_supervisor_details && $thesis->assignments->where('status', 'active')->count() > 0)
                                     <div class="p-8 bg-white rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
                                         <div class="absolute top-0 right-0 w-24 h-24 bg-brand-50 rounded-full -mr-12 -mt-12 opacity-40"></div>
                                         <div class="relative z-10">
@@ -441,19 +441,19 @@
                                     $dynamicSteps = [];
                                     
                                     // 1. Initial Unlock State
-                                    if ($milestone->template->submission_requires_approval) {
+                                    if ($milestone->template?->submission_requires_approval) {
                                         $dynamicSteps[] = [
                                             'id' => 'unlock',
                                             'label' => 'Access',
-                                            'responsible' => $milestone->template->submission_approver_roles[0] ?? 'Supervisor',
+                                            'responsible' => $milestone->template?->submission_approver_roles[0] ?? 'Supervisor',
                                             'icon' => 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z',
                                             'check' => function($m) { return $m->is_submission_unlocked; }
                                         ];
                                     }
 
                                     // 2. Submission Phases (Manuscript & Publication)
-                                    if ($milestone->template->requires_submission) {
-                                        $subTypes = $milestone->template->submission_type ?? ['file'];
+                                    if ($milestone->template?->requires_submission) {
+                                        $subTypes = $milestone->template?->submission_type ?? ['file'];
                                         
                                         // Manuscript Deposit
                                         if (in_array('file', $subTypes)) {
@@ -479,11 +479,11 @@
                                     }
 
                                     // 3. Similarity Protocol (Plagiarism Result)
-                                    if ($milestone->template->allow_plagiarism_report) {
+                                    if ($milestone->template?->allow_plagiarism_report) {
                                         $dynamicSteps[] = [
                                             'id' => 'plagiarism',
                                             'label' => 'Plagiarism Result',
-                                            'responsible' => $milestone->template->plagiarism_report_role ?? 'Admin',
+                                            'responsible' => $milestone->template?->plagiarism_report_role ?? 'Admin',
                                             'icon' => 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
                                             'check' => function($m) { 
                                                 return $m->submissions->where('type', 'plagiarism_report')->count() > 0 || 
@@ -493,7 +493,7 @@
                                     }
 
                                     // 4. Examiner Assignment
-                                    if ($milestone->template->show_internal_examiner_assignment) {
+                                    if ($milestone->template?->show_internal_examiner_assignment) {
                                         $dynamicSteps[] = [
                                             'id' => 'examiner',
                                             'label' => 'Examiner',
@@ -504,18 +504,18 @@
                                     }
 
                                     // 5. Defence Protocol
-                                    if ($milestone->template->allow_defence_date) {
+                                    if ($milestone->template?->allow_defence_date) {
                                         $dynamicSteps[] = [
                                             'id' => 'defence',
                                             'label' => 'Defence',
-                                            'responsible' => $milestone->template->defence_date_role ?? 'Admin',
+                                            'responsible' => $milestone->template?->defence_date_role ?? 'Admin',
                                             'icon' => 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
                                             'check' => function($m) { return isset($m->metadata['defence_date']); }
                                         ];
                                     }
 
                                     // 6. Final Clearance (Approval)
-                                    if ($milestone->template->requires_approval) {
+                                    if ($milestone->template?->requires_approval) {
                                         $dynamicSteps[] = [
                                             'id' => 'approval',
                                             'label' => 'Clearance',
@@ -536,7 +536,7 @@
 
                                     $totalSteps = count($dynamicSteps);
                                     $smartProgress = $totalSteps > 0 ? round(($currentStepIdx / $totalSteps) * 100) : 100;
-                                    $isTerminal = ($milestone->template->order == 9 || $milestone->template->is_final_archival);
+                                    $isTerminal = ($milestone->template?->order == 9 || $milestone->template?->is_final_archival);
                                     $headerLabel = $isTerminal ? 'Final Institutional Graduation Protocol' : 'Standard Progress Track';
                                     $headerSub = $isTerminal ? 'Terminal Archival & Certification' : 'Phase Sequence Index';
                                 @endphp
@@ -545,7 +545,7 @@
                                     <!-- Dynamic Protocol Card -->
                                     <div class="w-full mb-8 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
                                         <!-- Header -->
-                                        <div class="px-8 py-6 bg-gradient-to-r {{ $milestone->template->order == 9 ? 'from-gray-900 to-gray-800' : 'from-brand-900 to-brand-800' }} text-white relative overflow-hidden">
+                                        <div class="px-8 py-6 bg-gradient-to-r {{ $milestone->template?->order == 9 ? 'from-gray-900 to-gray-800' : 'from-brand-900 to-brand-800' }} text-white relative overflow-hidden">
                                             <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg width=&quot;60&quot; height=&quot;60&quot; viewBox=&quot;0 0 60 60&quot; xmlns=&quot;http://www.w3.org/2000/svg&quot;%3E%3Cg fill=&quot;none&quot; fill-rule=&quot;evenodd&quot;%3E%3Cg fill=&quot;%23ffffff&quot; fill-opacity=&quot;1&quot;%3E%3Cpath d=&quot;M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z&quot;/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')"></div>
                                             <div class="relative z-10 flex items-center justify-between">
                                                 <div>
@@ -620,8 +620,8 @@
                                 <!-- ═══ Advanced Institutional Workflows ═══ -->
                                 @if(auth()->user()->hasAnyRole(['Admin', 'Director', 'Program Coordinator', 'Internal Examiner']))
                                     @php
-                                        $hasDefenceDate = $milestone->template->allow_defence_date;
-                                        $hasExaminerAssign = $milestone->template->show_internal_examiner_assignment;
+                                        $hasDefenceDate = $milestone->template?->allow_defence_date;
+                                        $hasExaminerAssign = $milestone->template?->show_internal_examiner_assignment;
                                         $showAdminPanel = $hasDefenceDate || $hasExaminerAssign;
                                     @endphp
 
@@ -639,35 +639,35 @@
 
                                         <div class="p-6 space-y-5" x-data="{ scheduling: false }">
                                             @php
-                                                $lowerName = strtolower($milestone->template->name);
+                                                $lowerName = strtolower($milestone->template?->name);
                                                 $dType = 'General';
                                                 $dColor = 'brand';
                                                 $dIcon = 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z';
                                                 
-                                                if ($milestone->template->defence_type === 'proposal') {
+                                                if ($milestone->template?->defence_type === 'proposal') {
                                                     $dType = 'Proposal';
                                                     $dColor = 'blue';
-                                                } elseif ($milestone->template->defence_type === 'internal') {
+                                                } elseif ($milestone->template?->defence_type === 'internal') {
                                                     $dType = 'Internal';
                                                     $dColor = 'emerald';
-                                                } elseif ($milestone->template->defence_type === 'external') {
+                                                } elseif ($milestone->template?->defence_type === 'external') {
                                                     $dType = 'External';
                                                     $dColor = 'rose';
                                                 } else {
                                                     if (str_contains($lowerName, 'proposal')) {
                                                         $dType = 'Proposal';
                                                         $dColor = 'blue';
-                                                    } elseif (str_contains($lowerName, 'internal') || $milestone->template->order == 9) {
+                                                    } elseif (str_contains($lowerName, 'internal') || $milestone->template?->order == 9) {
                                                         $dType = 'Internal';
                                                         $dColor = 'emerald';
-                                                    } elseif (str_contains($lowerName, 'external') || $milestone->template->is_final_archival) {
+                                                    } elseif (str_contains($lowerName, 'external') || $milestone->template?->is_final_archival) {
                                                         $dType = 'External';
                                                         $dColor = 'rose';
                                                     }
                                                 }
                                                 
                                                 // Respect template settings for defence date visibility
-                                                $canSetDate = $milestone->template->allow_defence_date && (auth()->user()->hasRole('Admin') || auth()->user()->hasRole($milestone->template->defence_date_role ?? 'Program Coordinator'));
+                                                $canSetDate = $milestone->template?->allow_defence_date && (auth()->user()->hasRole('Admin') || auth()->user()->hasRole($milestone->template?->defence_date_role ?? 'Program Coordinator'));
                                             @endphp
 
                                             @if($canSetDate)
@@ -678,7 +678,7 @@
                                                         </div>
                                                         
                                                         @php
-                                                            $isInternal = ($dType === 'Internal' || $milestone->template->order == 9);
+                                                            $isInternal = ($dType === 'Internal' || $milestone->template?->order == 9);
                                                             $examLabel = $isInternal ? 'Internal Examination' : ($dType === 'External' ? 'External Defence' : ($dType === 'Proposal' ? 'Proposal Defence' : 'Examination'));
                                                         @endphp
                                                         <div class="px-5 py-2 rounded-xl bg-{{ $dColor }}-100 mb-6 border border-{{ $dColor }}-200">
@@ -784,8 +784,8 @@
                                             @endif
 
                                             @php
-                                                $isPlagiarismEnabled = $milestone->template->allow_plagiarism_report;
-                                                $canUploadPlagiarism = $isPlagiarismEnabled && (auth()->user()->hasRole('Admin') || auth()->user()->hasRole($milestone->template->plagiarism_report_role ?? 'Admin'));
+                                                $isPlagiarismEnabled = $milestone->template?->allow_plagiarism_report;
+                                                $canUploadPlagiarism = $isPlagiarismEnabled && (auth()->user()->hasRole('Admin') || auth()->user()->hasRole($milestone->template?->plagiarism_report_role ?? 'Admin'));
                                                 $hasPlagiarismReport = $milestone->submissions->where('type', 'plagiarism_report')->count() > 0 || 
                                                                        $milestone->submissions->where('type', 'manuscript')->whereNotNull('plagiarism_data')->count() > 0;
                                             @endphp
@@ -879,7 +879,7 @@
                                 @endif
 
                                 <!-- Assigned Examiner Display (All Roles) -->
-                                @if($milestone->template->show_internal_examiner_assignment && $thesis->internalExaminer)
+                                @if($milestone->template?->show_internal_examiner_assignment && $thesis->internalExaminer)
                                     <div class="mb-6 flex items-center gap-4 p-5 bg-white rounded-2xl border border-gray-100 shadow-sm">
                                         <div class="w-12 h-12 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
@@ -896,7 +896,7 @@
                                 @endif
 
                                 <!-- Scheduled Defence Date Display (All Roles) -->
-                                @if($milestone->template->allow_defence_date && $milestone->defence_date)
+                                @if($milestone->template?->allow_defence_date && $milestone->defence_date)
                                     <div class="mb-6 flex items-center gap-4 p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100">
                                         <div class="w-12 h-12 rounded-2xl bg-white border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-sm shrink-0">
                                             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -949,7 +949,7 @@
                                 @endif
 
                                 @php
-                                    $userApproverRoles = $milestone->template->required_approvers ?? ['Program Coordinator'];
+                                    $userApproverRoles = $milestone->template?->required_approvers ?? ['Program Coordinator'];
                                     $userCanEverApprove = false;
                                     $matchedRole = null;
                                     foreach($userApproverRoles as $r) {
@@ -964,8 +964,8 @@
                                 @if($userCanEverApprove && $milestone->status !== 'approved')
                                     @if($canUserApprove)
                                         @php
-                                            $blockApprovalUnlock = $milestone->template->submission_requires_approval && !$milestone->is_submission_unlocked;
-                                            $blockApprovalSubmission = $milestone->template->requires_submission && $milestone->submissions->count() === 0;
+                                            $blockApprovalUnlock = $milestone->template?->submission_requires_approval && !$milestone->is_submission_unlocked;
+                                            $blockApprovalSubmission = $milestone->template?->requires_submission && $milestone->submissions->count() === 0;
                                             $blockApproval = $blockApprovalUnlock || $blockApprovalSubmission;
                                             $blockReason = $blockApprovalSubmission ? 'Awaiting Student Submission' : 'Submit form not unlocked';
                                         @endphp
@@ -1031,9 +1031,9 @@
                             <!-- Right: Activity & Artifact Hub -->
                             <div class="flex-1 space-y-8">
                                 <!-- WhatsApp-Style Institutional Comm-Link -->
-                                @if($milestone->template->has_chat)
+                                @if($milestone->template?->has_chat)
                                     @php $hasAssignments = $thesis->assignments->where('status', 'active')->count() > 0; @endphp
-                                    @if($milestone->template->show_supervisor_assignment && !$hasAssignments && auth()->user()->hasRole('Student'))
+                                    @if($milestone->template?->show_supervisor_assignment && !$hasAssignments && auth()->user()->hasRole('Student'))
                                         <div class="p-10 bg-gray-50 border border-gray-100 rounded-3xl flex flex-col items-center justify-center text-center">
                                             <div class="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-gray-200 mb-4 shadow-sm">
                                                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
@@ -1043,7 +1043,7 @@
                                         </div>
                                     @else
                                         @php
-                                            $approverRoles = $milestone->template->required_approvers ?? [];
+                                            $approverRoles = $milestone->template?->required_approvers ?? [];
                                             $mentions = collect();
                                             
                                             if (in_array('Supervisor', $approverRoles)) {
@@ -1082,9 +1082,9 @@
                                             </div>
                                         </div>
 
-                                        @if(auth()->user()->hasRole('Student') && $milestone->thesis->student->user_id === auth()->id() && $milestone->status !== 'approved' && $milestone->template->requires_submission)
+                                        @if(auth()->user()->hasRole('Student') && $milestone->thesis->student->user_id === auth()->id() && $milestone->status !== 'approved' && $milestone->template?->requires_submission)
                                             @php
-                                                $isUnlocked = !$milestone->template->submission_requires_approval || $milestone->is_submission_unlocked;
+                                                $isUnlocked = !$milestone->template?->submission_requires_approval || $milestone->is_submission_unlocked;
                                             @endphp
                                             
                                             @if($isUnlocked)
@@ -1165,9 +1165,9 @@
                                                                 </div>
                                                             </div>
 
-                                                        <div class="grid grid-cols-1 {{ count($milestone->template->submission_type) > 1 || $milestone->template->is_final_archival ? 'md:grid-cols-2' : '' }} gap-6">
+                                                        <div class="grid grid-cols-1 {{ count($milestone->template?->submission_type ?? []) > 1 || $milestone->template?->is_final_archival ? 'md:grid-cols-2' : '' }} gap-6">
                                                             <!-- Milestone 13 Extra Fields -->
-                                                            @if($milestone->template->is_final_archival)
+                                                            @if($milestone->template?->is_final_archival)
                                                                 <div class="md:col-span-2 space-y-6 bg-white/40 p-10 rounded-[2.5rem] border border-brand-100/50 shadow-sm">
                                                                     <div>
                                                                         <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Final Thesis Title</label>
@@ -1180,7 +1180,7 @@
                                                                         @foreach($milestone->thesis->assignments as $assignment)
                                                                             <div>
                                                                                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">{{ $assignment->role }}</label>
-                                                                                <input type="text" value="{{ $assignment->supervisor->user->name }}" readonly disabled
+                                                                                <input type="text" value="{{ $assignment->supervisor?->user?->name ?? 'N/A' }}" readonly disabled
                                                                                     class="w-full px-6 py-4 bg-gray-50 border border-gray-200 rounded-[1.5rem] text-sm font-bold text-gray-500 cursor-not-allowed outline-none">
                                                                             </div>
                                                                         @endforeach
@@ -1201,17 +1201,17 @@
                                                             @endif
 
                                                             <!-- File Upload -->
-                                                            @if(in_array('file', $milestone->template->submission_type))
+                                                            @if(in_array('file', $milestone->template?->submission_type ?? []))
                                                             <div class="relative group/ms">
                                                                 <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
-                                                                    @if($milestone->template->is_final_archival)
+                                                                    @if($milestone->template?->is_final_archival)
                                                                         Final Library Copy (PDF Only)
                                                                     @else
-                                                                        {{ count($milestone->template->submission_type) > 1 ? 'Thesis Manuscript' : 'Working Document' }} (Mandatory)
+                                                                        {{ count($milestone->template?->submission_type) > 1 ? 'Thesis Manuscript' : 'Working Document' }} (Mandatory)
                                                                     @endif
                                                                 </label>
                                                                 <input type="file" name="file" 
-                                                                    @if($milestone->template->is_final_archival) accept="application/pdf" @endif
+                                                                    @if($milestone->template?->is_final_archival) accept="application/pdf" @endif
                                                                     class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" required 
                                                                     @change="fileLoaded = !!$event.target.files[0]">
                                                                 <div class="px-6 py-6 bg-white rounded-3xl border border-gray-100 border-dotted flex flex-col items-center justify-center gap-2 group-hover/ms:border-brand-500 transition-all shadow-sm"
@@ -1223,7 +1223,7 @@
                                                             @endif
 
                                                             <!-- Publication Upload: Smart Multi-File Manager -->
-                                                            @if(in_array('publication', $milestone->template->submission_type))
+                                                            @if(in_array('publication', $milestone->template?->submission_type ?? []))
                                                             @php
                                                                 $pubCountStored = $milestone->submissions->where('type', 'publication')->count();
                                                                 $maxRemaining = 5 - $pubCountStored;
@@ -1361,7 +1361,7 @@
                                                                 </div>
                                                             </div>
                                                             <div class="flex items-center gap-2">
-                                                                @if(auth()->user()->hasAnyRole(['Admin', 'Program Coordinator']) && $milestone->template->order == 9)
+                                                                @if(auth()->user()->hasAnyRole(['Admin', 'Program Coordinator']) && $milestone->template?->order == 9)
                                                                     <form x-data="{ uploading: false }" action="{{ route('submissions.plagiarism', $submission) }}" method="POST" enctype="multipart/form-data" class="flex items-center gap-2 mr-2" @submit.prevent="
                                                                         uploading = true;
                                                                         fetch($event.target.action, {

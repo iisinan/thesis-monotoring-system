@@ -56,6 +56,11 @@ class MilestoneTemplate extends Model
         'show_external_examiner_assignment' => 'boolean',
     ];
 
+    public function getSubmissionTypeAttribute($value)
+    {
+        return json_decode($value ?? '[]', true) ?: ['file'];
+    }
+
     protected static function boot()
     {
         parent::boot();
