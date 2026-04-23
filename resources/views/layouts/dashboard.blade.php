@@ -2,7 +2,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" 
       x-data="{ 
           darkMode: false, 
-          sidebarOpen: Alpine.store('sidebar').open 
+          get sidebarOpen() { return this.$store.sidebar.open }
       }"
       class="h-full bg-slate-50">
 <head>
