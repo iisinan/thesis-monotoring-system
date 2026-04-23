@@ -55,6 +55,14 @@ class MilestoneController extends Controller
                 ->with(['template', 'submissions.submittedBy', 'messages.sender', 'unlockedBy'])
                 ->get()
                 ->sortBy('template.order');
+
+            if ($milestones->isEmpty()) {
+                $thesis->syncMilestones();
+                $milestones = $thesis->milestones()
+                    ->with(['template', 'submissions.submittedBy', 'messages.sender', 'unlockedBy'])
+                    ->get()
+                    ->sortBy('template.order');
+            }
             
             // Get supervisors
             $supervisors = $thesis->assignments->map(function ($assignment) {
