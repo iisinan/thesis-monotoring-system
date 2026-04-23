@@ -179,9 +179,14 @@ class CohortController extends Controller
             ]);
             
             // Dispatch credentials notification
-            // Temporarily disabled for debugging 500 errors
-            // \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeUser($user, $password));
+            // Dispatch credentials notification with safety catch
+            try {
+                \Illuminate\Support\Facades\Mail::to($user->email)->queue(new \App\Mail\WelcomeUser($user, $password));
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Failed to queue welcome email for {$user->email}: " . $e->getMessage());
+            }
         });
+
 
 
         return redirect()->route('admin.cohorts.show', $cohort)->with('success', 'Academic identity provisioned and notified successfully.');
