@@ -9,7 +9,7 @@
 @endsection
 
 @section('content')
-<div class="space-y-8 pb-20" x-data="{ expanded: '{{ request('expanded') }}' || null }">
+<div class="space-y-8 pb-20" x-data="{ expanded: '{{ request('expanded', $ongoingMilestoneId) }}' }">
     <script>
         window.refreshMilestone = async (id) => {
             const container = document.getElementById('milestone-container-' + id);
@@ -110,8 +110,9 @@
                 @foreach($milestones as $m)
                     <div class="flex flex-col items-center min-w-[140px] group">
                         <!-- Connector Node -->
-                        <div class="relative z-10 w-14 h-14 rounded-2xl flex items-center justify-center border-4 border-white shadow-lg transition-all duration-500 group-hover:scale-110"
-                             class="{{ $m->status === 'approved' ? 'bg-green-500 text-white' : ($m->id == $ongoingMilestoneId ? 'bg-brand-500 text-white ring-8 ring-brand-50/50' : 'bg-white text-gray-400 border-gray-100') }}">
+                        <div class="relative z-10 w-14 h-14 rounded-2xl flex items-center justify-center border-4 border-white shadow-lg transition-all duration-500 group-hover:scale-110 cursor-pointer"
+                             @click="expanded = expanded === '{{ $m->id }}' ? null : '{{ $m->id }}'; if(expanded) $nextTick(() => document.getElementById('milestone-container-' + '{{ $m->id }}').scrollIntoView({ behavior: 'smooth', block: 'center' }))"
+                             :class="{ 'bg-green-500 text-white': '{{ $m->status }}' === 'approved', 'bg-brand-500 text-white ring-8 ring-brand-50/50': '{{ $m->id }}' === ongoingMilestoneId, 'bg-white text-gray-400 border-gray-100': '{{ $m->status }}' !== 'approved' && '{{ $m->id }}' !== ongoingMilestoneId }">
                             @if($m->status === 'approved')
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
                             @elseif($m->id == $ongoingMilestoneId)
