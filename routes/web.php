@@ -167,10 +167,20 @@ Route::get('/debug/send-test-email', function() {
             'note' => 'If using SMTP, check your inbox. If using log driver, check storage/logs/laravel.log'
         ]);
 
+
     } catch (\Exception $e) {
         return response()->json(['error' => 'Failed to send email: ' . $e->getMessage()], 500);
     }
 })->middleware(['auth']);
+
+Route::get('/student-diag', function() {
+    $results = [];
+    $results['notifications_table'] = Schema::hasTable('notifications');
+    $results['student_count'] = \App\Models\User::role('Student')->count();
+    $results['milestones_templates'] = \App\Models\MilestoneTemplate::count();
+    return response()->json($results);
+});
+
 
 
 
