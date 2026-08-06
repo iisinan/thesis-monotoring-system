@@ -49,5 +49,5 @@ echo "=== Caching Config ==="
 php artisan config:cache || echo "Config cache failed"
 php artisan route:cache || echo "Route cache failed"
 
-echo "=== Starting Server on Port ${PORT:-8000} ==="
-exec php artisan serve --host=0.0.0.0 --port="${PORT:-8000}"
+echo "=== Starting Server on Port 8000 ==="
+exec php artisan serve --host=0.0.0.0 --port=8000
