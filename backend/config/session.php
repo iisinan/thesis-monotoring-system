@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'driver' => 'cookie', // Forced to 'cookie' to prevent 419 errors on stateless Render containers
+    'driver' => 'file', // Forced to 'file' to bypass broken Redis env vars on Render
 
     /*
     |--------------------------------------------------------------------------
@@ -156,7 +156,7 @@ return [
     |
     */
 
-    'domain' => null, // Forced to null to bypass broken Render env vars
+    'domain' => env('SESSION_DOMAIN'),
 
     /*
     |--------------------------------------------------------------------------
