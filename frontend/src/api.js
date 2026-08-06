@@ -4,7 +4,10 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'https://thesis-monotoring-syst
 
 const api = axios.create({
   baseURL: BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  },
   timeout: 30000, // 30s timeout (Render cold starts can be slow)
   withCredentials: false,
 });

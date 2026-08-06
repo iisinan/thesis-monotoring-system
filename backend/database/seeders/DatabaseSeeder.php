@@ -64,7 +64,7 @@ class DatabaseSeeder extends Seeder
         ]);
         $supervisorUser->syncRoles(['Supervisor']);
         if (!$supervisorUser->supervisorProfile) {
-            $supervisorUser->supervisorProfile()->create(['department' => 'Computer Science', 'max_students' => 5, 'specialization_areas' => ['AI', 'Cybersecurity']]);
+            $supervisorUser->supervisorProfile()->create(['department' => 'Computer Science', 'max_students' => 5, 'specialization_areas' => json_encode(['AI', 'Cybersecurity'])]);
         }
 
         // Dummy Students

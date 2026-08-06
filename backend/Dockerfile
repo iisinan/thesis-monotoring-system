@@ -63,6 +63,9 @@ COPY . .
 # Setup nginx config
 COPY nginx.conf /etc/nginx/sites-available/default
 
+# Allow PHP-FPM to read environment variables from Render
+RUN echo "clear_env = no" >> /usr/local/etc/php-fpm.d/www.conf
+
 # Run composer scripts now that the full app is present (package:discover, etc.)
 RUN composer run-script post-autoload-dump || true
 
