@@ -288,6 +288,12 @@ class MilestoneReviewController extends Controller
             }
         }
 
+        // Invalidate student dashboard query cache
+        $studentUser = $milestone->thesis->student?->user;
+        if ($studentUser) {
+            \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUser->id);
+        }
+
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,

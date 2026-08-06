@@ -20,10 +20,21 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     Route::get('/thesis', function (Request $request) {
-        $student = $request->user()->studentProfile;
-        if (!$student) return response()->json(['message' => 'Profile not found'], 404);
-        
-        return $student->load(['thesis.milestones.template', 'thesis.assignments.supervisor.user', 'program', 'level']);
+        $user = $request->user();
+        $cacheKey = 'user_thesis_' . $user->id;
+
+        $data = Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($user) {
+            $student = $user->studentProfile;
+            if (!$student) return null;
+            
+            return $student->load(['thesis.milestones.template', 'thesis.assignments.supervisor.user', 'program', 'level'])->toArray();
+        });
+
+        if (!$data) {
+            return response()->json(['message' => 'Profile not found'], 404);
+        }
+
+        return response()->json($data);
     });
     
     Route::post('/logout', [AuthController::class, 'logout']);

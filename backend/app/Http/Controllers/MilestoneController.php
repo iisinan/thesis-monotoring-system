@@ -454,6 +454,9 @@ class MilestoneController extends Controller
             \App\Events\MilestoneSubmitted::dispatch($milestone, $userId);
         }
 
+        // Invalidate student dashboard query cache
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . Auth::id());
+
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
