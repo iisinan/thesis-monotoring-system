@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     nodejs \
     npm \
+    nginx \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -58,6 +59,9 @@ RUN npm ci
 
 # Copy the rest of the application
 COPY . .
+
+# Setup nginx config
+COPY nginx.conf /etc/nginx/sites-available/default
 
 # Run composer scripts now that the full app is present (package:discover, etc.)
 RUN composer run-script post-autoload-dump || true
