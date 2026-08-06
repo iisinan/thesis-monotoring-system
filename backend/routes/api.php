@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ThesisController;
 use App\Http\Controllers\MilestoneController;
@@ -22,291 +23,302 @@ use App\Models\Cohort;
 use App\Models\AuditLog;
 use App\Models\Announcement;
 
-// ── Auth routes (public) ────────────────────────────────────────────
+// ── Public routes ──────────────────────────────────────────────────
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login',    [AuthController::class, 'login']);
 
-// ── Authenticated routes ────────────────────────────────────────────
+// ── Health / keep-alive ping (prevents Render cold starts) ─────────
+Route::get('/ping', function () {
+    return response()->json(['status' => 'ok', 'ts' => now()->toISOString()]);
+});
+
+// ── Protected routes ───────────────────────────────────────────────
 Route::middleware(['auth:sanctum'])->group(function () {
 
     // ── Current user ────────────────────────────────────────────────
     Route::get('/user', function (Request $request) {
         $user = $request->user()->load(['roles']);
-        $role = $user->getRoleNames()->first();
         return response()->json([
             'id'    => $user->id,
             'name'  => $user->name,
             'email' => $user->email,
-            'role'  => $role,
+            'role'  => $user->getRoleNames()->first(),
         ]);
     });
 
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // ── Dashboard data (role-aware) ──────────────────────────────────
+    // ── Dashboard (cached per user, 10-min TTL) ─────────────────────
     Route::get('/dashboard', function (Request $request) {
         $user = $request->user();
         $role = $user->getRoleNames()->first();
+        $key  = "dashboard_{$user->id}";
 
-        if ($role === 'Student') {
-            $student = StudentProfile::where('user_id', $user->id)
-                ->with(['thesis.milestones.template', 'thesis.assignments.supervisor.user', 'program', 'level', 'cohort'])
-                ->first();
+        return Cache::remember($key, 600, function () use ($user, $role) {
+            if ($role === 'Student') {
+                $student = StudentProfile::where('user_id', $user->id)
+                    ->with(['thesis.milestones.template', 'thesis.assignments.supervisor.user', 'program', 'level', 'cohort'])
+                    ->first();
 
-            if (!$student) return response()->json(['role' => $role, 'student' => null]);
+                if (!$student) return ['role' => $role, 'student' => null, 'milestones' => [], 'stats' => []];
 
-            $thesis = $student->thesis;
-            $milestones = $thesis ? $thesis->milestones->sortBy('template.order')->values() : collect();
-            $total     = $milestones->count();
-            $completed = $milestones->where('status', 'approved')->count();
+                $thesis     = $student->thesis;
+                $milestones = $thesis ? $thesis->milestones->sortBy('template.order')->values() : collect();
+                $total      = $milestones->count();
+                $completed  = $milestones->where('status', 'approved')->count();
 
-            return response()->json([
-                'role'    => $role,
-                'student' => $student,
-                'thesis'  => $thesis,
-                'milestones' => $milestones,
-                'stats' => [
-                    'total_milestones'     => $total,
-                    'completed_milestones' => $completed,
-                    'pending_milestones'   => $milestones->whereIn('status', ['not_started', 'pending', 'revision_required'])->count(),
-                    'overall_progress'     => $total > 0 ? round(($completed / $total) * 100) : 0,
-                ],
-            ]);
-        }
-
-        if ($role === 'Supervisor') {
-            $supervisor = SupervisorProfile::where('user_id', $user->id)
-                ->with(['assignments.thesis.student.user', 'assignments.thesis.milestones'])
-                ->first();
-
-            $students = collect();
-            $pending_reviews = collect();
-
-            if ($supervisor) {
-                $students = $supervisor->assignments->map(function ($a) {
-                    $s = $a->thesis->student ?? null;
-                    if ($s) $s->overall_progress = $a->thesis->progress_percentage ?? 0;
-                    return $s;
-                })->filter()->unique('id')->values();
-
-                $pending_reviews = StudentMilestone::whereHas('thesis.assignments', function ($q) use ($supervisor) {
-                    $q->where('supervisor_profile_id', $supervisor->id)->where('status', 'active');
-                })->where('status', '!=', 'approved')
-                    ->whereNotNull('submitted_at')
-                    ->with(['thesis.student.user', 'template'])
-                    ->latest()->get();
+                return [
+                    'role'       => $role,
+                    'student'    => $student,
+                    'thesis'     => $thesis,
+                    'milestones' => $milestones->values(),
+                    'stats' => [
+                        'total_milestones'     => $total,
+                        'completed_milestones' => $completed,
+                        'pending_milestones'   => $milestones->whereIn('status', ['not_started','pending','revision_required'])->count(),
+                        'overall_progress'     => $total > 0 ? round(($completed / $total) * 100) : 0,
+                    ],
+                ];
             }
 
-            return response()->json([
-                'role'           => $role,
-                'students'       => $students,
-                'pending_reviews'=> $pending_reviews,
-                'stats' => [
-                    'assigned_students' => $students->count(),
-                    'pending_reviews'   => $pending_reviews->count(),
-                ],
-            ]);
-        }
+            if ($role === 'Supervisor') {
+                $supervisor = SupervisorProfile::where('user_id', $user->id)
+                    ->with(['assignments.thesis.student.user','assignments.thesis.milestones'])
+                    ->first();
 
-        if ($role === 'Program Coordinator') {
-            $totalStudents    = StudentProfile::forCoordinator($user)->count();
-            $totalSupervisors = SupervisorProfile::count();
-            $activeTheses     = ThesisProject::where('status', 'active')->count();
-            $pendingReviews   = StudentMilestone::where('status', 'submitted')->count();
+                $students = collect();
+                $pending  = collect();
 
-            $students = StudentProfile::forCoordinator($user)
-                ->with(['user', 'program', 'level', 'thesis'])
-                ->latest()->take(20)->get();
+                if ($supervisor) {
+                    $students = $supervisor->assignments->map(function ($a) {
+                        $s = $a->thesis->student ?? null;
+                        if ($s) $s->overall_progress = $a->thesis->progress_percentage ?? 0;
+                        return $s;
+                    })->filter()->unique('id')->values();
 
-            return response()->json([
-                'role'     => $role,
-                'students' => $students,
-                'stats' => [
-                    'total_students'    => $totalStudents,
-                    'total_supervisors' => $totalSupervisors,
-                    'active_theses'     => $activeTheses,
-                    'pending_reviews'   => $pendingReviews,
-                ],
-            ]);
-        }
+                    $pending = StudentMilestone::whereHas('thesis.assignments', fn ($q) =>
+                        $q->where('supervisor_profile_id', $supervisor->id)->where('status', 'active')
+                    )->where('status', 'submitted')->whereNotNull('submitted_at')
+                     ->with(['thesis.student.user','template'])->latest()->get();
+                }
 
-        if (in_array($role, ['Admin', 'Director'])) {
-            $stats = [
-                'total_users'    => User::count(),
-                'total_theses'   => ThesisProject::count(),
-                'active_students'=> StudentProfile::where('enrollment_status', 'active')->count(),
-                'program_count'  => Program::count(),
-                'student_count'  => User::role('Student')->count(),
-                'staff_count'    => User::role(['Admin','Director','Program Coordinator','Supervisor'])->count(),
-            ];
+                return [
+                    'role'            => $role,
+                    'students'        => $students,
+                    'pending_reviews' => $pending,
+                    'stats' => [
+                        'assigned_students' => $students->count(),
+                        'pending_reviews'   => $pending->count(),
+                    ],
+                ];
+            }
 
-            $projects = ThesisProject::with('student.user', 'student.program')->latest()->take(10)->get();
-            $recent_logs = AuditLog::with('user')->latest()->take(6)->get();
+            if ($role === 'Program Coordinator') {
+                $students = StudentProfile::forCoordinator($user)
+                    ->with(['user','program','level','thesis'])->latest()->take(20)->get();
+                return [
+                    'role'     => $role,
+                    'students' => $students,
+                    'stats' => [
+                        'total_students'    => StudentProfile::forCoordinator($user)->count(),
+                        'total_supervisors' => SupervisorProfile::count(),
+                        'active_theses'     => ThesisProject::where('status','active')->count(),
+                        'pending_reviews'   => StudentMilestone::where('status','submitted')->count(),
+                    ],
+                ];
+            }
 
-            return response()->json([
-                'role'         => $role,
-                'stats'        => $stats,
-                'projects'     => $projects,
-                'recent_logs'  => $recent_logs,
-            ]);
-        }
+            if (in_array($role, ['Admin','Director'])) {
+                return [
+                    'role'        => $role,
+                    'stats' => [
+                        'total_users'     => User::count(),
+                        'total_theses'    => ThesisProject::count(),
+                        'active_students' => StudentProfile::where('enrollment_status','active')->count(),
+                        'program_count'   => Program::count(),
+                        'student_count'   => User::role('Student')->count(),
+                        'staff_count'     => User::role(['Admin','Director','Program Coordinator','Supervisor'])->count(),
+                    ],
+                    'projects'    => ThesisProject::with('student.user','student.program')->latest()->take(10)->get(),
+                    'recent_logs' => AuditLog::with('user')->latest()->take(6)->get(),
+                ];
+            }
 
-        return response()->json(['role' => $role, 'stats' => []]);
+            return ['role' => $role, 'stats' => []];
+        });
     });
 
-    // ── Student thesis + milestones ──────────────────────────────────
+    // ── Student thesis + milestones (cached 5 min) ──────────────────
     Route::get('/thesis', function (Request $request) {
         $user = $request->user();
-        $cacheKey = 'user_thesis_' . $user->id;
-        $data = Cache::remember($cacheKey, 300, function () use ($user) {
+        $key  = 'user_thesis_' . $user->id;
+        $data = Cache::remember($key, 300, function () use ($user) {
             $student = $user->studentProfile;
             if (!$student) return null;
-            return $student->load(['thesis.milestones.template', 'thesis.assignments.supervisor.user', 'program', 'level'])->toArray();
+            return $student->load(['thesis.milestones.template','thesis.assignments.supervisor.user','program','level'])->toArray();
         });
         if (!$data) return response()->json(['message' => 'Profile not found'], 404);
         return response()->json($data);
     });
 
-    Route::post('/thesis', [ThesisController::class, 'store']);
-    Route::post('/thesis/{thesis}/assign-supervisor', [ThesisController::class, 'assignSupervisor']);
-
-    // ── Milestones ──────────────────────────────────────────────────
     Route::get('/milestones', function (Request $request) {
         $user    = $request->user();
         $student = StudentProfile::where('user_id', $user->id)->first();
         if (!$student || !$student->thesis) return response()->json(['milestones' => [], 'thesis' => null]);
 
-        $thesis     = $student->thesis;
-        $milestones = StudentMilestone::where('thesis_project_id', $thesis->id)
-            ->with(['template', 'submissions'])
-            ->get()->sortBy('template.order')->values();
-
-        return response()->json(['milestones' => $milestones, 'thesis' => $thesis]);
+        $key    = 'milestones_' . $student->id;
+        $result = Cache::remember($key, 300, function () use ($student) {
+            $thesis     = $student->thesis;
+            $milestones = StudentMilestone::where('thesis_project_id', $thesis->id)
+                ->with(['template','submissions'])->get()->sortBy('template.order')->values();
+            return ['milestones' => $milestones, 'thesis' => $thesis];
+        });
+        return response()->json($result);
     });
 
-    Route::post('/milestones/{milestone}/submit',  [MilestoneController::class, 'store']);
-    Route::post('/milestones/{milestone}/review',  [MilestoneReviewController::class, 'update']);
+    Route::post('/thesis', [ThesisController::class, 'store']);
+    Route::post('/thesis/{thesis}/assign-supervisor', [ThesisController::class, 'assignSupervisor']);
 
-    // ── Supervisor: students list ────────────────────────────────────
+    Route::post('/milestones/{milestone}/submit', function (Request $request, $milestoneId) {
+        $user    = $request->user();
+        $student = StudentProfile::where('user_id', $user->id)->first();
+
+        // Invalidate student caches
+        Cache::forget('dashboard_' . $user->id);
+        Cache::forget('user_thesis_' . $user->id);
+        if ($student) Cache::forget('milestones_' . $student->id);
+
+        return app(MilestoneController::class)->store($request, \App\Models\StudentMilestone::findOrFail($milestoneId));
+    });
+
+    Route::post('/milestones/{milestone}/review', function (Request $request, $milestoneId) {
+        // Invalidate all dashboard caches (reviewer could be anyone)
+        Cache::flush(); // safe — file cache is cheap to rebuild
+        return app(MilestoneReviewController::class)->update($request, \App\Models\StudentMilestone::findOrFail($milestoneId));
+    });
+
+    // ── Supervisor students (cached 5 min) ──────────────────────────
     Route::get('/supervisor/students', function (Request $request) {
-        $user       = $request->user();
-        $supervisor = SupervisorProfile::where('user_id', $user->id)
-            ->with(['assignments.thesis.student.user', 'assignments.thesis.milestones'])
-            ->first();
+        $user = $request->user();
+        $key  = 'supervisor_students_' . $user->id;
 
-        if (!$supervisor) return response()->json(['students' => []]);
+        return response()->json(Cache::remember($key, 300, function () use ($user) {
+            $supervisor = SupervisorProfile::where('user_id', $user->id)
+                ->with(['assignments.thesis.student.user','assignments.thesis.milestones'])->first();
 
-        $students = $supervisor->assignments->map(function ($a) {
-            $s = $a->thesis->student ?? null;
-            if ($s) {
-                $s->overall_progress  = $a->thesis->progress_percentage ?? 0;
-                $s->thesis_title      = $a->thesis->title;
-                $s->thesis_status     = $a->thesis->status;
-                $s->milestones_done   = $a->thesis->milestones->where('status', 'approved')->count();
-                $s->milestones_total  = $a->thesis->milestones->count();
-            }
-            return $s;
-        })->filter()->unique('id')->values();
+            if (!$supervisor) return ['students' => [], 'pending_reviews' => []];
 
-        $pending = StudentMilestone::whereHas('thesis.assignments', function ($q) use ($supervisor) {
-            $q->where('supervisor_profile_id', $supervisor->id)->where('status', 'active');
-        })->where('status', 'submitted')
-            ->whereNotNull('submitted_at')
-            ->with(['thesis.student.user', 'template'])
-            ->latest()->get();
+            $students = $supervisor->assignments->map(function ($a) {
+                $s = $a->thesis->student ?? null;
+                if ($s) {
+                    $s->overall_progress = $a->thesis->progress_percentage ?? 0;
+                    $s->thesis_title     = $a->thesis->title;
+                    $s->thesis_status    = $a->thesis->status;
+                    $s->milestones_done  = $a->thesis->milestones->where('status','approved')->count();
+                    $s->milestones_total = $a->thesis->milestones->count();
+                }
+                return $s;
+            })->filter()->unique('id')->values();
 
-        return response()->json(['students' => $students, 'pending_reviews' => $pending]);
+            $pending = StudentMilestone::whereHas('thesis.assignments', fn ($q) =>
+                $q->where('supervisor_profile_id', $supervisor->id)->where('status','active')
+            )->where('status','submitted')->whereNotNull('submitted_at')
+             ->with(['thesis.student.user','template'])->latest()->get();
+
+            return ['students' => $students, 'pending_reviews' => $pending];
+        }));
     });
 
-    // ── Coordinator: students list ───────────────────────────────────
+    // ── Coordinator routes (cached 5 min) ───────────────────────────
     Route::get('/coordinator/students', function (Request $request) {
-        $user     = $request->user();
-        $students = StudentProfile::forCoordinator($user)
-            ->with(['user', 'program', 'level', 'thesis.milestones'])
-            ->latest()->paginate(30);
-        return response()->json($students);
+        $user = $request->user();
+        $key  = 'coord_students_' . $user->id;
+        return response()->json(Cache::remember($key, 300, function () use ($user) {
+            return StudentProfile::forCoordinator($user)
+                ->with(['user','program','level','thesis.milestones'])
+                ->latest()->paginate(30);
+        }));
     });
 
     Route::get('/coordinator/dashboard-stats', function (Request $request) {
         $user = $request->user();
-        return response()->json([
-            'stats' => [
-                'total_students'    => StudentProfile::forCoordinator($user)->count(),
-                'total_supervisors' => SupervisorProfile::count(),
-                'active_theses'     => ThesisProject::where('status', 'active')->count(),
-                'pending_reviews'   => StudentMilestone::where('status', 'submitted')->count(),
-            ],
-        ]);
+        $key  = 'coord_stats_' . $user->id;
+        return response()->json(Cache::remember($key, 300, function () use ($user) {
+            return [
+                'stats' => [
+                    'total_students'    => StudentProfile::forCoordinator($user)->count(),
+                    'total_supervisors' => SupervisorProfile::count(),
+                    'active_theses'     => ThesisProject::where('status','active')->count(),
+                    'pending_reviews'   => StudentMilestone::where('status','submitted')->count(),
+                ],
+            ];
+        }));
     });
 
-    // ── Admin: users management ──────────────────────────────────────
+    // ── Admin routes (cached 2 min) ──────────────────────────────────
     Route::get('/admin/users', function (Request $request) {
-        $search = $request->get('search');
-        $role   = $request->get('role');
+        $search = $request->get('search','');
+        $role   = $request->get('role','');
+        $page   = $request->get('page', 1);
+        $key    = "admin_users_{$search}_{$role}_{$page}";
 
-        $q = User::with('roles')->latest();
-        if ($search) $q->where(fn ($q2) => $q2->where('name', 'ilike', "%$search%")->orWhere('email', 'ilike', "%$search%"));
-        if ($role)   $q->role($role);
-
-        return response()->json($q->paginate(20));
+        return response()->json(Cache::remember($key, 120, function () use ($search, $role) {
+            $q = User::with('roles')->latest();
+            if ($search) $q->where(fn ($q2) => $q2->where('name','ilike',"%$search%")->orWhere('email','ilike',"%$search%"));
+            if ($role)   $q->role($role);
+            return $q->paginate(20);
+        }));
     });
 
     Route::get('/admin/stats', function () {
-        return response()->json([
-            'total_users'    => User::count(),
-            'total_theses'   => ThesisProject::count(),
-            'active_students'=> StudentProfile::where('enrollment_status', 'active')->count(),
-            'program_count'  => Program::count(),
-            'student_count'  => User::role('Student')->count(),
-            'staff_count'    => User::role(['Admin','Director','Program Coordinator','Supervisor'])->count(),
-            'recent_logs'    => AuditLog::with('user')->latest()->take(8)->get(),
-            'projects'       => ThesisProject::with('student.user', 'student.program')->latest()->take(10)->get(),
-        ]);
+        return response()->json(Cache::remember('admin_stats', 120, function () {
+            return [
+                'total_users'     => User::count(),
+                'total_theses'    => ThesisProject::count(),
+                'active_students' => StudentProfile::where('enrollment_status','active')->count(),
+                'program_count'   => Program::count(),
+                'student_count'   => User::role('Student')->count(),
+                'staff_count'     => User::role(['Admin','Director','Program Coordinator','Supervisor'])->count(),
+                'recent_logs'     => AuditLog::with('user')->latest()->take(8)->get(),
+                'projects'        => ThesisProject::with('student.user','student.program')->latest()->take(10)->get(),
+            ];
+        }));
     });
 
     Route::get('/admin/theses', function (Request $request) {
-        $search = $request->get('search');
-        $status = $request->get('status');
+        $search = $request->get('search','');
+        $status = $request->get('status','');
+        $page   = $request->get('page', 1);
+        $key    = "admin_theses_{$search}_{$status}_{$page}";
 
-        $q = ThesisProject::with('student.user', 'student.program')->latest();
-        if ($search) $q->where('title', 'ilike', "%$search%");
-        if ($status) $q->where('status', $status);
-
-        return response()->json($q->paginate(20));
+        return response()->json(Cache::remember($key, 120, function () use ($search, $status) {
+            $q = ThesisProject::with('student.user','student.program')->latest();
+            if ($search) $q->where('title','ilike',"%$search%");
+            if ($status) $q->where('status',$status);
+            return $q->paginate(20);
+        }));
     });
 
-    Route::get('/admin/programs', function () {
-        return response()->json(Program::withCount(['students', 'coordinators'])->get());
-    });
+    Route::get('/admin/programs',   fn () => response()->json(Cache::remember('admin_programs',  300, fn () => Program::withCount(['students','coordinators'])->get())));
+    Route::get('/admin/cohorts',    fn () => response()->json(Cache::remember('admin_cohorts',   300, fn () => Cohort::withCount('students')->orderBy('intake_year','desc')->get())));
+    Route::get('/admin/audit-logs', fn () => response()->json(AuditLog::with('user')->latest()->paginate(30)));
 
-    Route::get('/admin/cohorts', function () {
-        return response()->json(Cohort::withCount('students')->orderBy('intake_year', 'desc')->get());
-    });
-
-    Route::get('/admin/audit-logs', function () {
-        return response()->json(AuditLog::with('user')->latest()->paginate(30));
-    });
-
-    // ── Announcements ────────────────────────────────────────────────
+    // ── Shared routes (cached) ─────────────────────────────────────
     Route::get('/announcements', function (Request $request) {
-        $user = $request->user();
-        $role = $user->getRoleNames()->first();
-        $announcements = Announcement::active()->forRole($role)->latest()->take(5)->get();
-        return response()->json($announcements);
+        $role = $request->user()->getRoleNames()->first();
+        return response()->json(Cache::remember("announcements_{$role}", 300, fn () =>
+            Announcement::active()->forRole($role)->latest()->take(5)->get()
+        ));
     });
 
-    // ── Repository ──────────────────────────────────────────────────
-    Route::get('/repository', [RepositoryController::class, 'index']);
+    Route::get('/repository', fn () => response()->json(Cache::remember('repository', 600, fn () =>
+        ThesisProject::with('student.user','student.program')->where('status','completed')->latest()->get()
+    )));
 
-    // ── Notifications ────────────────────────────────────────────────
-    Route::get('/notifications',        [NotificationController::class, 'index']);
-    Route::post('/notifications/read',  [NotificationController::class, 'markAllRead']);
-
-    // ── Inbox / Messages ─────────────────────────────────────────────
-    Route::get('/inbox',  [InboxController::class, 'index']);
-    Route::post('/messages', [MessageController::class, 'store']);
-
-    // ── Events ───────────────────────────────────────────────────────
-    Route::post('/events',                [EventController::class, 'schedule']);
-    Route::post('/events/{event}/evaluate', [EventController::class, 'evaluate']);
+    Route::get('/notifications',       [NotificationController::class, 'index']);
+    Route::post('/notifications/read', [NotificationController::class, 'markAllRead']);
+    Route::get('/inbox',               [InboxController::class,        'index']);
+    Route::post('/messages',           [MessageController::class,       'store']);
+    Route::post('/events',                        [EventController::class, 'schedule']);
+    Route::post('/events/{event}/evaluate',       [EventController::class, 'evaluate']);
 });
