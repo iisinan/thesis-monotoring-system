@@ -36,9 +36,9 @@ export default function Login({ onLoginSuccess, onNavigateToHome }) {
     }
   };
 
-  const handleQuickLogin = (quickEmail) => {
+  const handleQuickLogin = (quickEmail, quickPassword = 'password') => {
     setEmail(quickEmail);
-    setPassword('password');
+    setPassword(quickPassword);
   };
 
   return (
@@ -244,7 +244,7 @@ export default function Login({ onLoginSuccess, onNavigateToHome }) {
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => handleQuickLogin('admin@acetel.noun.edu.ng')}
+                onClick={() => handleQuickLogin('isinan@noun.edu.ng', 'Sinan3367#')}
                 className="py-2 text-center bg-white hover:bg-slate-100 border border-slate-200 hover:border-slate-300 rounded-lg text-emerald-600 text-[10px] font-bold transition-all"
               >
                 Admin (Neon Database)
