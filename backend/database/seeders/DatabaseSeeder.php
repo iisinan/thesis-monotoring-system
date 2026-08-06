@@ -84,13 +84,17 @@ class DatabaseSeeder extends Seeder
     }
 
     private function createStudent($name, $email, $program, $level, $cohort, $idNumber) {
-        $user = User::factory()->create(['name' => $name, 'email' => $email, 'password' => bcrypt('password')]);
+        $user = User::updateOrCreate(['email' => $email], ['name' => $name, 'password' => bcrypt('password')]);
         $user->assignRole('Student');
-        return $user->studentProfile()->create([
-            'program_id' => $program->id, 'level_id' => $level->id, 'cohort_id' => $cohort->id,
-            'student_id_number' => $idNumber, 'enrollment_status' => 'active', 'current_semester' => 2
-        ]);
+        if (!$user->studentProfile) {
+            return $user->studentProfile()->create([
+                'program_id' => $program->id, 'level_id' => $level->id, 'cohort_id' => $cohort->id,
+                'student_id_number' => $idNumber, 'enrollment_status' => 'active', 'current_semester' => 2
+            ]);
+        }
+        return $user->studentProfile;
     }
+
 
     private function createThesis($studentProfile, $title, $status) {
         $thesis = \App\Models\ThesisProject::create([
