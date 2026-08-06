@@ -52,6 +52,31 @@ class DatabaseSeeder extends Seeder
         ]);
         $admin->syncRoles(['Admin']);
 
+        // Dummy Program Coordinator
+        $coordUser = User::updateOrCreate(['email' => 'coordinator@noun.edu.ng'], [
+            'name' => 'Dr. Coordinator', 'password' => bcrypt('password'), 'is_active' => true
+        ]);
+        $coordUser->syncRoles(['Program Coordinator']);
+
+        // Dummy Supervisor
+        $supervisorUser = User::updateOrCreate(['email' => 'supervisor@noun.edu.ng'], [
+            'name' => 'Prof. Supervisor', 'password' => bcrypt('password'), 'is_active' => true
+        ]);
+        $supervisorUser->syncRoles(['Supervisor']);
+        if (!$supervisorUser->supervisorProfile) {
+            $supervisorUser->supervisorProfile()->create(['department' => 'Computer Science', 'max_students' => 5, 'specialization_areas' => ['AI', 'Cybersecurity']]);
+        }
+
+        // Dummy Students
+        if (User::role('Student')->count() < 2) {
+            $student1 = $this->createStudent('Alice Scholar', 'student1@noun.edu.ng', $progAI, $mscLevel, $cohort, 'NOU123456789');
+            $thesis1 = $this->createThesis($student1, 'Advanced Machine Learning in Cybersecurity', 'in_progress');
+            $this->assignSupervisor($thesis1, $supervisorUser);
+
+            $student2 = $this->createStudent('Bob Researcher', 'student2@noun.edu.ng', $progCyber, $phdLevel, $cohort, 'NOU987654321');
+            $this->createThesis($student2, 'Quantum Cryptography for Modern Networks', 'proposal_pending');
+        }
+
     }
 
     private function createStudent($name, $email, $program, $level, $cohort, $idNumber) {
