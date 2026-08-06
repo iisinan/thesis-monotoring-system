@@ -39,9 +39,11 @@ echo "=== Running migrations ==="
 php artisan migrate --force || echo "WARN: Migration failed — check DB connection"
 
 # ── Production caching ───────────────────────────────────────────
-echo "=== Caching config and routes ==="
+echo "=== Caching config, routes, views, and events ==="
 php artisan config:cache || echo "WARN: Config cache failed"
 php artisan route:cache  || echo "WARN: Route cache failed"
+php artisan view:cache   || echo "WARN: View cache failed"
+php artisan event:cache  || echo "WARN: Event cache failed"
 
 # ── Test whether Redis is actually reachable ─────────────────────
 echo "=== Testing Redis connection ==="
