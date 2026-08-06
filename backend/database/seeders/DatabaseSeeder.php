@@ -74,11 +74,11 @@ class DatabaseSeeder extends Seeder
         // Dummy Students
         if (User::role('Student')->count() < 2) {
             $student1 = $this->createStudent('Alice Scholar', 'student1@noun.edu.ng', $progAI, $mscLevel, $cohort, 'NOU123456789');
-            $thesis1 = $this->createThesis($student1, 'Advanced Machine Learning in Cybersecurity', 'in_progress');
+            $thesis1 = $this->createThesis($student1, 'Advanced Machine Learning in Cybersecurity', 'active');
             $this->assignSupervisor($thesis1, $supervisorUser);
 
             $student2 = $this->createStudent('Bob Researcher', 'student2@noun.edu.ng', $progCyber, $phdLevel, $cohort, 'NOU987654321');
-            $this->createThesis($student2, 'Quantum Cryptography for Modern Networks', 'proposal_pending');
+            $this->createThesis($student2, 'Quantum Cryptography for Modern Networks', 'proposed');
         }
 
     }
