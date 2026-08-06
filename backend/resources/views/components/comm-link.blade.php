@@ -143,7 +143,7 @@
 
     <div x-show="!isMinimized" x-cloak class="flex-1 flex flex-col bg-[#efeae2] relative overflow-hidden" style="min-h: {{ $height }}; max-h: {{ $maxHeight }};">
         <!-- Chat Background Pattern -->
-        <div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: url('https://www.transparenttextures.com/patterns/cubes.png');"></div>
+        <div class="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]"></div>
 
         <!-- Messages Stream -->
         <div class="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar relative z-10" x-ref="stream" id="chat-stream-{{ $milestoneId ?? 'global' }}">
