@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'database'),
+    'driver' => 'file', // Forced to 'file' to bypass broken Redis env vars on Render
 
     /*
     |--------------------------------------------------------------------------

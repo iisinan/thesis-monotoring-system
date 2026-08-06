@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('QUEUE_CONNECTION', 'database'),
+    'default' => 'sync', // Forced to 'sync' to bypass broken Redis env vars on Render
 
     /*
     |--------------------------------------------------------------------------

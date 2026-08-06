@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default' => env('CACHE_STORE', 'database'),
+    'default' => 'file', // Forced to 'file' to bypass broken Redis env vars on Render
 
     /*
     |--------------------------------------------------------------------------
