@@ -1,0 +1,5 @@
+name = "tms-frontend"
+pages_build_output_dir = "./dist"
+
+[vars]
+VITE_API_URL = "https://tms-backend.onrender.com/api"

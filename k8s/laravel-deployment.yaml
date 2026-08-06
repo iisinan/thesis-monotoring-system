@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tms-laravel-api
+  labels:
+    app: tms-laravel-api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: tms-laravel-api
+  template:
+    metadata:
+      labels:
+        app: tms-laravel-api
+    spec:
+      containers:
+      - name: laravel
+        image: tms-laravel-api:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+        env:
+        - name: APP_ENV
+          value: "production"
+        - name: APP_KEY
+          valueFrom:
+            secretKeyRef:
+              name: tms-secrets
+              key: app-key
+        - name: DB_CONNECTION
+          value: "pgsql"
+        - name: DB_HOST
+          value: "postgres-service"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_DATABASE
+          value: "tms_db"
+        - name: DB_USERNAME
+          value: "postgres"
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: tms-secrets
+              key: db-password
+        - name: PLAGIARISM_SERVICE_URL
+          value: "http://tms-plagiarism-service:8001"
+        livenessProbe:
+          httpGet:
+            path: /up
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /up
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        resources:
+          limits:
+            cpu: "1"
+            memory: "1Gi"
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tms-laravel-service
+spec:
+  selector:
+    app: tms-laravel-api
+  ports:
+  - protocol: TCP
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP
