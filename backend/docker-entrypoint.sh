@@ -9,8 +9,9 @@ mkdir -p storage/framework/views storage/framework/cache storage/framework/sessi
 chmod -R 775 storage bootstrap/cache
 chown -R www-data:www-data storage bootstrap/cache
 
-# Delete .env to ensure Railway variables take priority
-rm -f .env || true
+# Touch .env to ensure it exists so key:generate won't crash if it runs
+touch .env
+
 
 # NUCLEAR CACHE CLEAR: Manually delete cache files before Laravel starts
 echo "=== Nuking Cache Files ==="
