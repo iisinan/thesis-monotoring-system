@@ -1,51 +1,71 @@
-import React, { useState, useEffect } from 'react';
-import Welcome from './pages/Welcome';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import React, { useEffect } from 'react';
+import './index.css';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { getCurrentUser } from './api';
 
+// Pages
+import Welcome   from './pages/Welcome';
+import Login     from './pages/Login';
+import AppShell  from './components/AppShell';
+
+// Role dashboards & pages
+import StudentDashboard     from './pages/student/Dashboard';
+import StudentMilestones    from './pages/student/Milestones';
+import SupervisorDashboard  from './pages/supervisor/Dashboard';
+import CoordinatorDashboard from './pages/coordinator/Dashboard';
+import CoordinatorStudents  from './pages/coordinator/Students';
+import AdminDashboard       from './pages/admin/Dashboard';
+import AdminUsers           from './pages/admin/Users';
+import AdminTheses          from './pages/admin/Theses';
+import Repository           from './pages/Repository';
+import Inbox                from './pages/Inbox';
+
+function RequireAuth({ children }) {
+  const user = getCurrentUser();
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+function RoleDashboard() {
+  const user = getCurrentUser();
+  if (!user) return <Navigate to="/login" replace />;
+  const role = user.role;
+  if (role === 'Student')           return <StudentDashboard />;
+  if (role === 'Supervisor')        return <SupervisorDashboard />;
+  if (role === 'Program Coordinator') return <CoordinatorDashboard />;
+  if (role === 'Admin' || role === 'Director') return <AdminDashboard />;
+  return <StudentDashboard />;
+}
+
 export default function App() {
-  const [currentView, setCurrentView] = useState('welcome');
-  const [user, setUser] = useState(null);
-
   useEffect(() => {
-    // Check if user has an active session on mount
-    const token = localStorage.getItem('auth_token');
-    const storedUser = getCurrentUser();
-    
-    if (token && storedUser) {
-      setUser(storedUser);
-      setCurrentView('dashboard');
-    }
-
-    // Register session expiration listener
-    const handleExpiration = () => {
-      handleLogout();
-      alert('Your security session has expired. Please sign in again.');
-    };
-    window.addEventListener('auth_session_expired', handleExpiration);
-    return () => window.removeEventListener('auth_session_expired', handleExpiration);
+    const onExpire = () => { window.location.href = '/login'; };
+    window.addEventListener('auth_session_expired', onExpire);
+    return () => window.removeEventListener('auth_session_expired', onExpire);
   }, []);
 
-  const handleLoginSuccess = (authenticatedUser) => {
-    setUser(authenticatedUser);
-    setCurrentView('dashboard');
-  };
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/"       element={<Welcome />} />
+        <Route path="/login"  element={<Login />} />
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('current_user');
-    setUser(null);
-    setCurrentView('welcome');
-  };
+        {/* Protected app routes */}
+        <Route path="/app" element={<RequireAuth><AppShell /></RequireAuth>}>
+          <Route index                      element={<RoleDashboard />} />
+          <Route path="milestones"          element={<StudentMilestones />} />
+          <Route path="supervisor/students" element={<SupervisorDashboard />} />
+          <Route path="coordinator"         element={<CoordinatorDashboard />} />
+          <Route path="coordinator/students"element={<CoordinatorStudents />} />
+          <Route path="admin"               element={<AdminDashboard />} />
+          <Route path="admin/users"         element={<AdminUsers />} />
+          <Route path="admin/theses"        element={<AdminTheses />} />
+          <Route path="repository"          element={<Repository />} />
+          <Route path="inbox"               element={<Inbox />} />
+        </Route>
 
-  if (currentView === 'dashboard' && user) {
-    return <Dashboard user={user} onLogout={handleLogout} />;
-  }
-
-  if (currentView === 'login') {
-    return <Login onLoginSuccess={handleLoginSuccess} onNavigateToHome={() => setCurrentView('welcome')} />;
-  }
-
-  return <Welcome onNavigateToLogin={() => setCurrentView('login')} />;
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }

@@ -1,28 +1,25 @@
 import axios from 'axios';
 
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: false,
 });
 
-// Attach Bearer Token dynamically
+// Attach Bearer Token
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
-}, (error) => {
-  return Promise.reject(error);
-});
+}, Promise.reject);
 
-// Handle unauthorized responses automatically
+// Handle 401
 api.interceptors.response.use(
-  (response) => response,
+  (r) => r,
   (error) => {
-    if (error.response && error.response.status === 401) {
+    if (error.response?.status === 401) {
       localStorage.removeItem('auth_token');
       localStorage.removeItem('current_user');
       window.dispatchEvent(new Event('auth_session_expired'));
@@ -31,29 +28,8 @@ api.interceptors.response.use(
   }
 );
 
-export const setAuthToken = (token) => {
-  if (token) {
-    localStorage.setItem('auth_token', token);
-  } else {
-    localStorage.removeItem('auth_token');
-  }
-};
-
-export const saveCurrentUser = (user) => {
-  if (user) {
-    localStorage.setItem('current_user', JSON.stringify(user));
-  } else {
-    localStorage.removeItem('current_user');
-  }
-};
-
-export const getCurrentUser = () => {
-  const user = localStorage.getItem('current_user');
-  try {
-    return user ? JSON.parse(user) : null;
-  } catch (e) {
-    return null;
-  }
-};
+export const setAuthToken  = (t) => t ? localStorage.setItem('auth_token', t) : localStorage.removeItem('auth_token');
+export const saveCurrentUser = (u) => u ? localStorage.setItem('current_user', JSON.stringify(u)) : localStorage.removeItem('current_user');
+export const getCurrentUser  = () => { try { return JSON.parse(localStorage.getItem('current_user')); } catch { return null; } };
 
 export default api;
