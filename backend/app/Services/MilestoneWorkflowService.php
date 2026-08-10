@@ -61,7 +61,7 @@ class MilestoneWorkflowService
             for ($i = 0; $i < $roleIndex; $i++) {
                 $prevRole = $requiredRoles[$i];
                 if ($prevRole === 'Supervisor') {
-                    $activeSIds = $milestone->thesis->assignments()->whereIn('status', ['active', 'ended'])->pluck('supervisor_profile_id')->toArray();
+                    $activeSIds = $milestone->thesis->assignments()->where('status', 'active')->pluck('supervisor_profile_id')->toArray();
                     $uIds = $approvals->where('role', 'Supervisor')->pluck('user_id')->toArray();
                     $approvedPs = \App\Models\SupervisorProfile::whereIn('user_id', $uIds)->pluck('id')->toArray();
                     
@@ -89,27 +89,27 @@ class MilestoneWorkflowService
         $template = $milestone->template;
         $project = $milestone->thesis;
 
-        switch ($template->order) {
-            case 2: // Supervisors Assigned
+        switch ($template->slug) {
+            case 'supervisors_assigned':
                 $this->activateCommunicationChannels($project);
                 $project->update(['status' => 'active']);
                 break;
-            case 3: // Cleared for Proposal Defence
+            case 'cleared_for_proposal_defence':
                 $project->update(['status' => 'cleared_for_proposal']);
                 break;
-            case 4: // Did Proposal Defence
+            case 'did_proposal_defence':
                 $project->update(['status' => 'proposal_passed']);
                 break;
-            case 9: // Cleared for Internal Defence
+            case 'cleared_for_internal_defence':
                 $project->update(['status' => 'cleared_for_internal']);
                 break;
-            case 10: // Did Internal Defence
+            case 'did_internal_defence':
                 $project->update(['status' => 'internal_passed']);
                 break;
-            case 11: // Cleared for External
+            case 'cleared_for_external_defence':
                 $project->update(['status' => 'cleared_for_external']);
                 break;
-            case 13: // Submitted Final Thesis
+            case 'submitted_final_thesis':
                 $project->update([
                     'status' => 'completed',
                     'end_date' => now()
@@ -139,7 +139,7 @@ class MilestoneWorkflowService
     {
         $count = count($supervisorIds);
         $student = $project->student;
-        $levelName = strtoupper($student->level->name ?? '');
+        $levelName = strtoupper(optional($student->level)->name ?? '');
 
         if (str_contains($levelName, 'PHD')) {
              if ($count !== 3) {
@@ -174,7 +174,7 @@ class MilestoneWorkflowService
             if ($role === 'Supervisor') {
                 // Institutional Consensus: ALL assigned supervisors must approve
                 $activeSupervisorIds = $milestone->thesis->assignments()
-                    ->whereIn('status', ['active', 'ended'])
+                    ->where('status', 'active')
                     ->pluck('supervisor_profile_id')
                     ->toArray();
                 

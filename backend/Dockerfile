@@ -1,26 +1,21 @@
-FROM php:8.2-fpm
+FROM dunglas/frankenphp:php8.2
 
-# Install system dependencies
+# Set the Caddy/FrankenPHP working directory
+WORKDIR /app
+
+# Install system dependencies and Node.js
 RUN apt-get update && apt-get install -y \
     git \
     curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libpq-dev \
-    libzip-dev \
-    libicu-dev \
     zip \
     unzip \
-    nodejs \
-    npm \
-    nginx \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
-RUN docker-php-ext-install \
-    pdo \
+# Install PHP extensions using the provided install-php-extensions script
+RUN install-php-extensions \
     pdo_pgsql \
     pgsql \
     mbstring \
@@ -31,7 +26,8 @@ RUN docker-php-ext-install \
     zip \
     intl \
     xml \
-    opcache
+    opcache \
+    redis
 
 # OPcache production configuration
 RUN { \
@@ -47,18 +43,18 @@ RUN { \
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-WORKDIR /var/www
-
-# Default environment - Railway will override these via its Variables tab
+# Default environment variables
 ENV APP_ENV=production \
     APP_DEBUG=false \
     LOG_CHANNEL=stderr \
-    LOG_LEVEL=error
+    LOG_LEVEL=error \
+    OCTANE_SERVER=frankenphp \
+    SERVER_NAME=":8000"
 
 # Copy composer files first for layer caching
 COPY composer.json composer.lock ./
 
-# Install PHP dependencies (no scripts — artisan commands need the full app)
+# Install PHP dependencies
 RUN composer install \
     --optimize-autoloader \
     --no-scripts \
@@ -72,21 +68,15 @@ RUN npm ci
 # Copy the rest of the application
 COPY . .
 
-# Setup nginx config
-COPY nginx.conf /etc/nginx/sites-available/default
-
-# Allow PHP-FPM to read environment variables from Render
-RUN echo "clear_env = no" >> /usr/local/etc/php-fpm.d/www.conf
-
-# Run composer scripts now that the full app is present (package:discover, etc.)
+# Run composer scripts now that the full app is present
 RUN composer run-script post-autoload-dump || true
 
 # Build frontend assets
 RUN npm run build
 
-# Set permissions for Laravel storage, cache, and database directories
-RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache /var/www/database \
-    && chmod -R 775 /var/www/storage /var/www/bootstrap/cache /var/www/database
+# Set permissions for Laravel storage and cache directories
+RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache /app/database \
+    && chmod -R 775 /app/storage /app/bootstrap/cache /app/database
 
 # Copy and set up the entrypoint script
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh

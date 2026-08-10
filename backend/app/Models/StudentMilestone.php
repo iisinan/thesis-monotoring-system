@@ -76,7 +76,7 @@ class StudentMilestone extends Model
         
         // 1. Supervisor Assignment
         if ($this->template?->show_supervisor_assignment) {
-            $hasAssignments = $this->thesis?->assignments()->whereIn('status', ['active', 'ended'])->count() > 0;
+            $hasAssignments = $this->thesis?->assignments->where('status', 'active')->count() > 0;
             $tasks[] = [
                 'id' => 'supervisor_allocation',
                 'name' => 'Supervisor Allocation',
@@ -161,7 +161,7 @@ class StudentMilestone extends Model
             
             foreach($requiredRoles as $role) {
                 if ($role === 'Supervisor') {
-                    $activeSupervisors = $this->thesis->assignments()->whereIn('status', ['active', 'ended'])->with('supervisor.user')->get();
+                    $activeSupervisors = $this->thesis->assignments->where('status', 'active');
 
                     if ($activeSupervisors->count() > 0) {
                         foreach ($activeSupervisors as $assignment) {

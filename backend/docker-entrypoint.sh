@@ -49,34 +49,21 @@ php artisan event:cache  || echo "WARN: Event cache failed"
 echo "=== Testing Redis connection ==="
 php -r "
 try {
-    \$redis = new Predis\Client([
-        'host'     => getenv('REDIS_HOST') ?: '127.0.0.1',
-        'port'     => intval(getenv('REDIS_PORT') ?: 6379),
-        'password' => (getenv('REDIS_PASSWORD') && getenv('REDIS_PASSWORD') !== 'null') ? getenv('REDIS_PASSWORD') : null,
-        'scheme'   => (getenv('REDIS_TLS') === 'true') ? 'tls' : 'tcp',
-    ]);
+    \$redis = new Redis();
+    \$host = getenv('REDIS_HOST') ?: '127.0.0.1';
+    \$port = intval(getenv('REDIS_PORT') ?: 6379);
+    \$scheme = (getenv('REDIS_TLS') === 'true') ? 'tls://' : '';
+    \$redis->connect(\$scheme . \$host, \$port);
+    if (getenv('REDIS_PASSWORD') && getenv('REDIS_PASSWORD') !== 'null') {
+        \$redis->auth(getenv('REDIS_PASSWORD'));
+    }
     \$redis->ping();
     echo 'Redis: CONNECTED' . PHP_EOL;
 } catch (Exception \$e) {
-    echo 'Redis: UNAVAILABLE — using file/array cache fallback' . PHP_EOL;
+    echo 'Redis: UNAVAILABLE — ' . \$e->getMessage() . PHP_EOL;
 }
-" 2>/dev/null || echo "Redis test skipped (predis not in path context)"
-
-# ── Choose the best available server ─────────────────────────────
-# Prefer FrankenPHP > php-fpm+nginx > artisan serve (dev only)
-echo "=== Starting application server ==="
-
-if command -v frankenphp > /dev/null 2>&1; then
-    echo "Server: FrankenPHP (production)"
-    exec frankenphp run --config /etc/caddy/Caddyfile
-
-elif command -v nginx > /dev/null 2>&1 && command -v php-fpm > /dev/null 2>&1; then
-    echo "Server: php-fpm + nginx (production)"
-    php-fpm -D
-    exec nginx -g "daemon off;"
-
-else
-    # Fallback: php artisan serve with multiple workers via pcntl fork
-    echo "Server: artisan serve (development fallback — consider upgrading to FrankenPHP)"
-    exec php artisan serve --host=0.0.0.0 --port=8000
-fi
+" 2>/dev/null || echo "Redis test skipped"
+# ── Start Laravel Octane ─────────────────────────────────────────
+echo "=== Starting application server (Laravel Octane + FrankenPHP) ==="
+export PORT="${PORT:-8000}"
+exec php artisan octane:start --server=frankenphp --host=0.0.0.0 --port=$PORT --workers=auto --task-workers=auto --max-requests=500

@@ -25,3 +25,7 @@ Thumbs.db
 scratch_mail_test.php
 test_bulk_upload.php
 thesis_mobile_app/scratch/
+
+**/caddy
+frankenphp
+frankenphp-worker.php

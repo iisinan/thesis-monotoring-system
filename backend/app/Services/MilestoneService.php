@@ -22,20 +22,24 @@ class MilestoneService
             $fileMeta = [];
 
             if ($file) {
-                // Upload logic (S3 or local)
-                $path = $file->store('submissions/' . $milestone->thesis_project_id);
-                $fileUrl = Storage::url($path);
-                $fileMeta = [
-                    'original_name' => $file->getClientOriginalName(),
-                    'size' => $file->getSize(),
-                    'mime' => $file->getMimeType(),
-                ];
+                try {
+                    // Upload logic (S3 or local)
+                    $path = $file->store('submissions/' . $milestone->thesis_project_id);
+                    $fileUrl = Storage::url($path);
+                    $fileMeta = [
+                        'original_name' => $file->getClientOriginalName(),
+                        'size' => $file->getSize(),
+                        'mime' => $file->getMimeType(),
+                    ];
+                } catch (\Exception $e) {
+                    throw new \Exception("Failed to store submission file: " . $e->getMessage());
+                }
             }
 
             // Create submission record
             $submission = Submission::create([
                 'student_milestone_id' => $milestone->id,
-                'version' => $milestone->submissions()->count() + 1,
+                'version' => ($milestone->submissions()->max('version') ?? 0) + 1,
                 'file_url' => $fileUrl,
                 'file_meta' => $fileMeta,
                 'submitted_by' => $submitter->id,

@@ -331,15 +331,26 @@ class DashboardController extends Controller
     {
         // 1. Core Data
         $data['recent_logs'] = \App\Models\AuditLog::with('user')->latest()->take(6)->get();
-        $data['projects'] = \App\Models\ThesisProject::with('student.user', 'student.program')->latest()->take(10)->get();
-        $data['programs'] = \App\Models\Program::all();
-        $data['project_count'] = \App\Models\ThesisProject::count();
         
-        $data['ready_for_defense_projects'] = \App\Models\ThesisProject::with(['student.user', 'student.program', 'student.level'])
-            ->whereNotNull('cleared_for_internal_at')
-            ->latest('cleared_for_internal_at')
-            ->take(5)
-            ->get();
+        $data['projects'] = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_projects', 300, function() {
+            return \App\Models\ThesisProject::with('student.user', 'student.program')->latest()->take(10)->get();
+        });
+        
+        $data['programs'] = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_programs', 3600, function() {
+            return \App\Models\Program::all();
+        });
+        
+        $data['project_count'] = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_project_count', 300, function() {
+            return \App\Models\ThesisProject::count();
+        });
+        
+        $data['ready_for_defense_projects'] = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_ready_defense', 300, function() {
+            return \App\Models\ThesisProject::with(['student.user', 'student.program', 'student.level'])
+                ->whereNotNull('cleared_for_internal_at')
+                ->latest('cleared_for_internal_at')
+                ->take(5)
+                ->get();
+        });
             
         // M9 Alerts (Students who just reached or submitted Milestone 9)
         $data['m9Alerts'] = \App\Models\StudentMilestone::with(['thesis.student.user', 'template'])
@@ -353,59 +364,66 @@ class DashboardController extends Controller
         $unreadCounts = $this->getUnreadMessagesCount($user);
          
         // 2. Statistics
-        $data['stats'] = [
-            'total_users' => \App\Models\User::count(),
-            'total_theses' => $data['project_count'],
-            'active_students' => \App\Models\StudentProfile::where('enrollment_status', 'active')->count(),
-            'cleared_theses' => \App\Models\ThesisProject::whereNotNull('cleared_for_internal_at')->count(),
-            
-            'active_users_24h' => \App\Models\User::where('last_login_at', '>=', now()->subDay())->count(),
-            'student_count' => \App\Models\User::role('Student')->count(),
-            'program_count' => \App\Models\Program::count(),
-            'staff_count' => \App\Models\User::role(['Director', 'Admin', 'Program Coordinator', 'Supervisor'])->count(),
-            'staff_count' => \App\Models\User::role(['Director', 'Admin', 'Program Coordinator', 'Supervisor'])->count(),
-            'failed_jobs' => \Illuminate\Support\Facades\DB::table('failed_jobs')->count(),
-            'pending_jobs' => \Illuminate\Support\Facades\DB::table('jobs')->count(),
-            'unread_messages' => $unreadCounts['total'],
-            'unread_chat' => $unreadCounts['chat'],
-            'unread_inbox' => $unreadCounts['inbox'],
-        ];
+        $data['stats'] = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_stats', 300, function() use ($data) {
+            return [
+                'total_users' => \App\Models\User::count(),
+                'total_theses' => $data['project_count'],
+                'active_students' => \App\Models\StudentProfile::where('enrollment_status', 'active')->count(),
+                'cleared_theses' => \App\Models\ThesisProject::whereNotNull('cleared_for_internal_at')->count(),
+                'active_users_24h' => \App\Models\User::where('last_login_at', '>=', now()->subDay())->count(),
+                'student_count' => \App\Models\User::role('Student')->count(),
+                'program_count' => \App\Models\Program::count(),
+                'staff_count' => \App\Models\User::role(['Director', 'Admin', 'Program Coordinator', 'Supervisor'])->count(),
+                'failed_jobs' => \Illuminate\Support\Facades\DB::table('failed_jobs')->count(),
+                'pending_jobs' => \Illuminate\Support\Facades\DB::table('jobs')->count(),
+            ];
+        });
+        
+        $data['stats']['unread_messages'] = $unreadCounts['total'];
+        $data['stats']['unread_chat'] = $unreadCounts['chat'];
+        $data['stats']['unread_inbox'] = $unreadCounts['inbox'];
 
         // 3. Activity Intelligence
-        $data['recentLogins'] = \App\Models\LoginActivity::with('user')
-            ->latest('login_at')
-            ->take(15)
-            ->get();
+        $data['recentLogins'] = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_recent_logins', 60, function() {
+            return \App\Models\LoginActivity::with('user')
+                ->latest('login_at')
+                ->take(15)
+                ->get();
+        });
 
-        $data['usersWithLastLogin'] = \App\Models\User::select('users.*')
-            ->with('roles')
-            ->leftJoin('login_activities', function ($join) {
-                $join->on('users.id', '=', 'login_activities.user_id')
-                    ->whereRaw('login_activities.login_at = (SELECT MAX(la2.login_at) FROM login_activities la2 WHERE la2.user_id = users.id)');
-            })
-            ->addSelect([
-                'last_session_ip' => \App\Models\LoginActivity::select('ip_address')
-                    ->whereColumn('user_id', 'users.id')
-                    ->latest('login_at')
-                    ->take(1),
-                'last_session_browser' => \App\Models\LoginActivity::select('browser')
-                    ->whereColumn('user_id', 'users.id')
-                    ->latest('login_at')
-                    ->take(1),
-                'total_logins' => \App\Models\LoginActivity::selectRaw('COUNT(*)')
-                    ->whereColumn('user_id', 'users.id'),
-            ])
-            ->orderByDesc('last_login_at')
-            ->take(10)
-            ->get();
+        $data['usersWithLastLogin'] = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_users_with_logins', 300, function() {
+            return \App\Models\User::select('users.*')
+                ->with('roles')
+                ->leftJoin('login_activities', function ($join) {
+                    $join->on('users.id', '=', 'login_activities.user_id')
+                        ->whereRaw('login_activities.login_at = (SELECT MAX(la2.login_at) FROM login_activities la2 WHERE la2.user_id = users.id)');
+                })
+                ->addSelect([
+                    'last_session_ip' => \App\Models\LoginActivity::select('ip_address')
+                        ->whereColumn('user_id', 'users.id')
+                        ->latest('login_at')
+                        ->take(1),
+                    'last_session_browser' => \App\Models\LoginActivity::select('browser')
+                        ->whereColumn('user_id', 'users.id')
+                        ->latest('login_at')
+                        ->take(1),
+                    'total_logins' => \App\Models\LoginActivity::selectRaw('COUNT(*)')
+                        ->whereColumn('user_id', 'users.id'),
+                ])
+                ->orderByDesc('last_login_at')
+                ->take(10)
+                ->get();
+        });
 
-        $data['activityStats'] = [
-            'logins_today' => \App\Models\LoginActivity::whereDate('login_at', today())->count(),
-            'logins_this_week' => \App\Models\LoginActivity::where('login_at', '>=', now()->startOfWeek())->count(),
-            'unique_users_today' => \App\Models\LoginActivity::whereDate('login_at', today())->distinct('user_id')->count('user_id'),
-            'active_sessions' => \App\Models\LoginActivity::whereNull('logout_at')
-                ->where('login_at', '>=', now()->subHours(24))->count(),
-        ];
+        $data['activityStats'] = \Illuminate\Support\Facades\Cache::remember('admin_dashboard_activity_stats', 60, function() {
+            return [
+                'logins_today' => \App\Models\LoginActivity::whereDate('login_at', today())->count(),
+                'logins_this_week' => \App\Models\LoginActivity::where('login_at', '>=', now()->startOfWeek())->count(),
+                'unique_users_today' => \App\Models\LoginActivity::whereDate('login_at', today())->distinct('user_id')->count('user_id'),
+                'active_sessions' => \App\Models\LoginActivity::whereNull('logout_at')
+                    ->where('login_at', '>=', now()->subHours(24))->count(),
+            ];
+        });
         
         return view($view, $data);
     }

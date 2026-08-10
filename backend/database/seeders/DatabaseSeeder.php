@@ -69,6 +69,7 @@ class DatabaseSeeder extends Seeder
                 'max_students' => 5,
                 'specialization' => 'Artificial Intelligence'
             ]);
+            $supervisorUser->load('supervisorProfile');
         }
 
         // Dummy Students

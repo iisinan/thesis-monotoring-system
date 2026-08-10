@@ -14,6 +14,7 @@ class MilestoneTemplate extends Model
     protected $fillable = [
         'program_id',
         'name',
+        'slug',
         'order',
         'requires_submission',
         'submission_requires_approval',
