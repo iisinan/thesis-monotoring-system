@@ -25,9 +25,13 @@ class ProgramController extends Controller
 
     public function store(Request $request)
     {
+        $request->merge([
+            'code' => strtoupper($request->code),
+        ]);
+
         $validated = $request->validate([
             'name' => 'required|string|max:255|unique:programs',
-            'code' => 'required|string|max:10|unique:programs|uppercase',
+            'code' => 'required|string|max:10|unique:programs',
             'serial_number' => 'nullable|string|max:20|unique:programs',
             'degree_type' => 'required|in:MSc,PhD',
         ]);
@@ -48,10 +52,14 @@ class ProgramController extends Controller
 
     public function update(Request $request, Program $program)
     {
+        $request->merge([
+            'code' => strtoupper($request->code),
+        ]);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('programs')->ignore($program->id)],
-            'code' => ['required', 'string', 'max:10', 'uppercase', Rule::unique('programs')->ignore($program->id)],
-            'serial_number' => ['required', 'string', 'max:20', 'uppercase', Rule::unique('programs')->ignore($program->id)],
+            'code' => ['required', 'string', 'max:10', Rule::unique('programs')->ignore($program->id)],
+            'serial_number' => ['nullable', 'string', 'max:20', 'uppercase', Rule::unique('programs')->ignore($program->id)],
             'degree_type' => ['required', 'in:MSc,PhD'],
             'coordinator_id' => ['nullable', 'exists:users,id'],
         ]);
@@ -59,7 +67,6 @@ class ProgramController extends Controller
         $program->update([
             'name' => $validated['name'],
             'code' => $validated['code'],
-            'serial_number' => $validated['serial_number'],
             'degree_type' => $validated['degree_type'],
         ]);
 
