@@ -90,6 +90,15 @@ class MilestoneWorkflowService
         $project = $milestone->thesis;
 
         switch ($template->slug) {
+            case 'seminar_as_a_course':
+                $this->activateCommunicationChannels($project);
+                $studentUser = $project->student->user ?? null;
+                if ($studentUser) {
+                    \Illuminate\Support\Facades\Mail::raw("Your 'Seminar as a course' milestone has been marked as done.", function($msg) use ($studentUser) {
+                        $msg->to($studentUser->email)->subject("Milestone Completed: Seminar as a course");
+                    });
+                }
+                break;
             case 'supervisors_assigned':
                 $this->activateCommunicationChannels($project);
                 $project->update(['status' => 'active']);

@@ -67,6 +67,11 @@ class StudentMilestonePolicy
             return false;
         }
 
+        // Check if it requires a date to be set first
+        if ($milestone->template->allow_defence_date && !$milestone->defence_date) {
+            return false;
+        }
+
         // Check if submission is locked by a gatekeeper
         if ($milestone->template->submission_requires_approval && !$milestone->is_submission_unlocked) {
             return false;

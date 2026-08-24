@@ -68,8 +68,7 @@ Route::post('/operations/retry/{id}', [SystemOperationController::class, 'retryJ
 Route::post('/operations/flush', [SystemOperationController::class, 'flushFailedJobs'])->name('operations.flush');
 
 use App\Http\Controllers\Admin\MilestoneTemplateController;
-Route::post('milestone-templates/reorder', [MilestoneTemplateController::class, 'reorder'])->name('milestone-templates.reorder');
-Route::resource('milestone-templates', MilestoneTemplateController::class);
+Route::resource('milestone-templates', MilestoneTemplateController::class)->only(['index', 'show']);
 
 use App\Http\Controllers\Admin\BulkScheduleController;
 Route::get('bulk-schedule', [BulkScheduleController::class, 'index'])->name('bulk-schedule.index');

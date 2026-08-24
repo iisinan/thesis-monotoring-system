@@ -13,10 +13,26 @@ class MilestoneTemplateSeeder extends Seeder
      */
     public function run(): void
     {
+        // Make sure we wipe old ones so we don't have duplicates or order conflicts if running again
+        // Or we just rely on updateOrCreate
+
         $milestones = [
             [
-                'name' => 'Student Finished Course work',
+                'name' => 'Seminar as a course',
                 'order' => 1,
+                'requires_submission' => true,
+                'requires_approval' => true,
+                'required_approvers' => ['Admin'],
+                'allow_defence_date' => true,
+                'defence_type' => 'seminar',
+                'defence_date_role' => 'Admin',
+                'has_chat' => true,
+                'submission_type' => ['ppt'],
+                'description' => 'Student uploads PPT for presentation. Admin records result and approves milestone.'
+            ],
+            [
+                'name' => 'Student Finished Course work',
+                'order' => 2,
                 'requires_submission' => true,
                 'requires_approval' => true,
                 'required_approvers' => ['Program Coordinator'],
@@ -24,7 +40,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Assigned Supervisor',
-                'order' => 2,
+                'order' => 3,
                 'requires_submission' => false,
                 'requires_approval' => true,
                 'required_approvers' => ['Program Coordinator'],
@@ -32,7 +48,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Cleared For Proposal Defence',
-                'order' => 3,
+                'order' => 4,
                 'requires_submission' => true,
                 'requires_approval' => true,
                 'required_approvers' => ['Supervisor', 'Program Coordinator'],
@@ -43,7 +59,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Did Proposal Defence',
-                'order' => 4,
+                'order' => 5,
                 'requires_submission' => false,
                 'requires_approval' => true,
                 'required_approvers' => ['Program Coordinator'],
@@ -51,7 +67,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Cleared For Internal Defence',
-                'order' => 5,
+                'order' => 6,
                 'requires_submission' => true,
                 'requires_approval' => true,
                 'required_approvers' => ['Supervisor', 'Program Coordinator'],
@@ -62,7 +78,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Did Internal Defence',
-                'order' => 6,
+                'order' => 7,
                 'requires_submission' => false,
                 'requires_approval' => true,
                 'required_approvers' => ['Program Coordinator'],
@@ -71,7 +87,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Effect Corrections',
-                'order' => 7,
+                'order' => 8,
                 'requires_submission' => true,
                 'requires_approval' => true,
                 'required_approvers' => ['Internal Examiner', 'Program Coordinator'],
@@ -79,7 +95,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Cleared For External',
-                'order' => 8,
+                'order' => 9,
                 'requires_submission' => false,
                 'requires_approval' => true,
                 'required_approvers' => ['Internal Examiner', 'Program Coordinator'],
@@ -90,7 +106,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Submitted Final Thesis',
-                'order' => 9,
+                'order' => 10,
                 'requires_submission' => true,
                 'requires_approval' => true,
                 'required_approvers' => ['Program Examiner'],
