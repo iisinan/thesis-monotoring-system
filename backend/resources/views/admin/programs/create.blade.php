@@ -40,10 +40,6 @@
                             <option value="MSc" {{ old('degree_type') == 'MSc' ? 'selected' : '' }}>Master of Science (MSc)</option>
                             <option value="PhD" {{ old('degree_type') == 'PhD' ? 'selected' : '' }}>Doctor of Philosophy (PhD)</option>
                         </select>
-                        <p class="mt-2 text-xs text-slate-500 font-medium">
-                            <span class="text-acetel-600 font-bold">MSc Rules:</span> Exactly 2 supervisors. <br/>
-                            <span class="text-acetel-600 font-bold">PhD Rules:</span> Exactly 3 supervisors. Primary must be a Professor.
-                        </p>
                         @error('degree_type') <p class="text-red-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
                     </div>
                 </div>
