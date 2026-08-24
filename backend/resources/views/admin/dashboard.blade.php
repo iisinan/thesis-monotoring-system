@@ -36,13 +36,6 @@
                 </div>
             </div>
 
-            <div class="shrink-0 lg:block hidden">
-                 <div class="w-64 h-64 rounded-[3rem] bg-green-50/50 border border-green-100 flex flex-col items-center justify-center text-center p-8 backdrop-blur-sm shadow-sm">
-                    <img src="{{ asset('images/acetel-logo.jpeg') }}" alt="ACETEL" class="w-20 h-20 object-contain mb-6 opacity-90">
-                    <p class="text-[9px] font-black text-green-600 uppercase tracking-widest mb-1.5 leading-none">Institutional Core</p>
-                    <p class="text-xl font-black text-slate-800 tracking-tight uppercase leading-none">Admin v4.0</p>
-                 </div>
-            </div>
     </div>
 
     {{-- Urgent Operational Alerts (M9 / Final Phase) --}}
