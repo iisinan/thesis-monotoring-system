@@ -29,7 +29,6 @@
                 <thead class="bg-slate-50/50">
                     <tr>
                         <th class="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Program Name</th>
-                        <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Program Code</th>
                         <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Serial</th>
                         <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Students</th>
                         <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Coordinator</th>
@@ -49,11 +48,6 @@
                                     <p class="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Field of Study</p>
                                 </div>
                             </div>
-                        </td>
-                        <td class="px-6 py-7">
-                            <span class="inline-flex items-center px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200">
-                                {{ $program->code }}
-                            </span>
                         </td>
                         <td class="px-6 py-7">
                             <span class="text-xs font-black text-slate-900 tracking-tight">{{ $program->serial_number ?? '---' }}</span>
