@@ -734,14 +734,19 @@
                                                         @php
                                                             $isInternal = ($dType === 'Internal' || $milestone->template?->order == 9);
                                                             $examLabel = $isInternal ? 'Internal Examination' : ($dType === 'External' ? 'External Defence' : ($dType === 'Proposal' ? 'Proposal Defence' : 'Examination'));
+                                                            $isDateExpired = $milestone->defence_date && \Carbon\Carbon::parse($milestone->defence_date)->endOfDay()->isPast() && $milestone->status !== 'approved';
                                                         @endphp
-                                                        <div class="px-5 py-2 rounded-xl bg-{{ $dColor }}-100 mb-6 border border-{{ $dColor }}-200">
-                                                            <span class="text-[10px] font-black text-{{ $dColor }}-700 uppercase tracking-[0.2em]">{{ $examLabel }} Protocol</span>
+                                                        <div class="px-5 py-2 rounded-xl bg-{{ $isDateExpired ? 'red' : $dColor }}-100 mb-6 border border-{{ $isDateExpired ? 'red' : $dColor }}-200">
+                                                            <span class="text-[10px] font-black text-{{ $isDateExpired ? 'red' : $dColor }}-700 uppercase tracking-[0.2em]">{{ $isDateExpired ? 'Schedule Expired' : $examLabel . ' Protocol' }}</span>
                                                         </div>
 
-                                                        <h5 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-2">Authorize & Schedule Protocol</h5>
+                                                        <h5 class="text-sm font-black text-gray-900 uppercase tracking-widest mb-2">{{ $isDateExpired ? 'Set New Date' : 'Authorize & Schedule Protocol' }}</h5>
                                                         <p class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-8 leading-relaxed">
-                                                            Grant institutional authorization for the <span class="text-{{ $dColor }}-600 font-black">{{ $examLabel }}</span>. <br> Stakeholders will be notified upon confirmation.
+                                                            @if($isDateExpired)
+                                                                <span class="text-red-500 font-bold">The scheduled date has passed without approval.</span><br> Please schedule a new date to continue.
+                                                            @else
+                                                                Grant institutional authorization for the <span class="text-{{ $dColor }}-600 font-black">{{ $examLabel }}</span>. <br> Stakeholders will be notified upon confirmation.
+                                                            @endif
                                                         </p>
 
                                                         <form @submit.prevent="
@@ -769,13 +774,13 @@
                                                                 }
                                                             })
                                                             .finally(() => scheduling = false)
-                                                        " x-data="{ localDate: '{{ $milestone->defence_date ? $milestone->defence_date->format('Y-m-d') : '' }}' }" class="w-full">
+                                                        " x-data="{ localDate: '{{ $milestone->defence_date && !$isDateExpired ? $milestone->defence_date->format('Y-m-d') : '' }}' }" class="w-full">
                                                             
                                                             <div class="relative group/input">
                                                                 <!-- Visual Trigger Button -->
                                                                 <button type="button" 
                                                                     @click="$refs.datePicker.showPicker()"
-                                                                    class="w-full py-5 px-8 bg-{{ $dColor }}-600 text-white text-xs font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-gray-900 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_15px_30px_-10px_rgba(0,0,0,0.2)] flex items-center justify-center gap-3">
+                                                                    class="w-full py-5 px-8 bg-{{ $isDateExpired ? 'red' : $dColor }}-600 text-white text-xs font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-gray-900 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-[0_15px_30px_-10px_rgba(0,0,0,0.2)] flex items-center justify-center gap-3">
                                                                     <span x-text="localDate ? 'Reschedule Protocol' : 'Authorize & Select Date'"></span>
                                                                     <svg class="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                                                                 </button>

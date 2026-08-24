@@ -68,8 +68,10 @@ class StudentMilestonePolicy
         }
 
         // Check if it requires a date to be set first
-        if ($milestone->template->allow_defence_date && !$milestone->defence_date) {
-            return false;
+        if ($milestone->template->allow_defence_date) {
+            if (!$milestone->defence_date || (\Carbon\Carbon::parse($milestone->defence_date)->endOfDay()->isPast() && $milestone->status !== 'approved')) {
+                return false;
+            }
         }
 
         // Check if submission is locked by a gatekeeper

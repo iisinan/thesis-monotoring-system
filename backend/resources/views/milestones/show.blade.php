@@ -48,13 +48,77 @@
         <!-- Main Column: Submission Area -->
         <div class="lg:col-span-2 space-y-6">
             <!-- Scheduled Date Section -->
-            @if($milestone->template->allow_defence_date && $milestone->defence_date)
-                @php
-                    $defenceDateStr = $milestone->defence_date;
-                    $defenceDate = \Carbon\Carbon::parse($defenceDateStr);
-                    $isApproved = !is_null($milestone->date_approved_at);
-                @endphp
-                <div class="bg-white rounded-3xl border {{ $isApproved ? 'border-emerald-100' : 'border-amber-200' }} shadow-sm p-6 sm:p-8">
+            @php
+                $hasDefenceDateAllowed = $milestone->template->allow_defence_date;
+                $defenceDateStr = $milestone->defence_date;
+                $defenceDate = $defenceDateStr ? \Carbon\Carbon::parse($defenceDateStr) : null;
+                $isApproved = !is_null($milestone->date_approved_at);
+                $isDateExpired = $defenceDate && $defenceDate->endOfDay()->isPast() && $milestone->status !== 'approved';
+                $canSetDate = auth()->user()->hasRole('Admin') || auth()->user()->hasRole($milestone->template->defence_date_role ?? 'Program Coordinator');
+            @endphp
+
+            @if($hasDefenceDateAllowed)
+                @if(!$defenceDate || $isDateExpired)
+                    @if($canSetDate)
+                        <div class="bg-white rounded-3xl border border-indigo-100 shadow-sm p-6 sm:p-8 mb-6 relative overflow-hidden">
+                            <div class="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-white pointer-events-none"></div>
+                            <div class="relative flex flex-col sm:flex-row items-center justify-between gap-6">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center flex-shrink-0">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-xl font-black text-slate-900 tracking-tight">
+                                            {{ $isDateExpired ? 'Schedule Expired' : 'Schedule Presentation' }}
+                                        </h3>
+                                        <p class="text-xs font-bold text-slate-500 mt-1 uppercase tracking-wider">
+                                            {{ $isDateExpired ? 'The previous date passed. Please set a new date.' : 'Set a date for this milestone to become active.' }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <form x-data="{ scheduling: false, localDate: '' }" @submit.prevent="
+                                    scheduling = true;
+                                    fetch('{{ route('milestones.set_defence_date', $milestone) }}', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                                            'Accept': 'application/json'
+                                        },
+                                        body: JSON.stringify({ defence_date: localDate })
+                                    })
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        if (data.success) {
+                                            window.location.reload();
+                                        } else {
+                                            alert(data.message);
+                                        }
+                                    })
+                                    .finally(() => scheduling = false)
+                                " class="w-full sm:w-auto">
+                                    <div class="relative group/input flex flex-col sm:flex-row gap-3">
+                                        <input type="date" 
+                                            name="defence_date" 
+                                            x-model="localDate"
+                                            class="px-4 py-3 rounded-xl border border-slate-200 text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 w-full sm:w-auto" 
+                                            required>
+                                        
+                                        <button type="submit" 
+                                            :disabled="scheduling || !localDate"
+                                            class="px-6 py-3 bg-indigo-600 text-white text-xs font-black uppercase tracking-[0.2em] rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-50">
+                                            <span x-text="scheduling ? 'Saving...' : 'Set Date'"></span>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    @endif
+                @endif
+
+                @if($defenceDate && !$isDateExpired)
+                    <div class="bg-white rounded-3xl border {{ $isApproved ? 'border-emerald-100' : 'border-amber-200' }} shadow-sm p-6 sm:p-8 mb-6">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
                         <div class="flex items-center gap-4">
                             <div class="w-12 h-12 rounded-xl {{ $isApproved ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100' }} border flex items-center justify-center flex-shrink-0">
@@ -92,6 +156,7 @@
                         @endif
                     </div>
                 </div>
+                @endif
             @endif
 
 
@@ -118,7 +183,7 @@
             <!-- Submission Form -->
             @if(in_array($milestone->status, ['not_started', 'revision_required']))
                 @if($milestone->template->requires_submission)
-                    @if($milestone->template->allow_defence_date && !$milestone->defence_date)
+                    @if($hasDefenceDateAllowed && (!$defenceDate || $isDateExpired))
                         <div class="overflow-hidden rounded-3xl bg-white border border-gray-100 shadow-sm p-10 flex flex-col items-center justify-center text-center">
                             <div class="w-16 h-16 bg-gray-100 text-gray-500 rounded-2xl flex items-center justify-center mb-6">
                                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
