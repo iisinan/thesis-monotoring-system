@@ -19,6 +19,7 @@ class MilestoneTemplateSeeder extends Seeder
         $milestones = [
             [
                 'name' => 'Seminar as a course',
+                'slug' => 'seminar_as_a_course',
                 'order' => 1,
                 'requires_submission' => true,
                 'requires_approval' => true,
@@ -32,6 +33,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Finished Course work',
+                'slug' => 'student_finished_course_work',
                 'order' => 2,
                 'requires_submission' => true,
                 'requires_approval' => true,
@@ -40,6 +42,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Assigned Supervisor',
+                'slug' => 'supervisors_assigned',
                 'order' => 3,
                 'requires_submission' => false,
                 'requires_approval' => true,
@@ -48,6 +51,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Cleared For Proposal Defence',
+                'slug' => 'cleared_for_proposal_defence',
                 'order' => 4,
                 'requires_submission' => true,
                 'requires_approval' => true,
@@ -59,6 +63,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Did Proposal Defence',
+                'slug' => 'did_proposal_defence',
                 'order' => 5,
                 'requires_submission' => false,
                 'requires_approval' => true,
@@ -67,6 +72,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Cleared For Internal Defence',
+                'slug' => 'cleared_for_internal_defence',
                 'order' => 6,
                 'requires_submission' => true,
                 'requires_approval' => true,
@@ -78,6 +84,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Did Internal Defence',
+                'slug' => 'did_internal_defence',
                 'order' => 7,
                 'requires_submission' => false,
                 'requires_approval' => true,
@@ -87,6 +94,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Effect Corrections',
+                'slug' => 'student_effect_corrections',
                 'order' => 8,
                 'requires_submission' => true,
                 'requires_approval' => true,
@@ -95,6 +103,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Cleared For External',
+                'slug' => 'cleared_for_external_defence',
                 'order' => 9,
                 'requires_submission' => false,
                 'requires_approval' => true,
@@ -106,6 +115,7 @@ class MilestoneTemplateSeeder extends Seeder
             ],
             [
                 'name' => 'Student Submitted Final Thesis',
+                'slug' => 'submitted_final_thesis',
                 'order' => 10,
                 'requires_submission' => true,
                 'requires_approval' => true,
