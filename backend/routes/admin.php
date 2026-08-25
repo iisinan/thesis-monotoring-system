@@ -69,6 +69,7 @@ Route::post('/operations/flush', [SystemOperationController::class, 'flushFailed
 
 use App\Http\Controllers\Admin\MilestoneTemplateController;
 Route::resource('milestone-templates', MilestoneTemplateController::class)->only(['index', 'show']);
+Route::post('milestone-templates/{template}/date', [MilestoneTemplateController::class, 'setDate'])->name('milestone-templates.set-date');
 
 use App\Http\Controllers\Admin\BulkScheduleController;
 Route::get('bulk-schedule', [BulkScheduleController::class, 'index'])->name('bulk-schedule.index');

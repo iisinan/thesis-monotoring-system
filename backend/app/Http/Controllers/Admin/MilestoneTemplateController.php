@@ -182,4 +182,22 @@ class MilestoneTemplateController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    public function setDate(Request $request, $templateId)
+    {
+        $template = MilestoneTemplate::findOrFail($templateId);
+        
+        $validated = $request->validate([
+            'global_defence_date' => 'required|date'
+        ]);
+
+        $template->update(['global_defence_date' => $validated['global_defence_date']]);
+
+        // Sync to all un-approved student milestones
+        \App\Models\StudentMilestone::where('milestone_template_id', $template->id)
+            ->where('status', '!=', 'approved')
+            ->update(['defence_date' => $validated['global_defence_date']]);
+
+        return redirect()->route('admin.milestone-templates.index')->with('success', "Date scheduled for {$template->name} and synced to all pending students.");
+    }
 }
