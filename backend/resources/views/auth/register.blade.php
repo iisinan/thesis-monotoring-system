@@ -352,9 +352,12 @@
     const serverMilestones = @json($milestones);
     
     
+    
     const serverLevels = @json($levels);
+    const serverPrograms = @json($programs);
     
     function registrationWizard() {
+
 
         return {
             step: 1,
@@ -366,7 +369,7 @@
                 principal_supervisor_id: '',
                 co_supervisor_id: '',
                 third_supervisor_id: '',
-                level_id: ''
+                program_id: ''
             },
 
             // Hardcode the mapping since we know the 7 exact slugs/names the user just asked for
@@ -383,13 +386,13 @@
 
             
             isPhd() {
-                if (!this.form.level_id) return false;
-                const level = serverLevels.find(l => l.id == this.form.level_id);
-                return level ? level.name.toLowerCase().includes('phd') : false;
-            },
+                if (!this.form.program_id) return false;
+                const prog = serverPrograms.find(p => p.id == this.form.program_id);
+                return prog ? prog.name.toLowerCase().includes('phd') : false;
+            },,
 
             validateStep1() {
-                const requiredFields = ['first_name', 'last_name', 'email', 'password', 'password_confirmation', 'matric_number', 'program_id', 'level_id'];
+                const requiredFields = ['name', 'email', 'password', 'password_confirmation', 'matric_number', 'program_id'];
                 for(let field of requiredFields) {
                     if(!document.querySelector(`[name="${field}"]`).value) {
                         alert(`Please fill all required fields before continuing.`);

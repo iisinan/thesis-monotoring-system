@@ -33,13 +33,11 @@ class RegisteredUserController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'first_name' => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|confirmed|min:8',
             'matric_number' => 'required|string|max:255|unique:student_profiles,student_id_number',
             'program_id' => 'required|exists:programs,id',
-            'level_id' => 'required|exists:levels,id',
             'thesis_title' => 'nullable|string|max:255',
             'thesis_abstract' => 'nullable|string',
             'supervisor_ids' => 'nullable|array',
@@ -88,7 +86,7 @@ class RegisteredUserController extends Controller
 
             // 2. Create User
             $user = User::create([
-                'name' => trim($request->first_name . ' ' . $request->last_name),
+                'name' => trim($request->name),
                 'email' => strtolower($request->email),
                 'password' => Hash::make($request->password),
                 'email_verified_at' => now(),
@@ -97,12 +95,22 @@ class RegisteredUserController extends Controller
             $role = Role::firstOrCreate(['name' => 'Student', 'guard_name' => 'web']);
             $user->assignRole($role);
 
+            $program = \App\Models\Program::find($request->program_id);
+            $isPhd = stripos($program->name, 'phd') !== false;
+            
+            $levelId = null;
+            if ($isPhd) {
+                $levelId = \App\Models\Level::where('name', 'like', '%PhD%')->value('id');
+            } else {
+                $levelId = \App\Models\Level::where('name', 'like', '%MSc%')->value('id');
+            }
+
             // 3. Create StudentProfile
             $student = StudentProfile::create([
                 'user_id' => $user->id,
                 'student_id_number' => $matric,
                 'program_id' => $request->program_id,
-                'level_id' => $request->level_id,
+                'level_id' => $levelId,
                 'cohort_id' => $cohort->id,
             ]);
 
