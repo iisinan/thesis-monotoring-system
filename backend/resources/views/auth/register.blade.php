@@ -72,22 +72,12 @@
                 <div class="space-y-5">
                     <!-- Full Name -->
                     <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-1.5">First Name</label>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Full Name</label>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                             </div>
-                            <input type="text" name="first_name" required placeholder="John"
-                                   class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
-                        </div>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Last Name</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                            </div>
-                            <input type="text" name="last_name" required placeholder="Doe"
+                            <input type="text" name="name" required placeholder="John Doe"
                                    class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
                         </div>
                     </div>
@@ -160,23 +150,14 @@
 
                     
 
-                    <!-- Program / Degree Grid -->
-                    <div class="grid grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                    <!-- Programme -->
+                    <div class="bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1.5">Programme</label>
-                            <select name="program_id" required class="w-full rounded-xl border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
-                                <option value="" disabled selected>Select Pro...</option>
+                            <select name="program_id" x-model="form.program_id" required class="w-full rounded-xl border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
+                                <option value="" disabled selected>Select Programme...</option>
                                 @foreach($programs as $program)
                                     <option value="{{ $program->id }}">{{ $program->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Degree</label>
-                            <select name="level_id" required class="w-full rounded-xl x-model="form.level_id" border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
-                                <option value="" disabled selected>Select De...</option>
-                                @foreach($levels as $level)
-                                    <option value="{{ $level->id }}">{{ $level->name }}</option>
                                 @endforeach
                             </select>
                         </div>
