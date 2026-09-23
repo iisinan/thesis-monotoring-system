@@ -41,7 +41,8 @@ class RegisteredUserController extends Controller
             'thesis_title' => 'nullable|string|max:255',
             'thesis_abstract' => 'nullable|string',
             'supervisor_ids' => 'nullable|array',
-            'supervisor_ids.*' => 'nullable|exists:supervisor_profiles,id',
+            'supervisor_ids.*' => 'nullable',
+            'new_supervisors' => 'nullable|array',
             'completed_milestones' => 'nullable|array',
             'completed_milestones.*' => 'exists:milestone_templates,id',
         ]);
@@ -123,22 +124,51 @@ class RegisteredUserController extends Controller
             ]);
 
             // 5. Assign Supervisors
+            $finalSupIds = [];
             if ($request->has('supervisor_ids')) {
-                // filter empty values
-                $supIds = array_filter($request->supervisor_ids);
-                foreach ($supIds as $supId) {
-                    SupervisionAssignment::create([
-                        'thesis_project_id' => $thesis->id,
-                        'supervisor_profile_id' => $supId,
-                        'status' => 'active',
-                        'assigned_at' => now(),
-                    ]);
-                    
-                    // Increment supervisor load
-                    $supProfile = SupervisorProfile::find($supId);
-                    if ($supProfile) {
-                        $supProfile->increment('current_load');
+                $finalSupIds = array_filter($request->supervisor_ids, fn($v) => is_numeric($v));
+            }
+
+            if ($request->has('new_supervisors')) {
+                foreach ($request->new_supervisors as $newSup) {
+                    if (!empty($newSup['name']) && !empty($newSup['email'])) {
+                        // Create User
+                        $supUser = User::firstOrCreate(
+                            ['email' => $newSup['email']],
+                            [
+                                'name' => $newSup['name'],
+                                'password' => Hash::make(Str::random(12)), // random password
+                            ]
+                        );
+                        if (!$supUser->hasRole('supervisor')) {
+                            $supUser->assignRole('supervisor');
+                        }
+
+                        // Create SupervisorProfile
+                        $supProfile = SupervisorProfile::firstOrCreate(
+                            ['user_id' => $supUser->id],
+                            [
+                                'department' => 'Assigned',
+                                'title' => 'Supervisor',
+                                'max_load' => 5,
+                            ]
+                        );
+                        $finalSupIds[] = $supProfile->id;
                     }
+                }
+            }
+
+            foreach ($finalSupIds as $supId) {
+                SupervisionAssignment::create([
+                    'thesis_project_id' => $thesis->id,
+                    'supervisor_profile_id' => $supId,
+                    'status' => 'active',
+                    'assigned_at' => now(),
+                ]);
+                
+                $supProfile = SupervisorProfile::find($supId);
+                if ($supProfile) {
+                    $supProfile->increment('current_load');
                 }
             }
 

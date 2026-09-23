@@ -54,8 +54,16 @@
             <!-- Hidden inputs to hold Alpine state for submission -->
             <input type="hidden" name="completed_milestones[]" x-model="form.completed_milestones" />
             <input type="hidden" name="supervisor_ids[]" x-model="form.principal_supervisor_id" />
+            <input type="hidden" name="new_supervisors[0][name]" x-model="form.new_principal_name" />
+            <input type="hidden" name="new_supervisors[0][email]" x-model="form.new_principal_email" />
+
             <input type="hidden" name="supervisor_ids[]" x-model="form.co_supervisor_id" />
+            <input type="hidden" name="new_supervisors[1][name]" x-model="form.new_co_name" />
+            <input type="hidden" name="new_supervisors[1][email]" x-model="form.new_co_email" />
+
             <input type="hidden" name="supervisor_ids[]" x-model="form.third_supervisor_id" />
+            <input type="hidden" name="new_supervisors[2][name]" x-model="form.new_third_name" />
+            <input type="hidden" name="new_supervisors[2][email]" x-model="form.new_third_email" />
             
             <!-- STEP 1: Profile -->
             <div x-show="step === 1" x-transition.opacity.duration.300ms>
@@ -241,34 +249,85 @@
                     
                     <template x-if="getCurrentSubStepType() === 'supervisors'">
                         <div class="mb-6 space-y-4">
-                            <div class="p-4 bg-white border border-slate-200 rounded-xl">
-                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 block">Principal Supervisor</span>
-                                <select x-model="form.principal_supervisor_id" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
-                                    <option value="">-- Select a Supervisor --</option>
-                                    @foreach($supervisors as $supervisor)
-                                        <option value="{{ $supervisor->id }}">{{ $supervisor->user->name }}</option>
-                                    @endforeach
-                                </select>
+                            <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false, selectedName: '' }" @click.away="open = false">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                    <span>Principal Supervisor</span>
+                                    <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.principal_supervisor_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
+                                </span>
+                                
+                                <div x-show="mode === 'select'" class="relative">
+                                    <input type="text" x-model="search" @focus="open = true" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4" placeholder="Search supervisor...">
+                                    
+                                    <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                        <template x-for="supervisor in serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))">
+                                            <div @click="form.principal_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_principal_name=''; form.new_principal_email='';" 
+                                                 class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
+                                                 x-text="supervisor.name"></div>
+                                        </template>
+                                        <div x-show="serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">
+                                            No supervisors found.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div x-show="mode === 'manual'" class="space-y-3 mt-2" x-cloak>
+                                    <input type="text" x-model="form.new_principal_name" placeholder="Supervisor Full Name" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                    <input type="email" x-model="form.new_principal_email" placeholder="Supervisor Email Address" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                </div>
                             </div>
                             
-                            <div class="p-4 bg-white border border-slate-200 rounded-xl">
-                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 block">Co-Supervisor</span>
-                                <select x-model="form.co_supervisor_id" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
-                                    <option value="">-- Select a Supervisor --</option>
-                                    @foreach($supervisors as $supervisor)
-                                        <option value="{{ $supervisor->id }}">{{ $supervisor->user->name }}</option>
-                                    @endforeach
-                                </select>
+                            <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false, selectedName: '' }" @click.away="open = false">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                    <span>Co-Supervisor</span>
+                                    <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.co_supervisor_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
+                                </span>
+                                
+                                <div x-show="mode === 'select'" class="relative">
+                                    <input type="text" x-model="search" @focus="open = true" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4" placeholder="Search supervisor...">
+                                    
+                                    <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                        <template x-for="supervisor in serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))">
+                                            <div @click="form.co_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_co_name=''; form.new_co_email='';" 
+                                                 class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
+                                                 x-text="supervisor.name"></div>
+                                        </template>
+                                        <div x-show="serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">
+                                            No supervisors found.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div x-show="mode === 'manual'" class="space-y-3 mt-2" x-cloak>
+                                    <input type="text" x-model="form.new_co_name" placeholder="Supervisor Full Name" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                    <input type="email" x-model="form.new_co_email" placeholder="Supervisor Email Address" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                </div>
                             </div>
 
-                            <div class="p-4 bg-white border border-slate-200 rounded-xl" x-show="isPhd()">
-                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 block">Third Supervisor</span>
-                                <select x-model="form.third_supervisor_id" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
-                                    <option value="">-- Select a Supervisor --</option>
-                                    @foreach($supervisors as $supervisor)
-                                        <option value="{{ $supervisor->id }}">{{ $supervisor->user->name }}</option>
-                                    @endforeach
-                                </select>
+                            <div class="p-4 bg-white border border-slate-200 rounded-xl" x-show="isPhd()" x-data="{ mode: 'select', search: '', open: false, selectedName: '' }" @click.away="open = false">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                    <span>Third Supervisor</span>
+                                    <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.third_supervisor_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
+                                </span>
+                                
+                                <div x-show="mode === 'select'" class="relative">
+                                    <input type="text" x-model="search" @focus="open = true" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4" placeholder="Search supervisor...">
+                                    
+                                    <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                        <template x-for="supervisor in serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))">
+                                            <div @click="form.third_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_third_name=''; form.new_third_email='';" 
+                                                 class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
+                                                 x-text="supervisor.name"></div>
+                                        </template>
+                                        <div x-show="serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">
+                                            No supervisors found.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div x-show="mode === 'manual'" class="space-y-3 mt-2" x-cloak>
+                                    <input type="text" x-model="form.new_third_name" placeholder="Supervisor Full Name" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                    <input type="email" x-model="form.new_third_email" placeholder="Supervisor Email Address" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                </div>
                             </div>
                         </div>
                     </template>
@@ -334,6 +393,7 @@
     
     
     
+    const serverSupervisors = @json($supervisors->map(function($s) { return ['id' => $s->id, 'name' => $s->user->name]; }));
     const serverLevels = @json($levels);
     const serverPrograms = @json($programs);
     
@@ -348,8 +408,14 @@
             form: {
                 completed_milestones: [],
                 principal_supervisor_id: '',
+                new_principal_name: '',
+                new_principal_email: '',
                 co_supervisor_id: '',
+                new_co_name: '',
+                new_co_email: '',
                 third_supervisor_id: '',
+                new_third_name: '',
+                new_third_email: '',
                 program_id: ''
             },
 
