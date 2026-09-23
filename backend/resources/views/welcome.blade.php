@@ -83,13 +83,16 @@
             </div>
 
             <!-- Action -->
-            <div class="flex items-center gap-5">
+            <div class="flex items-center gap-3 lg:gap-5">
                 @auth
                     <a href="{{ url('/dashboard') }}" class="flex items-center gap-2 bg-acetel-600 text-white text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl hover:bg-acetel-700 hover:scale-105 transition-all shadow-premium">
                         Dashboard
                         <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </a>
                 @else
+                    <a href="{{ route('register') }}" class="hidden sm:inline-block bg-white text-acetel-600 border border-acetel-200 text-[10px] font-black uppercase tracking-widest px-7 py-4 rounded-2xl hover:bg-acetel-50 hover:border-acetel-300 transition-all shadow-sm">
+                        Register
+                    </a>
                     <a href="{{ route('login') }}" class="bg-acetel-600 text-white text-[10px] font-black uppercase tracking-widest px-7 py-4 rounded-2xl hover:bg-acetel-700 hover:scale-105 transition-all shadow-premium">
                         Sign In
                     </a>
@@ -166,11 +169,19 @@
 
                 <!-- CTAs -->
                 <div class="flex flex-wrap gap-5">
-                    <a href="{{ route('login') }}" class="group relative flex items-center gap-4 bg-slate-950 text-white px-10 py-5 rounded-3xl hover:bg-acetel-700 transition-all shadow-premium overflow-hidden">
-                        <span class="relative z-10 text-[11px] font-black uppercase tracking-[0.2em]">Enter Portal</span>
-                        <svg class="w-4 h-4 relative z-10 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                        <div class="absolute inset-0 bg-gradient-to-r from-acetel-600 to-acetel-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                    </a>
+                    @auth
+                        <a href="{{ url('/dashboard') }}" class="group relative flex items-center gap-4 bg-slate-950 text-white px-10 py-5 rounded-3xl hover:bg-acetel-700 transition-all shadow-premium overflow-hidden">
+                            <span class="relative z-10 text-[11px] font-black uppercase tracking-[0.2em]">Enter Portal</span>
+                            <svg class="w-4 h-4 relative z-10 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                            <div class="absolute inset-0 bg-gradient-to-r from-acetel-600 to-acetel-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        </a>
+                    @else
+                        <a href="{{ route('register') }}" class="group relative flex items-center gap-4 bg-slate-950 text-white px-10 py-5 rounded-3xl hover:bg-acetel-700 transition-all shadow-premium overflow-hidden">
+                            <span class="relative z-10 text-[11px] font-black uppercase tracking-[0.2em]">Start Journey</span>
+                            <svg class="w-4 h-4 relative z-10 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                            <div class="absolute inset-0 bg-gradient-to-r from-acetel-600 to-acetel-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        </a>
+                    @endauth
                     <a href="{{ route('repository.index') }}" class="flex items-center gap-4 bg-white border border-acetel-100 text-slate-900 px-10 py-5 rounded-3xl hover:border-acetel-300 hover:bg-acetel-50 transition-all font-bold text-[11px] uppercase tracking-[0.2em] shadow-sm">
                         Archives
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
