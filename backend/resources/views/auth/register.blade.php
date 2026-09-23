@@ -389,7 +389,7 @@
                 if (!this.form.program_id) return false;
                 const prog = serverPrograms.find(p => p.id == this.form.program_id);
                 return prog ? prog.name.toLowerCase().includes('phd') : false;
-            },,
+            },
 
             validateStep1() {
                 const requiredFields = ['name', 'email', 'password', 'password_confirmation', 'matric_number', 'program_id'];
