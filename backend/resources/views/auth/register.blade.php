@@ -367,7 +367,7 @@
                 co_supervisor_id: '',
                 third_supervisor_id: '',
                 level_id: ''
-            },,
+            },
 
             // Hardcode the mapping since we know the 7 exact slugs/names the user just asked for
             // Seminar course, Supervisors asigned, proposal defence, progress presentation 1, Progress Presentation 2, Internal defence, and Viva 
