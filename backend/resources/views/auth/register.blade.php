@@ -55,6 +55,7 @@
             <input type="hidden" name="completed_milestones[]" x-model="form.completed_milestones" />
             <input type="hidden" name="supervisor_ids[]" x-model="form.principal_supervisor_id" />
             <input type="hidden" name="supervisor_ids[]" x-model="form.co_supervisor_id" />
+            <input type="hidden" name="supervisor_ids[]" x-model="form.third_supervisor_id" />
             
             <!-- STEP 1: Profile -->
             <div x-show="step === 1" x-transition.opacity.duration.300ms>
@@ -157,17 +158,7 @@
                         </div>
                     </div>
 
-                    <!-- Admission Year -->
-                    <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Admission Year</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                            </div>
-                            <input type="number" name="admission_year" required placeholder="E.G. 2021" value="{{ date('Y') }}"
-                                   class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
-                        </div>
-                    </div>
+                    
 
                     <!-- Program / Degree Grid -->
                     <div class="grid grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
@@ -182,7 +173,7 @@
                         </div>
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1.5">Degree</label>
-                            <select name="level_id" required class="w-full rounded-xl border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
+                            <select name="level_id" required class="w-full rounded-xl x-model="form.level_id" border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
                                 <option value="" disabled selected>Select De...</option>
                                 @foreach($levels as $level)
                                     <option value="{{ $level->id }}">{{ $level->name }}</option>
@@ -288,6 +279,16 @@
                                     @endforeach
                                 </select>
                             </div>
+
+                            <div class="p-4 bg-white border border-slate-200 rounded-xl" x-show="isPhd()">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 block">Third Supervisor</span>
+                                <select x-model="form.third_supervisor_id" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
+                                    <option value="">-- Select a Supervisor --</option>
+                                    @foreach($supervisors as $supervisor)
+                                        <option value="{{ $supervisor->id }}">{{ $supervisor->user->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                     </template>
 
@@ -350,7 +351,11 @@
     // Pass the PHP milestones array to JS
     const serverMilestones = @json($milestones);
     
+    
+    const serverLevels = @json($levels);
+    
     function registrationWizard() {
+
         return {
             step: 1,
             milestoneStep: 1,
@@ -359,8 +364,10 @@
             form: {
                 completed_milestones: [],
                 principal_supervisor_id: '',
-                co_supervisor_id: ''
-            },
+                co_supervisor_id: '',
+                third_supervisor_id: '',
+                level_id: ''
+            },,
 
             // Hardcode the mapping since we know the 7 exact slugs/names the user just asked for
             // Seminar course, Supervisors asigned, proposal defence, progress presentation 1, Progress Presentation 2, Internal defence, and Viva 
@@ -374,8 +381,15 @@
                 { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?" }
             ],
 
+            
+            isPhd() {
+                if (!this.form.level_id) return false;
+                const level = serverLevels.find(l => l.id == this.form.level_id);
+                return level ? level.name.toLowerCase().includes('phd') : false;
+            },
+
             validateStep1() {
-                const requiredFields = ['first_name', 'last_name', 'email', 'password', 'password_confirmation', 'matric_number', 'admission_year', 'program_id', 'level_id'];
+                const requiredFields = ['first_name', 'last_name', 'email', 'password', 'password_confirmation', 'matric_number', 'program_id', 'level_id'];
                 for(let field of requiredFields) {
                     if(!document.querySelector(`[name="${field}"]`).value) {
                         alert(`Please fill all required fields before continuing.`);

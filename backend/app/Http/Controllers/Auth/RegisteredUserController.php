@@ -10,6 +10,8 @@ use App\Models\MilestoneTemplate;
 use App\Models\StudentMilestone;
 use App\Models\SupervisorProfile;
 use App\Models\SupervisionAssignment;
+use App\Models\Cohort;
+use App\Models\Level;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
@@ -21,7 +23,7 @@ class RegisteredUserController extends Controller
     public function create()
     {
         $programs = \App\Models\Program::all();
-        $levels = \App\Models\Level::all();
+        $levels = Level::all();
         $supervisors = SupervisorProfile::with('user')->get();
         $milestones = MilestoneTemplate::orderBy('order')->get();
 
@@ -35,20 +37,56 @@ class RegisteredUserController extends Controller
             'last_name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|confirmed|min:8',
-            'matric_number' => 'required|string|max:255|unique:student_profiles',
+            'matric_number' => 'required|string|max:255|unique:student_profiles,student_id_number',
             'program_id' => 'required|exists:programs,id',
             'level_id' => 'required|exists:levels,id',
-            'admission_year' => 'required|integer',
             'thesis_title' => 'nullable|string|max:255',
+            'thesis_abstract' => 'nullable|string',
             'supervisor_ids' => 'nullable|array',
-            'supervisor_ids.*' => 'exists:supervisor_profiles,id',
+            'supervisor_ids.*' => 'nullable|exists:supervisor_profiles,id',
             'completed_milestones' => 'nullable|array',
             'completed_milestones.*' => 'exists:milestone_templates,id',
         ]);
 
         DB::beginTransaction();
         try {
-            // 1. Create User
+            // 1. Parse Matric Number for Year and Batch (e.g. ACE2310008)
+            $matric = strtoupper($request->matric_number);
+            
+            // Default fallbacks
+            $year = (int)date('Y');
+            $batch = 1;
+            
+            if (strlen($matric) >= 6) {
+                $yearStr = substr($matric, 3, 2);
+                $batchStr = substr($matric, 5, 1);
+                
+                if (is_numeric($yearStr)) {
+                    $year = 2000 + (int)$yearStr;
+                }
+                if (is_numeric($batchStr)) {
+                    $parsedBatch = (int)$batchStr;
+                    if ($parsedBatch === 1 || $parsedBatch === 2) {
+                        $batch = $parsedBatch;
+                    }
+                }
+            }
+
+            $cohortCode = $year . '-B' . $batch;
+            $cohortName = $year . ' - Batch ' . $batch;
+            
+            $cohort = Cohort::firstOrCreate(
+                ['code' => $cohortCode],
+                [
+                    'name' => $cohortName,
+                    'intake_year' => $year,
+                    'start_date' => $year . '-01-01',
+                    'end_date' => ($year + 1) . '-12-31',
+                    'status' => 'active',
+                ]
+            );
+
+            // 2. Create User
             $user = User::create([
                 'name' => trim($request->first_name . ' ' . $request->last_name),
                 'email' => strtolower($request->email),
@@ -59,25 +97,28 @@ class RegisteredUserController extends Controller
             $role = Role::firstOrCreate(['name' => 'Student', 'guard_name' => 'web']);
             $user->assignRole($role);
 
-            // 2. Create StudentProfile
+            // 3. Create StudentProfile
             $student = StudentProfile::create([
                 'user_id' => $user->id,
-                'matric_number' => strtoupper($request->matric_number),
+                'student_id_number' => $matric,
                 'program_id' => $request->program_id,
                 'level_id' => $request->level_id,
-                'admission_year' => $request->admission_year,
+                'cohort_id' => $cohort->id,
             ]);
 
-            // 3. Create Thesis Project
+            // 4. Create Thesis Project
             $thesis = ThesisProject::create([
                 'student_profile_id' => $student->id,
                 'title' => $request->thesis_title ?? 'Untitled Thesis',
+                'abstract' => $request->thesis_abstract,
                 'status' => 'active', // default status
             ]);
 
-            // 4. Assign Supervisors
+            // 5. Assign Supervisors
             if ($request->has('supervisor_ids')) {
-                foreach ($request->supervisor_ids as $supId) {
+                // filter empty values
+                $supIds = array_filter($request->supervisor_ids);
+                foreach ($supIds as $supId) {
                     SupervisionAssignment::create([
                         'thesis_project_id' => $thesis->id,
                         'supervisor_profile_id' => $supId,
@@ -93,7 +134,7 @@ class RegisteredUserController extends Controller
                 }
             }
 
-            // 5. Setup Milestones
+            // 6. Setup Milestones
             $templates = MilestoneTemplate::orderBy('order')->get();
             $completedIds = $request->completed_milestones ?? [];
             
