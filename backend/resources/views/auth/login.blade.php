@@ -234,8 +234,14 @@
                 Browse Research Repository
             </a>
 
+            {{-- Register link --}}
+            <p class="mt-8 text-center text-sm text-slate-500">
+                Don't have an account?
+                <a href="{{ route('register') }}" class="font-bold text-green-600 hover:text-green-700 transition-colors">Register as Student</a>
+            </p>
+
             {{-- Back to home --}}
-            <p class="mt-8 text-center text-xs text-slate-400">
+            <p class="mt-4 text-center text-xs text-slate-400">
                 <a href="/" class="font-semibold text-slate-500 hover:text-green-600 transition-colors inline-flex items-center gap-1">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                     Back to home
