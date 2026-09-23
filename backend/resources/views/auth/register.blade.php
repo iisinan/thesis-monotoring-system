@@ -3,262 +3,435 @@
 @section('title', 'Student Registration - Thesis Monitoring System')
 
 @section('content')
-<div class="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#0A192F]">
-    {{-- Background pattern --}}
-    <div class="absolute inset-0 z-0">
-        <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
-        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full opacity-20 blur-[100px]" style="background: radial-gradient(circle, #22c55e 0%, transparent 70%);"></div>
-        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full opacity-20 blur-[100px]" style="background: radial-gradient(circle, #3b82f6 0%, transparent 70%);"></div>
-    </div>
-
-    <div class="w-full max-w-3xl z-10 px-4 py-8">
-        {{-- Card --}}
-        <div class="bg-white/95 backdrop-blur-md rounded-[2rem] shadow-2xl overflow-hidden border border-white/20 p-8 md:p-12 relative"
-             x-data="registrationWizard()">
+<div class="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" x-data="registrationWizard()">
+    
+    <div class="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 relative overflow-hidden">
+        
+        <!-- Main Header (Shows on Steps 2 and 3) -->
+        <div x-show="step > 1" x-cloak class="text-center mb-8">
+            <h1 class="text-2xl font-bold text-slate-900">ACETEL Postgraduate</h1>
+            <h2 class="text-xl font-bold text-green-600">Registration</h2>
             
-            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-500 via-emerald-400 to-green-600"></div>
-
-            {{-- Header --}}
-            <div class="text-center mb-10">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-green-50 text-green-600 mb-4 shadow-inner">
-                    <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                    </svg>
+            <!-- Progress Bar -->
+            <div class="mt-8 relative px-4">
+                <div class="absolute top-1/2 left-8 right-8 h-1 -translate-y-1/2 bg-slate-200 z-0 rounded-full">
+                    <div class="h-full bg-green-600 rounded-full transition-all duration-300" :style="'width: ' + ((step - 1) * 50) + '%'"></div>
                 </div>
-                <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight">Student Registration</h1>
-                <p class="text-slate-500 mt-2 font-medium">Create your account and select your current research progress.</p>
+                
+                <div class="relative z-10 flex justify-between">
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
+                             :class="step >= 1 ? 'bg-green-600 text-white' : 'bg-white border-2 border-slate-200 text-slate-400'">1</div>
+                        <span class="text-xs font-semibold mt-2" :class="step >= 1 ? 'text-green-600' : 'text-slate-400'">Profile</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
+                             :class="step >= 2 ? 'bg-green-600 text-white' : 'bg-white border-2 border-slate-200 text-slate-400'">2</div>
+                        <span class="text-xs font-semibold mt-2" :class="step >= 2 ? 'text-green-600' : 'text-slate-400'">Milestones</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
+                             :class="step >= 3 ? 'bg-green-600 text-white' : 'bg-white border-2 border-slate-200 text-slate-400'">3</div>
+                        <span class="text-xs font-semibold mt-2" :class="step >= 3 ? 'text-slate-400' : 'text-slate-400'">Thesis</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if ($errors->any())
+            <div class="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-medium">
+                <ul class="list-disc list-inside">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <form method="POST" action="{{ route('register') }}" id="registrationForm">
+            @csrf
+            
+            <!-- Hidden inputs to hold Alpine state for submission -->
+            <input type="hidden" name="completed_milestones[]" x-model="form.completed_milestones" />
+            <input type="hidden" name="supervisor_ids[]" x-model="form.supervisor_ids" />
+            
+            <!-- STEP 1: Profile -->
+            <div x-show="step === 1" x-transition.opacity.duration.300ms>
+                
+                <div class="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
+                    <a href="{{ route('login') }}" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        Cancel
+                    </a>
+                    <div class="w-7 h-7 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold ml-2">1</div>
+                    <h2 class="text-lg font-bold text-slate-900">Student Information</h2>
+                </div>
+
+                <div class="space-y-5">
+                    <!-- Full Name -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">First Name</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            </div>
+                            <input type="text" name="first_name" required placeholder="John"
+                                   class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Last Name</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                            </div>
+                            <input type="text" name="last_name" required placeholder="Doe"
+                                   class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
+                        </div>
+                    </div>
+
+                    <!-- Email -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Email Address</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            </div>
+                            <input type="email" name="email" required placeholder="john@example.com"
+                                   class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
+                        </div>
+                    </div>
+
+                    <!-- Password Grid -->
+                    <div class="grid grid-cols-2 gap-4" x-data="{ showP: false, showC: false }">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Password</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                </div>
+                                <input :type="showP ? 'text' : 'password'" name="password" required placeholder="••••••••"
+                                       class="pl-9 pr-10 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
+                                <button type="button" @click="showP = !showP" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Confirm Password</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                </div>
+                                <input :type="showC ? 'text' : 'password'" name="password_confirmation" required placeholder="••••••••"
+                                       class="pl-9 pr-10 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
+                                <button type="button" @click="showC = !showC" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Matric Number -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Matriculation Number</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>
+                            </div>
+                            <input type="text" name="matric_number" required placeholder="E.G. ACE26210011"
+                                   class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors uppercase">
+                        </div>
+                    </div>
+
+                    <!-- Place of Work -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Place of Work <span class="text-slate-400 font-normal">(Optional)</span></label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                            </div>
+                            <input type="text" name="place_of_work" placeholder="Where do you currently work?"
+                                   class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
+                        </div>
+                    </div>
+
+                    <!-- Admission Year -->
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Admission Year</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            </div>
+                            <input type="number" name="admission_year" required placeholder="E.G. 2021" value="{{ date('Y') }}"
+                                   class="pl-11 w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 transition-colors">
+                        </div>
+                    </div>
+
+                    <!-- Program / Degree Grid -->
+                    <div class="grid grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100">
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Programme</label>
+                            <select name="program_id" required class="w-full rounded-xl border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
+                                <option value="" disabled selected>Select Pro...</option>
+                                @foreach($programs as $program)
+                                    <option value="{{ $program->id }}">{{ $program->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Degree</label>
+                            <select name="level_id" required class="w-full rounded-xl border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
+                                <option value="" disabled selected>Select De...</option>
+                                @foreach($levels as $level)
+                                    <option value="{{ $level->id }}">{{ $level->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="pt-4">
+                        <button type="button" @click="if(validateStep1()) step = 2" 
+                                class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 hover:shadow-green-700/30 transition-all flex items-center justify-center gap-2">
+                            Continue to Questionnaire
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            {{-- Validation Errors --}}
-            @if ($errors->any())
-                <div class="mb-6 bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm font-medium">
-                    <ul class="list-disc list-inside">
-                        @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endif
-
-            <form method="POST" action="{{ route('register') }}">
-                @csrf
-
-                {{-- Progress Bar --}}
-                <div class="mb-10 relative">
-                    <div class="flex items-center justify-between relative z-10">
-                        <template x-for="(stepName, index) in steps" :key="index">
-                            <div class="flex flex-col items-center flex-1 relative">
-                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 relative z-10"
-                                     :class="step > index ? 'bg-green-500 text-white shadow-lg shadow-green-500/30' : (step === index ? 'bg-white text-green-600 border-2 border-green-500 shadow-md' : 'bg-slate-100 text-slate-400 border border-slate-200')">
-                                    <span x-text="index + 1" x-show="step <= index"></span>
-                                    <svg x-show="step > index" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                </div>
-                                <span class="text-xs mt-3 font-bold uppercase tracking-wider transition-colors duration-300"
-                                      :class="step >= index ? 'text-green-700' : 'text-slate-400'"
-                                      x-text="stepName"></span>
-                            </div>
-                        </template>
-                    </div>
-                    {{-- Lines --}}
-                    <div class="absolute top-5 left-0 w-full h-1 bg-slate-100 -z-0 rounded-full overflow-hidden">
-                        <div class="h-full bg-green-500 transition-all duration-500 ease-in-out"
-                             :style="'width: ' + ((step / (steps.length - 1)) * 100) + '%'"></div>
-                    </div>
-                </div>
-
-                {{-- Step 1: Account Details --}}
-                <div x-show="step === 0" x-transition.opacity.duration.300ms>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div class="space-y-1.5">
-                            <label for="first_name" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">First Name</label>
-                            <input type="text" name="first_name" id="first_name" value="{{ old('first_name') }}" required
-                                   class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                        </div>
-                        <div class="space-y-1.5">
-                            <label for="last_name" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Last Name</label>
-                            <input type="text" name="last_name" id="last_name" value="{{ old('last_name') }}" required
-                                   class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                        </div>
-                        <div class="space-y-1.5 md:col-span-2">
-                            <label for="email" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Email Address</label>
-                            <input type="email" name="email" id="email" value="{{ old('email') }}" required
-                                   class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                        </div>
-                        <div class="space-y-1.5">
-                            <label for="password" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Password</label>
-                            <input type="password" name="password" id="password" required
-                                   class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                        </div>
-                        <div class="space-y-1.5">
-                            <label for="password_confirmation" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Confirm Password</label>
-                            <input type="password" name="password_confirmation" id="password_confirmation" required
-                                   class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Step 2: Academic Details --}}
-                <div x-show="step === 1" x-cloak x-transition.opacity.duration.300ms>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div class="space-y-1.5">
-                            <label for="matric_number" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Matriculation Number</label>
-                            <input type="text" name="matric_number" id="matric_number" value="{{ old('matric_number') }}" required placeholder="e.g. NOU12345"
-                                   class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                        </div>
-                        <div class="space-y-1.5">
-                            <label for="admission_year" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Admission Year</label>
-                            <input type="number" name="admission_year" id="admission_year" value="{{ old('admission_year', date('Y')) }}" required
-                                   class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                        </div>
-                        <div class="space-y-1.5 md:col-span-2">
-                            <label for="program_id" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Program</label>
-                            <select name="program_id" id="program_id" required
-                                    class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                                <option value="">Select a Program</option>
-                                @foreach($programs as $program)
-                                    <option value="{{ $program->id }}" {{ old('program_id') == $program->id ? 'selected' : '' }}>{{ $program->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="space-y-1.5 md:col-span-2">
-                            <label for="level_id" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Level / Degree</label>
-                            <select name="level_id" id="level_id" required
-                                    class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                                <option value="">Select Level</option>
-                                @foreach($levels as $level)
-                                    <option value="{{ $level->id }}" {{ old('level_id') == $level->id ? 'selected' : '' }}>{{ $level->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="space-y-1.5 md:col-span-2">
-                            <label for="thesis_title" class="block text-xs font-bold text-slate-600 uppercase tracking-wider">Working Thesis Title (Optional)</label>
-                            <input type="text" name="thesis_title" id="thesis_title" value="{{ old('thesis_title') }}" placeholder="Enter your current research title"
-                                   class="w-full px-4 py-3.5 bg-white border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:ring-2 focus:ring-green-500/20 focus:border-green-500 transition-all">
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Step 3: Supervisors & Progress --}}
-                <div x-show="step === 2" x-cloak x-transition.opacity.duration.300ms>
-                    <div class="space-y-6">
-                        
-                        <div class="bg-blue-50/50 border border-blue-100 rounded-2xl p-5">
-                            <h3 class="text-sm font-bold text-blue-800 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                                Assigned Supervisors
-                            </h3>
-                            <p class="text-xs text-blue-600/80 mb-4 font-medium">Select your assigned supervisors if you already have them.</p>
-                            
-                            <div class="max-h-48 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                @foreach($supervisors as $supervisor)
-                                    <label class="flex items-center p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-blue-300 hover:shadow-sm transition-all group">
-                                        <input type="checkbox" name="supervisor_ids[]" value="{{ $supervisor->id }}" 
-                                               class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500">
-                                        <span class="ml-3 text-sm font-semibold text-slate-700 group-hover:text-blue-700 transition-colors">
-                                            {{ $supervisor->user->name }}
-                                            @if($supervisor->specialization)
-                                                <span class="text-xs font-medium text-slate-400 block">{{ $supervisor->specialization }}</span>
-                                            @endif
-                                        </span>
-                                    </label>
-                                @endforeach
-                            </div>
-                        </div>
-
-                        <div class="bg-green-50/50 border border-green-100 rounded-2xl p-5">
-                            <h3 class="text-sm font-bold text-green-800 uppercase tracking-wider mb-2 flex items-center gap-2">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                Research Progress Checklist
-                            </h3>
-                            <p class="text-xs text-green-600/80 mb-4 font-medium">Check off the milestones you have <strong class="font-bold">already completed</strong> and passed. They will be auto-approved in your new account.</p>
-                            
-                            <div class="space-y-2">
-                                @foreach($milestones as $milestone)
-                                    <label class="flex items-start p-3 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-green-300 hover:shadow-sm transition-all group">
-                                        <div class="flex items-center h-5 mt-0.5">
-                                            <input type="checkbox" name="completed_milestones[]" value="{{ $milestone->id }}" 
-                                                   class="w-4 h-4 text-green-600 border-slate-300 rounded focus:ring-green-500">
-                                        </div>
-                                        <div class="ml-3">
-                                            <span class="text-sm font-bold text-slate-700 group-hover:text-green-700 transition-colors block">{{ $milestone->name }}</span>
-                                            @if($milestone->description)
-                                                <span class="text-xs font-medium text-slate-500 block mt-0.5">{{ \Illuminate\Support\Str::limit($milestone->description, 60) }}</span>
-                                            @endif
-                                        </div>
-                                    </label>
-                                @endforeach
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                {{-- Navigation Buttons --}}
-                <div class="pt-8 flex items-center justify-between">
-                    <button type="button" 
-                            x-show="step > 0" 
-                            @click="step--" 
-                            class="px-5 py-2.5 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800 rounded-xl text-sm font-bold uppercase tracking-wider transition-colors">
+            <!-- STEP 2: Milestones -->
+            <div x-show="step === 2" x-cloak x-transition.opacity.duration.300ms>
+                
+                <!-- Main Sub-header -->
+                <div x-show="!showingSubStep" class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                    <button type="button" @click="step = 1" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                         Back
                     </button>
-                    <div x-show="step === 0"></div>
+                    <div class="w-7 h-7 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold ml-2">2</div>
+                    <h2 class="text-lg font-bold text-slate-900">Research Progress</h2>
+                </div>
 
-                    <button type="button" 
-                            x-show="step < steps.length - 1" 
-                            @click="if (validateStep()) step++" 
-                            class="px-6 py-2.5 bg-slate-900 text-white hover:bg-slate-800 rounded-xl text-sm font-bold uppercase tracking-wider shadow-lg shadow-slate-900/20 transition-all flex items-center gap-2">
-                        Next Step
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                    </button>
+                <!-- Main Questionnaire Box -->
+                <div x-show="!showingSubStep" class="bg-[#f2fdf7] border border-green-100 rounded-3xl p-8 relative overflow-hidden">
+                    
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="bg-green-100 text-green-700 font-bold text-xs px-3 py-1 rounded-full whitespace-nowrap">
+                            Question <span x-text="milestoneStep"></span> of 7
+                        </div>
+                        <div class="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div class="h-full bg-green-500 transition-all duration-300" :style="'width: ' + ((milestoneStep / 7) * 100) + '%'"></div>
+                        </div>
+                    </div>
 
-                    <button type="submit" 
-                            x-show="step === steps.length - 1" 
-                            class="px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-500 hover:to-emerald-500 rounded-xl text-sm font-bold uppercase tracking-wider shadow-lg shadow-green-600/30 transition-all transform hover:-translate-y-0.5 flex items-center gap-2">
-                        Complete Registration
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    <h3 class="text-2xl font-bold text-slate-900 leading-tight mb-8 text-center px-4" x-html="getCurrentQuestionHtml()"></h3>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <button type="button" @click="answerYes()" class="bg-[#18a04b] text-white font-bold py-4 rounded-2xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            Yes, I have
+                        </button>
+                        <button type="button" @click="answerNo()" class="bg-white border-2 border-slate-200 text-slate-700 font-bold py-4 rounded-2xl hover:border-slate-300 hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            No, I have not
+                        </button>
+                    </div>
+                </div>
+                
+                <p x-show="!showingSubStep" class="text-xs text-slate-400 text-center mt-6 px-8 flex items-start justify-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Selecting "No" will establish this as your current stage and complete your profile.
+                </p>
+
+                <!-- Sub-step (Grade or Supervisors) -->
+                <div x-show="showingSubStep" x-cloak>
+                    <div class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                        <button type="button" @click="showingSubStep = false" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                            Back
+                        </button>
+                        <div class="w-7 h-7 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold ml-2">2</div>
+                        <h2 class="text-lg font-bold text-slate-900 leading-tight" x-html="getCurrentSubTitle()"></h2>
+                    </div>
+
+                    <p class="text-sm text-slate-500 mb-6 font-medium" x-text="getCurrentSubDesc()"></p>
+                    
+                    <!-- Dynamic Sub-step Content -->
+                    <template x-if="getCurrentSubStepType() === 'grade'">
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Course Grade</label>
+                            <input type="text" placeholder="e.g. A, B+, 75%"
+                                   class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                        </div>
+                    </template>
+                    
+                    <template x-if="getCurrentSubStepType() === 'supervisors'">
+                        <div class="mb-6 space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 custom-scrollbar">
+                            @foreach($supervisors as $supervisor)
+                                <label class="flex items-center p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-green-300 hover:shadow-sm transition-all group">
+                                    <input type="checkbox" name="temp_supervisors" value="{{ $supervisor->id }}" @change="toggleSupervisor('{{ $supervisor->id }}')"
+                                           class="w-4 h-4 text-green-600 border-slate-300 rounded focus:ring-green-500">
+                                    <span class="ml-3 text-sm font-semibold text-slate-700 group-hover:text-green-700 transition-colors">
+                                        {{ $supervisor->user->name }}
+                                        @if($supervisor->specialization)
+                                            <span class="text-xs font-medium text-slate-400 block">{{ $supervisor->specialization }}</span>
+                                        @endif
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </template>
+
+                    <button type="button" @click="saveSubStep()" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                        <span x-text="getCurrentSubButtonText()"></span>
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
                     </button>
                 </div>
-            </form>
 
-            {{-- Sign in link --}}
-            <p class="mt-8 text-center text-sm text-slate-500">
-                Already have an account?
-                <a href="{{ route('login') }}" class="font-bold text-green-600 hover:text-green-700 transition-colors">Sign In</a>
-            </p>
-        </div>
+            </div>
+
+            <!-- STEP 3: Thesis -->
+            <div x-show="step === 3" x-cloak x-transition.opacity.duration.300ms>
+                
+                <div class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                    <button type="button" @click="step = 2; milestoneStep = milestoneStep > 1 ? milestoneStep - 1 : 1" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        Back
+                    </button>
+                    <div class="w-7 h-7 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold ml-2">3</div>
+                    <h2 class="text-lg font-bold text-slate-900 leading-tight">Thesis Details</h2>
+                </div>
+
+                <div class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Working Thesis Title (Optional)</label>
+                        <textarea name="thesis_title" rows="3" placeholder="Enter your current research title..."
+                               class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 hover:shadow-green-700/30 transition-all flex items-center justify-center gap-2">
+                        Complete Registration
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </div>
+            </div>
+
+        </form>
     </div>
 </div>
 
 <style>
     [x-cloak] { display: none !important; }
-    .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-track {
-        background: #f1f5f9; 
-        border-radius: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
-    }
-    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
-    }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 </style>
 
 <script>
+    // Pass the PHP milestones array to JS
+    const serverMilestones = @json($milestones);
+    
     function registrationWizard() {
         return {
-            step: 0,
-            steps: ['Account', 'Academic', 'Progress'],
-            validateStep() {
-                // Simple HTML5 validation trigger for the current step fields
-                const form = document.querySelector('form');
-                // We'll just let HTML5 validate when they submit, or we can check required fields manually.
-                // For a robust implementation, you'd check inputs in the current x-show div.
-                // For now, we allow them to click next and rely on backend / final submit validation.
-                return true; 
+            step: 1,
+            milestoneStep: 1,
+            showingSubStep: false,
+            
+            form: {
+                completed_milestones: [],
+                supervisor_ids: []
+            },
+
+            // Hardcode the mapping since we know the 7 exact slugs/names the user just asked for
+            // Seminar course, Supervisors asigned, proposal defence, progress presentation 1, Progress Presentation 2, Internal defence, and Viva 
+            questions: [
+                { id: serverMilestones.find(m => m.slug === 'seminar_as_a_course')?.id, text: "Have you completed your", highlight: "Seminar Course", textAfter: "?", subStep: "grade", title: "Seminar<br>Course<br>Grade", desc: "Since you have completed your Seminar Course, please provide your grade below.", btnText: "Save Grade & Continue" },
+                { id: serverMilestones.find(m => m.slug === 'supervisors_assigned')?.id, text: "Has your", highlight: "Supervisory Committee", textAfter: " been assigned?", subStep: "supervisors", title: "Assign<br>Supervisors", desc: "Since your committee is assigned, please select them below.", btnText: "Save Supervisors & Continue" },
+                { id: serverMilestones.find(m => m.slug === 'proposal_defence')?.id, text: "Have you completed your", highlight: "Proposal Defence", textAfter: "?" },
+                { id: serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id, text: "Have you completed your", highlight: "Progress Presentation 1", textAfter: "?" },
+                { id: serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id, text: "Have you completed your", highlight: "Progress Presentation 2", textAfter: "?" },
+                { id: serverMilestones.find(m => m.slug === 'internal_defence')?.id, text: "Have you completed your", highlight: "Internal Defence", textAfter: "?" },
+                { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?" }
+            ],
+
+            validateStep1() {
+                const requiredFields = ['first_name', 'last_name', 'email', 'password', 'password_confirmation', 'matric_number', 'admission_year', 'program_id', 'level_id'];
+                for(let field of requiredFields) {
+                    if(!document.querySelector(`[name="${field}"]`).value) {
+                        alert(`Please fill all required fields before continuing.`);
+                        return false;
+                    }
+                }
+                
+                if(document.querySelector(`[name="password"]`).value !== document.querySelector(`[name="password_confirmation"]`).value) {
+                    alert('Passwords do not match.');
+                    return false;
+                }
+                
+                return true;
+            },
+
+            getCurrentQuestionHtml() {
+                let q = this.questions[this.milestoneStep - 1];
+                return `${q.text} <span class="text-[#18a04b] underline decoration-2 underline-offset-4">${q.highlight}</span>${q.textAfter || ''}`;
+            },
+            
+            getCurrentSubTitle() {
+                return this.questions[this.milestoneStep - 1].title;
+            },
+            
+            getCurrentSubDesc() {
+                return this.questions[this.milestoneStep - 1].desc;
+            },
+
+            getCurrentSubStepType() {
+                return this.questions[this.milestoneStep - 1].subStep;
+            },
+            
+            getCurrentSubButtonText() {
+                return this.questions[this.milestoneStep - 1].btnText;
+            },
+
+            answerYes() {
+                let currentQ = this.questions[this.milestoneStep - 1];
+                if (currentQ.subStep) {
+                    this.showingSubStep = true;
+                } else {
+                    this.recordMilestoneAndNext(currentQ.id);
+                }
+            },
+            
+            answerNo() {
+                this.step = 3;
+            },
+            
+            saveSubStep() {
+                let currentQ = this.questions[this.milestoneStep - 1];
+                this.recordMilestoneAndNext(currentQ.id);
+            },
+            
+            recordMilestoneAndNext(id) {
+                if (id && !this.form.completed_milestones.includes(id)) {
+                    this.form.completed_milestones.push(id);
+                }
+                
+                this.showingSubStep = false;
+                
+                if (this.milestoneStep < 7) {
+                    this.milestoneStep++;
+                } else {
+                    this.step = 3;
+                }
+            },
+            
+            toggleSupervisor(id) {
+                if(this.form.supervisor_ids.includes(id)) {
+                    this.form.supervisor_ids = this.form.supervisor_ids.filter(v => v !== id);
+                } else {
+                    this.form.supervisor_ids.push(id);
+                }
             }
         }
     }
