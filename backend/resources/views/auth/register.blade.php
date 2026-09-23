@@ -53,7 +53,8 @@
             
             <!-- Hidden inputs to hold Alpine state for submission -->
             <input type="hidden" name="completed_milestones[]" x-model="form.completed_milestones" />
-            <input type="hidden" name="supervisor_ids[]" x-model="form.supervisor_ids" />
+            <input type="hidden" name="supervisor_ids[]" x-model="form.principal_supervisor_id" />
+            <input type="hidden" name="supervisor_ids[]" x-model="form.co_supervisor_id" />
             
             <!-- STEP 1: Profile -->
             <div x-show="step === 1" x-transition.opacity.duration.300ms>
@@ -267,19 +268,26 @@
                     </template>
                     
                     <template x-if="getCurrentSubStepType() === 'supervisors'">
-                        <div class="mb-6 space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50 custom-scrollbar">
-                            @foreach($supervisors as $supervisor)
-                                <label class="flex items-center p-3 bg-white border border-slate-200 rounded-lg cursor-pointer hover:border-green-300 hover:shadow-sm transition-all group">
-                                    <input type="checkbox" name="temp_supervisors" value="{{ $supervisor->id }}" @change="toggleSupervisor('{{ $supervisor->id }}')"
-                                           class="w-4 h-4 text-green-600 border-slate-300 rounded focus:ring-green-500">
-                                    <span class="ml-3 text-sm font-semibold text-slate-700 group-hover:text-green-700 transition-colors">
-                                        {{ $supervisor->user->name }}
-                                        @if($supervisor->specialization)
-                                            <span class="text-xs font-medium text-slate-400 block">{{ $supervisor->specialization }}</span>
-                                        @endif
-                                    </span>
-                                </label>
-                            @endforeach
+                        <div class="mb-6 space-y-4">
+                            <div class="p-4 bg-white border border-slate-200 rounded-xl">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 block">Principal Supervisor</span>
+                                <select x-model="form.principal_supervisor_id" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
+                                    <option value="">-- Select a Supervisor --</option>
+                                    @foreach($supervisors as $supervisor)
+                                        <option value="{{ $supervisor->id }}">{{ $supervisor->user->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            
+                            <div class="p-4 bg-white border border-slate-200 rounded-xl">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 block">Co-Supervisor</span>
+                                <select x-model="form.co_supervisor_id" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3">
+                                    <option value="">-- Select a Supervisor --</option>
+                                    @foreach($supervisors as $supervisor)
+                                        <option value="{{ $supervisor->id }}">{{ $supervisor->user->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                     </template>
 
@@ -299,20 +307,29 @@
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                         Back
                     </button>
-                    <div class="w-7 h-7 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-sm font-bold ml-2">3</div>
-                    <h2 class="text-lg font-bold text-slate-900 leading-tight">Thesis Details</h2>
+                </div>
+
+                <div class="text-center mb-8">
+                    <span class="inline-block px-4 py-1.5 bg-green-100 text-green-700 text-xs font-bold uppercase tracking-widest rounded-full mb-4">Proposal Details</span>
+                    <h2 class="text-2xl font-bold text-slate-900 mb-2">Research Details</h2>
+                    <p class="text-sm text-slate-500 font-medium">Please provide your approved thesis title and abstract.</p>
                 </div>
 
                 <div class="space-y-6">
                     <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Working Thesis Title (Optional)</label>
-                        <textarea name="thesis_title" rows="3" placeholder="Enter your current research title..."
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Thesis Title</label>
+                        <input type="text" name="thesis_title" placeholder="Enter your approved thesis title"
+                               class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Thesis Abstract</label>
+                        <textarea name="thesis_abstract" rows="5" placeholder="Paste your approved abstract here..."
                                class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors"></textarea>
                     </div>
 
                     <button type="submit" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 hover:shadow-green-700/30 transition-all flex items-center justify-center gap-2">
-                        Complete Registration
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        Save Details & Continue
                     </button>
                 </div>
             </div>
@@ -341,7 +358,8 @@
             
             form: {
                 completed_milestones: [],
-                supervisor_ids: []
+                principal_supervisor_id: '',
+                co_supervisor_id: ''
             },
 
             // Hardcode the mapping since we know the 7 exact slugs/names the user just asked for
