@@ -103,22 +103,19 @@ class MilestoneWorkflowService
                 $this->activateCommunicationChannels($project);
                 $project->update(['status' => 'active']);
                 break;
-            case 'cleared_for_proposal_defence':
-                $project->update(['status' => 'cleared_for_proposal']);
-                break;
-            case 'did_proposal_defence':
+            case 'proposal_defence':
                 $project->update(['status' => 'proposal_passed']);
                 break;
-            case 'cleared_for_internal_defence':
-                $project->update(['status' => 'cleared_for_internal']);
+            case 'progress_presentation_1':
+                // no specific status update needed, just progress
                 break;
-            case 'did_internal_defence':
+            case 'progress_presentation_2':
+                // no specific status update needed
+                break;
+            case 'internal_defence':
                 $project->update(['status' => 'internal_passed']);
                 break;
-            case 'cleared_for_external_defence':
-                $project->update(['status' => 'cleared_for_external']);
-                break;
-            case 'submitted_final_thesis':
+            case 'viva':
                 $project->update([
                     'status' => 'completed',
                     'end_date' => now()

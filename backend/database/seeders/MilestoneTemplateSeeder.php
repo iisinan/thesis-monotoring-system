@@ -2,23 +2,17 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\MilestoneTemplate;
+use Illuminate\Support\Facades\DB;
 
 class MilestoneTemplateSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        // Make sure we wipe old ones so we don't have duplicates or order conflicts if running again
-        // Or we just rely on updateOrCreate
-
         $milestones = [
             [
-                'name' => 'Seminar as a course',
+                'name' => 'Seminar course',
                 'slug' => 'seminar_as_a_course',
                 'order' => 1,
                 'requires_submission' => true,
@@ -32,47 +26,47 @@ class MilestoneTemplateSeeder extends Seeder
                 'description' => 'Student uploads PPT for presentation. Admin records result and approves milestone.'
             ],
             [
-                'name' => 'Student Finished Course work',
-                'slug' => 'student_finished_course_work',
-                'order' => 2,
-                'requires_submission' => true,
-                'requires_approval' => true,
-                'required_approvers' => ['Program Coordinator'],
-                'description' => 'Student uploads coursework results (PDF/image) for Program Coordinator approval.'
-            ],
-            [
-                'name' => 'Student Assigned Supervisor',
+                'name' => 'Supervisors assigned',
                 'slug' => 'supervisors_assigned',
-                'order' => 3,
+                'order' => 2,
                 'requires_submission' => false,
                 'requires_approval' => true,
                 'required_approvers' => ['Program Coordinator'],
                 'description' => 'Program Coordinator assigns supervisors based on level (MSc: 2, PhD: 3).'
             ],
             [
-                'name' => 'Student Cleared For Proposal Defence',
-                'slug' => 'cleared_for_proposal_defence',
-                'order' => 4,
+                'name' => 'Proposal defence',
+                'slug' => 'proposal_defence',
+                'order' => 3,
                 'requires_submission' => true,
                 'requires_approval' => true,
                 'required_approvers' => ['Supervisor', 'Program Coordinator'],
                 'allow_defence_date' => true,
                 'defence_type' => 'proposal',
                 'defence_date_role' => 'Program Coordinator',
-                'description' => 'Unanimous supervisor approval required, followed by Program Coordinator clearance and scheduling.'
+                'description' => 'Supervisor approval required, followed by Program Coordinator scheduling proposal defence.'
             ],
             [
-                'name' => 'Student Did Proposal Defence',
-                'slug' => 'did_proposal_defence',
-                'order' => 5,
-                'requires_submission' => false,
+                'name' => 'Progress presentation 1',
+                'slug' => 'progress_presentation_1',
+                'order' => 4,
+                'requires_submission' => true,
                 'requires_approval' => true,
-                'required_approvers' => ['Program Coordinator'],
-                'description' => 'Program Coordinator records defence outcome (pass/corrections/reschedule).'
+                'required_approvers' => ['Supervisor', 'Program Coordinator'],
+                'description' => 'First progress presentation submission and approval.'
             ],
             [
-                'name' => 'Student Cleared For Internal Defence',
-                'slug' => 'cleared_for_internal_defence',
+                'name' => 'Progress presentation 2',
+                'slug' => 'progress_presentation_2',
+                'order' => 5,
+                'requires_submission' => true,
+                'requires_approval' => true,
+                'required_approvers' => ['Supervisor', 'Program Coordinator'],
+                'description' => 'Second progress presentation submission and approval.'
+            ],
+            [
+                'name' => 'Internal defence',
+                'slug' => 'internal_defence',
                 'order' => 6,
                 'requires_submission' => true,
                 'requires_approval' => true,
@@ -80,54 +74,31 @@ class MilestoneTemplateSeeder extends Seeder
                 'allow_defence_date' => true,
                 'defence_type' => 'internal',
                 'defence_date_role' => 'Program Coordinator',
-                'description' => 'Unanimous supervisor approval required on latest draft before Program Coordinator schedules internal.'
+                'show_internal_examiner_assignment' => true,
+                'description' => 'Internal defence scheduling and outcome recording.'
             ],
             [
-                'name' => 'Student Did Internal Defence',
-                'slug' => 'did_internal_defence',
+                'name' => 'Viva',
+                'slug' => 'viva',
                 'order' => 7,
                 'requires_submission' => false,
                 'requires_approval' => true,
-                'required_approvers' => ['Program Coordinator'],
-                'show_internal_examiner_assignment' => true,
-                'description' => 'Outcome recorded and Internal Examiner assigned by Program Coordinator.'
-            ],
-            [
-                'name' => 'Student Effect Corrections',
-                'slug' => 'student_effect_corrections',
-                'order' => 8,
-                'requires_submission' => true,
-                'requires_approval' => true,
-                'required_approvers' => ['Internal Examiner', 'Program Coordinator'],
-                'description' => 'Internal Examiner reviews corrections repeatedly until cleared for external.'
-            ],
-            [
-                'name' => 'Student Cleared For External',
-                'slug' => 'cleared_for_external_defence',
-                'order' => 9,
-                'requires_submission' => false,
-                'requires_approval' => true,
-                'required_approvers' => ['Internal Examiner', 'Program Coordinator'],
+                'required_approvers' => ['Internal Examiner', 'Program Coordinator', 'Director'],
                 'allow_defence_date' => true,
                 'defence_type' => 'external',
                 'defence_date_role' => 'Director',
-                'description' => 'Final internal/coordinator joint approval for external examination pipeline.'
-            ],
-            [
-                'name' => 'Student Submitted Final Thesis',
-                'slug' => 'submitted_final_thesis',
-                'order' => 10,
-                'requires_submission' => true,
-                'requires_approval' => true,
-                'required_approvers' => ['Program Examiner'],
                 'is_final_archival' => true,
-                'description' => 'Final thesis submission verified by Program Examiner for completeness and forms.'
+                'description' => 'Final Viva / External defence.'
             ],
         ];
 
+        // Delete templates that are not in the new list to ensure ONLY these exist
+        $slugsToKeep = array_column($milestones, 'slug');
+        MilestoneTemplate::whereNotIn('slug', $slugsToKeep)->delete();
+
         foreach ($milestones as $milestone) {
             MilestoneTemplate::updateOrCreate(
-                ['name' => $milestone['name'], 'program_id' => null],
+                ['slug' => $milestone['slug'], 'program_id' => null],
                 $milestone
             );
         }
