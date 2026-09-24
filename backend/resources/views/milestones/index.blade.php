@@ -204,15 +204,19 @@
                 }
             @endphp
             
-            <div id="milestone-container-{{ $milestone->id }}" class="group/milestone relative bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-md hover:border-gray-200">
+            <div id="milestone-container-{{ $milestone->id }}" class="group/milestone relative bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 {{ $isActive ? 'hover:shadow-md hover:border-gray-200 ring-2 ring-brand-200' : '' }}">
                 <!-- Milestone Header -->
                 <button type="button"
-                        @cannot('view', $milestone)
-                            onclick="alert('Institutional Protocol: This milestone is currently locked. You must complete the ongoing phase first.');"
-                        @else
+                        @if($isCompleted)
+                            {{-- Past milestones: not clickable --}}
+                            type="button"
+                        @elseif($isActive || $isPendingMatch)
                             onclick="toggleMilestone('{{ $milestone->id }}')"
-                        @endcannot
-                        class="w-full text-left flex items-center justify-between px-10 py-10 transition-all duration-300 {{ $conf['label'] === 'Locked' ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50/30' }}">
+                        @else
+                            onclick="alert('Institutional Protocol: This milestone is currently locked. You must complete the ongoing phase first.');"
+                        @endif
+                        class="w-full text-left flex items-center justify-between px-10 py-10 transition-all duration-300 {{ $isCompleted ? 'cursor-default' : ($isActive || $isPendingMatch ? 'cursor-pointer hover:bg-gray-50/30' : 'cursor-not-allowed') }}"
+                        {{ $isCompleted ? 'disabled' : '' }}>
                     <div class="flex items-center gap-6">
                         <div class="relative">
                             <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-bold shadow-lg shadow-{{ $conf['color'] }}-500/10 border {{ $isCompleted ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-white border-gray-100 text-gray-900' }}">
