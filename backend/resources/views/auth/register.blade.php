@@ -3,6 +3,14 @@
 @section('title', 'Student Registration - Thesis Monitoring System')
 
 @section('content')
+<style>
+    /* Force WebKit browsers to always show the calendar picker icon */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        opacity: 1;
+        display: block;
+        cursor: pointer;
+    }
+</style>
 <div class="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" x-data="registrationWizard()">
     
     <div class="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 relative overflow-hidden">
@@ -372,7 +380,7 @@
                             </div>
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Upload Publication (PDF)</label>
-                                <input type="file" name="publication_file" accept=".pdf" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'internal_defence')?.id)"
+                                <input type="file" name="publication_files[]" multiple accept=".pdf" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'internal_defence')?.id)"
                                        class="w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition-colors">
                             </div>
                         </div>

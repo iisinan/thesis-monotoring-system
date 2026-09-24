@@ -49,7 +49,8 @@ class RegisteredUserController extends Controller
             'progress_presentation_1_date' => 'nullable|date',
             'progress_presentation_2_date' => 'nullable|date',
             'internal_defence_date' => 'nullable|date',
-            'publication_file' => 'nullable|file|mimes:pdf|max:10240',
+            'publication_files' => 'nullable|array',
+            'publication_files.*' => 'nullable|file|mimes:pdf|max:10240',
         ]);
 
         DB::beginTransaction();
@@ -204,15 +205,17 @@ class RegisteredUserController extends Controller
                         if ($request->has('internal_defence_date')) {
                             $sm->update(['defence_date' => $request->internal_defence_date]);
                         }
-                        if ($request->hasFile('publication_file')) {
-                            $path = $request->file('publication_file')->store('publications', 'public');
-                            \App\Models\Submission::create([
-                                'student_milestone_id' => $sm->id,
-                                'version' => 1,
-                                'file_url' => $path,
-                                'submitted_by' => $user->id,
-                                'description' => 'Publication uploaded during registration',
-                            ]);
+                        if ($request->hasFile('publication_files')) {
+                            foreach ($request->file('publication_files') as $file) {
+                                $path = $file->store('publications', 'public');
+                                \App\Models\Submission::create([
+                                    'student_milestone_id' => $sm->id,
+                                    'version' => 1,
+                                    'file_url' => $path,
+                                    'submitted_by' => $user->id,
+                                    'description' => 'Publication uploaded during registration',
+                                ]);
+                            }
                         }
                     }
                 }
