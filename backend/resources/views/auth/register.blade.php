@@ -327,10 +327,22 @@
                     </div>
 
                     <div x-show="getCurrentSubStepType() === 'proposal_defence_details'" x-cloak>
-                        <div class="mb-6">
-                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Proposal Defence</label>
-                            <input type="date" name="proposal_defence_date"
-                                   class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                        <div class="mb-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Proposal Defence</label>
+                                <input type="date" name="proposal_defence_date"
+                                       class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Approved Thesis Title</label>
+                                <input type="text" name="thesis_title" placeholder="Enter your approved thesis title"
+                                       class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Approved Thesis Abstract</label>
+                                <textarea name="thesis_abstract" rows="5" placeholder="Paste your approved abstract here..."
+                                       class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors"></textarea>
+                            </div>
                         </div>
                     </div>
 
@@ -389,6 +401,26 @@
                         </div>
                     </div>
 
+                    <div x-show="getCurrentSubStepType() === 'viva_details'" x-cloak>
+                        <div class="mb-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Viva</label>
+                                <input type="date" name="viva_date"
+                                       class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Internal Examiner Name</label>
+                                <input type="text" name="internal_examiner_name" placeholder="Enter Internal Examiner's Full Name"
+                                       class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Upload Final Thesis (PDF)</label>
+                                <input type="file" name="final_thesis_file" accept=".pdf"
+                                       class="w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition-colors">
+                            </div>
+                        </div>
+                    </div>
+
                     <button type="button" @click="saveSubStep()" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
                         <span x-text="getCurrentSubButtonText()"></span>
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
@@ -442,40 +474,7 @@
 
             </div>
 
-            <!-- STEP 3: Thesis -->
-            <div x-show="step === 3" x-cloak x-transition.opacity.duration.300ms>
-                
-                <div class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
-                    <button type="button" @click="step = 2" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
-                        Back
-                    </button>
-                </div>
 
-                <div class="text-center mb-8">
-                    <span class="inline-block px-4 py-1.5 bg-green-100 text-green-700 text-xs font-bold uppercase tracking-widest rounded-full mb-4">Proposal Details</span>
-                    <h2 class="text-2xl font-bold text-slate-900 mb-2">Research Details</h2>
-                    <p class="text-sm text-slate-500 font-medium">Please provide your approved thesis title and abstract.</p>
-                </div>
-
-                <div class="space-y-6">
-                    <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Thesis Title</label>
-                        <input type="text" name="thesis_title" placeholder="Enter your approved thesis title" required
-                               class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-bold text-slate-700 mb-1.5">Thesis Abstract</label>
-                        <textarea name="thesis_abstract" rows="5" placeholder="Paste your approved abstract here..." required
-                               class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors"></textarea>
-                    </div>
-
-                    <button type="submit" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 hover:shadow-green-700/30 transition-all flex items-center justify-center gap-2">
-                        Save Details & Continue
-                    </button>
-                </div>
-            </div>
 
         </form>
     </div>
@@ -526,11 +525,11 @@
             questions: [
                 { id: serverMilestones.find(m => m.slug === 'seminar_as_a_course')?.id, text: "Have you completed your", highlight: "Seminar Course", textAfter: "?", subStep: "grade", title: "Seminar<br>Course<br>Grade", desc: "Since you have completed your Seminar Course, please provide your grade below.", btnText: "Save Grade & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'supervisors_assigned')?.id, text: "Has your", highlight: "Supervisory Committee", textAfter: " been assigned?", subStep: "supervisors", title: "Assign<br>Supervisors", desc: "Since your committee is assigned, please select them below.", btnText: "Save Supervisors & Continue" },
-                { id: serverMilestones.find(m => m.slug === 'proposal_defence')?.id, text: "Have you completed your", highlight: "Proposal Defence", textAfter: "?", subStep: "proposal_defence_details", title: "Proposal Defence<br>Details", desc: "Please provide the date of your Proposal Defence.", btnText: "Save Date & Continue" },
+                { id: serverMilestones.find(m => m.slug === 'proposal_defence')?.id, text: "Have you completed your", highlight: "Proposal Defence", textAfter: "?", subStep: "proposal_defence_details", title: "Proposal Defence<br>Details", desc: "Please provide the date of your Proposal Defence, and your approved Thesis Title & Abstract.", btnText: "Save Details & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id, text: "Have you completed your", highlight: "Progress Presentation 1", textAfter: "?", subStep: "progress_presentation_1_details", subStepNo: "progress_presentation_1_schedule", title: "Progress Presentation 1<br>Details", desc: "Please provide the date of your Progress Presentation 1.", btnText: "Save Date & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id, text: "Have you completed your", highlight: "Progress Presentation 2", textAfter: "?", subStep: "progress_presentation_2_details", subStepNo: "progress_presentation_2_schedule", title: "Progress Presentation 2<br>Details", desc: "Please provide the date of your Progress Presentation 2.", btnText: "Save Date & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'internal_defence')?.id, text: "Have you completed your", highlight: "Internal Defence", textAfter: "?", subStep: "internal_defence_details", title: "Internal Defence<br>Details", desc: "Since you have completed your Internal Defence, please provide the date and upload your publication.", btnText: "Save Details & Continue" },
-                { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?" }
+                { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?", subStep: "viva_details", title: "Viva<br>Details", desc: "Since you have completed your Viva, please provide the date, examiner name, and your final thesis.", btnText: "Save & Complete Registration" }
             ],
 
             
@@ -661,7 +660,7 @@
                 if (currentQ.subStepNo) {
                     this.showingSubStepNo = true;
                 } else {
-                    this.step = 3;
+                    this.$el.closest('form').submit();
                 }
             },
             
@@ -683,7 +682,7 @@
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                         return;
                     }
-                } else if (type === 'proposal_defence_details' || type === 'progress_presentation_1_details' || type === 'progress_presentation_2_details' || type === 'internal_defence_details') {
+                } else if (type === 'proposal_defence_details' || type === 'progress_presentation_1_details' || type === 'progress_presentation_2_details' || type === 'internal_defence_details' || type === 'viva_details') {
                     let activeBlock = document.querySelector('[x-show="getCurrentSubStepType() === \'' + type + '\'"]');
                     if (activeBlock) {
                         let dateInput = activeBlock.querySelector('input[type="date"]');
@@ -692,6 +691,31 @@
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                             dateInput.focus();
                             return;
+                        }
+                        
+                        if (type === 'proposal_defence_details') {
+                            let titleInput = activeBlock.querySelector('input[name="thesis_title"]');
+                            let abstractInput = activeBlock.querySelector('textarea[name="thesis_abstract"]');
+                            if ((titleInput && !titleInput.value.trim()) || (abstractInput && !abstractInput.value.trim())) {
+                                this.errorMessage = 'Please provide your approved thesis title and abstract.';
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                return;
+                            }
+                        }
+                        
+                        if (type === 'viva_details') {
+                            let examinerInput = activeBlock.querySelector('input[name="internal_examiner_name"]');
+                            let fileInput = activeBlock.querySelector('input[name="final_thesis_file"]');
+                            if (examinerInput && !examinerInput.value.trim()) {
+                                this.errorMessage = 'Please provide the name of the internal examiner.';
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                return;
+                            }
+                            if (fileInput && !fileInput.value) {
+                                this.errorMessage = 'Please upload your final thesis file.';
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                return;
+                            }
                         }
                     }
                 }
@@ -714,7 +738,7 @@
                 }
                 
                 this.showingSubStepNo = false;
-                this.step = 3;
+                this.$el.closest('form').submit();
             },
             
             recordMilestoneAndNext(id) {
@@ -727,7 +751,7 @@
                 if (this.milestoneStep < 7) {
                     this.milestoneStep++;
                 } else {
-                    this.step = 3;
+                    this.$el.closest('form').submit();
                 }
             },
             

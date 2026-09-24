@@ -56,6 +56,10 @@ class RegisteredUserController extends Controller
             'publications.*.file' => 'nullable|file|mimes:pdf|max:10240',
             'progress_presentation_1_ppt' => 'nullable|file|max:10240',
             'progress_presentation_2_ppt' => 'nullable|file|max:10240',
+            'thesis_title' => 'nullable|string|max:255',
+            'thesis_abstract' => 'nullable|string',
+            'internal_examiner_name' => 'nullable|string|max:255',
+            'final_thesis_file' => 'nullable|file|mimes:pdf|max:20480',
         ]);
 
         DB::beginTransaction();
@@ -126,12 +130,42 @@ class RegisteredUserController extends Controller
                 'cohort_id' => $cohort->id,
             ]);
 
+            // 3b. Handle Internal Examiner
+            $internalExaminerProfileId = null;
+            if ($request->filled('internal_examiner_name')) {
+                $ieName = $request->internal_examiner_name;
+                // Generate a unique email for the dummy account
+                $ieEmail = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '.', $ieName)) . '-' . uniqid() . '@examiner.acetel.edu.ng';
+                
+                $ieUser = User::firstOrCreate(
+                    ['email' => $ieEmail],
+                    [
+                        'name' => $ieName,
+                        'password' => Hash::make(Str::random(12)),
+                    ]
+                );
+                if (!$ieUser->hasRole('Internal Examiner')) {
+                    $ieUser->assignRole('Internal Examiner');
+                }
+                
+                // Assuming InternalExaminerProfile exists (we verified the FK in the migration)
+                $ieProfile = \App\Models\InternalExaminerProfile::firstOrCreate(
+                    ['user_id' => $ieUser->id],
+                    [
+                        'department' => 'Assigned',
+                        'title' => 'Internal Examiner',
+                    ]
+                );
+                $internalExaminerProfileId = $ieProfile->id;
+            }
+
             // 4. Create Thesis Project
             $thesis = ThesisProject::create([
                 'student_profile_id' => $student->id,
                 'title' => $request->thesis_title ?? 'Untitled Thesis',
                 'abstract' => $request->thesis_abstract,
                 'status' => 'active', // default status
+                'internal_examiner_profile_id' => $internalExaminerProfileId,
             ]);
 
             // 5. Assign Supervisors
@@ -151,8 +185,8 @@ class RegisteredUserController extends Controller
                                 'password' => Hash::make(Str::random(12)), // random password
                             ]
                         );
-                        if (!$supUser->hasRole('supervisor')) {
-                            $supUser->assignRole('supervisor');
+                        if (!$supUser->hasRole('Supervisor')) {
+                            $supUser->assignRole('Supervisor');
                         }
 
                         // Create SupervisorProfile
@@ -235,6 +269,20 @@ class RegisteredUserController extends Controller
                                     'description' => $desc,
                                 ]);
                             }
+                        }
+                    } elseif ($template->slug === 'viva') {
+                        if ($request->has('viva_date')) {
+                            $sm->update(['defence_date' => $request->viva_date]);
+                        }
+                        if ($request->hasFile('final_thesis_file')) {
+                            $path = $request->file('final_thesis_file')->store('theses', 'public');
+                            \App\Models\Submission::create([
+                                'student_milestone_id' => $sm->id,
+                                'version' => 1,
+                                'file_url' => $path,
+                                'submitted_by' => $user->id,
+                                'description' => 'Final Thesis Uploaded',
+                            ]);
                         }
                     }
                 } else {
