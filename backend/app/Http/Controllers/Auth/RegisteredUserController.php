@@ -25,9 +25,11 @@ class RegisteredUserController extends Controller
         $programs = \App\Models\Program::all();
         $levels = Level::all();
         $supervisors = SupervisorProfile::with('user')->get();
+        $internalExaminers = \App\Models\InternalExaminerProfile::with('user')->get();
+        $externalExaminers = \App\Models\ExternalExaminerProfile::with('user')->get();
         $milestones = MilestoneTemplate::orderBy('order')->get();
 
-        return view('auth.register', compact('programs', 'levels', 'supervisors', 'milestones'));
+        return view('auth.register', compact('programs', 'levels', 'supervisors', 'internalExaminers', 'externalExaminers', 'milestones'));
     }
 
     public function store(Request $request)
@@ -58,7 +60,12 @@ class RegisteredUserController extends Controller
             'progress_presentation_2_ppt' => 'nullable|file|max:10240',
             'thesis_title' => 'nullable|string|max:255',
             'thesis_abstract' => 'nullable|string',
+            'internal_examiner_id' => 'nullable',
             'internal_examiner_name' => 'nullable|string|max:255',
+            'internal_examiner_email' => 'nullable|email|max:255',
+            'external_examiner_id' => 'nullable',
+            'external_examiner_name' => 'nullable|string|max:255',
+            'external_examiner_email' => 'nullable|email|max:255',
             'final_thesis_file' => 'nullable|file|mimes:pdf|max:20480',
         ]);
 
@@ -131,11 +138,12 @@ class RegisteredUserController extends Controller
             ]);
 
             // 3b. Handle Internal Examiner
-            $internalExaminerProfileId = null;
-            if ($request->filled('internal_examiner_name')) {
+            $internalExaminerProfileId = $request->input('internal_examiner_id');
+            if (!$internalExaminerProfileId && $request->filled('internal_examiner_name')) {
                 $ieName = $request->internal_examiner_name;
-                // Generate a unique email for the dummy account
-                $ieEmail = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '.', $ieName)) . '-' . uniqid() . '@examiner.acetel.edu.ng';
+                $ieEmail = $request->filled('internal_examiner_email') 
+                            ? $request->internal_examiner_email 
+                            : strtolower(preg_replace('/[^a-zA-Z0-9]+/', '.', $ieName)) . '-' . uniqid() . '@examiner.acetel.edu.ng';
                 
                 $ieUser = User::firstOrCreate(
                     ['email' => $ieEmail],
@@ -148,7 +156,6 @@ class RegisteredUserController extends Controller
                     $ieUser->assignRole('Internal Examiner');
                 }
                 
-                // Assuming InternalExaminerProfile exists (we verified the FK in the migration)
                 $ieProfile = \App\Models\InternalExaminerProfile::firstOrCreate(
                     ['user_id' => $ieUser->id],
                     [
@@ -159,6 +166,35 @@ class RegisteredUserController extends Controller
                 $internalExaminerProfileId = $ieProfile->id;
             }
 
+            // 3c. Handle External Examiner
+            $externalExaminerProfileId = $request->input('external_examiner_id');
+            if (!$externalExaminerProfileId && $request->filled('external_examiner_name')) {
+                $eeName = $request->external_examiner_name;
+                $eeEmail = $request->filled('external_examiner_email') 
+                            ? $request->external_examiner_email 
+                            : strtolower(preg_replace('/[^a-zA-Z0-9]+/', '.', $eeName)) . '-' . uniqid() . '@external.acetel.edu.ng';
+                
+                $eeUser = User::firstOrCreate(
+                    ['email' => $eeEmail],
+                    [
+                        'name' => $eeName,
+                        'password' => Hash::make(Str::random(12)),
+                    ]
+                );
+                if (!$eeUser->hasRole('External Examiner')) {
+                    $eeUser->assignRole('External Examiner');
+                }
+                
+                $eeProfile = \App\Models\ExternalExaminerProfile::firstOrCreate(
+                    ['user_id' => $eeUser->id],
+                    [
+                        'institution' => 'Assigned',
+                        'expertise' => 'External Examiner',
+                    ]
+                );
+                $externalExaminerProfileId = $eeProfile->id;
+            }
+
             // 4. Create Thesis Project
             $thesis = ThesisProject::create([
                 'student_profile_id' => $student->id,
@@ -166,6 +202,7 @@ class RegisteredUserController extends Controller
                 'abstract' => $request->thesis_abstract,
                 'status' => 'active', // default status
                 'internal_examiner_profile_id' => $internalExaminerProfileId,
+                'external_examiner_profile_id' => $externalExaminerProfileId,
             ]);
 
             // 5. Assign Supervisors

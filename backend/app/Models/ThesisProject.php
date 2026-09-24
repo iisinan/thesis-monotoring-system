@@ -21,6 +21,7 @@ class ThesisProject extends Model
         'end_date',
         'cleared_for_internal_at',
         'internal_examiner_profile_id',
+        'external_examiner_profile_id',
         'proposed_supervisors',
     ];
 
@@ -72,6 +73,11 @@ class ThesisProject extends Model
     public function internalExaminer()
     {
         return $this->belongsTo(InternalExaminerProfile::class, 'internal_examiner_profile_id');
+    }
+
+    public function externalExaminer()
+    {
+        return $this->belongsTo(ExternalExaminerProfile::class, 'external_examiner_profile_id');
     }
 
     public function assignments()

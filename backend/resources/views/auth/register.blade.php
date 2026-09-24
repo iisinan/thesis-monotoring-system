@@ -369,6 +369,36 @@
                                 <input type="date" name="internal_defence_date"
                                        class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                             </div>
+
+                            <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false }" @click.away="open = false">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                    <span>Internal Examiner</span>
+                                    <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.internal_examiner_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
+                                </span>
+                                
+                                <div x-show="mode === 'select'" class="relative">
+                                    <input type="text" x-model="search" @focus="open = true" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4" placeholder="Search internal examiner...">
+                                    
+                                    <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                        <template x-for="examiner in serverInternalExaminers.filter(e => e.user.name.toLowerCase().includes(search.toLowerCase()))">
+                                            <div @click="form.internal_examiner_id = examiner.id; search = examiner.user.name; open = false; form.new_internal_examiner_name=''; form.new_internal_examiner_email='';" 
+                                                 class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
+                                                 x-text="examiner.user.name"></div>
+                                        </template>
+                                        <div x-show="serverInternalExaminers.filter(e => e.user.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">No examiners found.</div>
+                                    </div>
+                                    <input type="hidden" name="internal_examiner_id" :value="form.internal_examiner_id">
+                                </div>
+
+                                <div x-show="mode === 'manual'" class="space-y-3">
+                                    <div>
+                                        <input type="text" name="internal_examiner_name" x-model="form.new_internal_examiner_name" placeholder="Examiner's Full Name" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                    </div>
+                                    <div>
+                                        <input type="email" name="internal_examiner_email" x-model="form.new_internal_examiner_email" placeholder="Examiner's Email Address (Optional)" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mb-2 flex items-center justify-between">
@@ -408,10 +438,34 @@
                                 <input type="date" name="viva_date"
                                        class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                             </div>
-                            <div>
-                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Internal Examiner Name</label>
-                                <input type="text" name="internal_examiner_name" placeholder="Enter Internal Examiner's Full Name"
-                                       class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                            <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false }" @click.away="open = false">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                    <span>External Examiner</span>
+                                    <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.external_examiner_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
+                                </span>
+                                
+                                <div x-show="mode === 'select'" class="relative">
+                                    <input type="text" x-model="search" @focus="open = true" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4" placeholder="Search external examiner...">
+                                    
+                                    <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                        <template x-for="examiner in serverExternalExaminers.filter(e => e.user.name.toLowerCase().includes(search.toLowerCase()))">
+                                            <div @click="form.external_examiner_id = examiner.id; search = examiner.user.name; open = false; form.new_external_examiner_name=''; form.new_external_examiner_email='';" 
+                                                 class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
+                                                 x-text="examiner.user.name"></div>
+                                        </template>
+                                        <div x-show="serverExternalExaminers.filter(e => e.user.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">No examiners found.</div>
+                                    </div>
+                                    <input type="hidden" name="external_examiner_id" :value="form.external_examiner_id">
+                                </div>
+
+                                <div x-show="mode === 'manual'" class="space-y-3">
+                                    <div>
+                                        <input type="text" name="external_examiner_name" x-model="form.new_external_examiner_name" placeholder="Examiner's Full Name" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                    </div>
+                                    <div>
+                                        <input type="email" name="external_examiner_email" x-model="form.new_external_examiner_email" placeholder="Examiner's Email Address (Optional)" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4">
+                                    </div>
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Upload Final Thesis (PDF)</label>
@@ -517,6 +571,12 @@
                 third_supervisor_id: '',
                 new_third_name: '',
                 new_third_email: '',
+                internal_examiner_id: '',
+                new_internal_examiner_name: '',
+                new_internal_examiner_email: '',
+                external_examiner_id: '',
+                new_external_examiner_name: '',
+                new_external_examiner_email: '',
                 program_id: ''
             },
 
@@ -528,8 +588,8 @@
                 { id: serverMilestones.find(m => m.slug === 'proposal_defence')?.id, text: "Have you completed your", highlight: "Proposal Defence", textAfter: "?", subStep: "proposal_defence_details", title: "Proposal Defence<br>Details", desc: "Please provide the date of your Proposal Defence, and your approved Thesis Title & Abstract.", btnText: "Save Details & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id, text: "Have you completed your", highlight: "Progress Presentation 1", textAfter: "?", subStep: "progress_presentation_1_details", subStepNo: "progress_presentation_1_schedule", title: "Progress Presentation 1<br>Details", desc: "Please provide the date of your Progress Presentation 1.", btnText: "Save Date & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id, text: "Have you completed your", highlight: "Progress Presentation 2", textAfter: "?", subStep: "progress_presentation_2_details", subStepNo: "progress_presentation_2_schedule", title: "Progress Presentation 2<br>Details", desc: "Please provide the date of your Progress Presentation 2.", btnText: "Save Date & Continue" },
-                { id: serverMilestones.find(m => m.slug === 'internal_defence')?.id, text: "Have you completed your", highlight: "Internal Defence", textAfter: "?", subStep: "internal_defence_details", title: "Internal Defence<br>Details", desc: "Since you have completed your Internal Defence, please provide the date and upload your publication.", btnText: "Save Details & Continue" },
-                { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?", subStep: "viva_details", title: "Viva<br>Details", desc: "Since you have completed your Viva, please provide the date, examiner name, and your final thesis.", btnText: "Save & Complete Registration" }
+                { id: serverMilestones.find(m => m.slug === 'internal_defence')?.id, text: "Have you completed your", highlight: "Internal Defence", textAfter: "?", subStep: "internal_defence_details", title: "Internal Defence<br>Details", desc: "Since you have completed your Internal Defence, please provide the date, select your internal examiner, and upload your publication.", btnText: "Save Details & Continue" },
+                { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?", subStep: "viva_details", title: "Viva<br>Details", desc: "Since you have completed your Viva, please provide the date, select your external examiner, and upload your final thesis.", btnText: "Save & Complete Registration" }
             ],
 
             
@@ -703,11 +763,18 @@
                             }
                         }
                         
+                        if (type === 'internal_defence_details') {
+                            if (!this.form.internal_examiner_id && !this.form.new_internal_examiner_name.trim()) {
+                                this.errorMessage = 'Please select or enter an Internal Examiner.';
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                return;
+                            }
+                        }
+                        
                         if (type === 'viva_details') {
-                            let examinerInput = activeBlock.querySelector('input[name="internal_examiner_name"]');
                             let fileInput = activeBlock.querySelector('input[name="final_thesis_file"]');
-                            if (examinerInput && !examinerInput.value.trim()) {
-                                this.errorMessage = 'Please provide the name of the internal examiner.';
+                            if (!this.form.external_examiner_id && !this.form.new_external_examiner_name.trim()) {
+                                this.errorMessage = 'Please select or enter an External Examiner.';
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                                 return;
                             }
