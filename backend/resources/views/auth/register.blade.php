@@ -177,7 +177,7 @@
             <div x-show="step === 2" x-cloak x-transition.opacity.duration.300ms>
                 
                 <!-- Main Sub-header -->
-                <div x-show="!showingSubStep" class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                <div x-show="!showingSubStep && !showingSubStepNo" class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
                     <button type="button" @click="if(milestoneStep > 1) { milestoneStep-- } else { step = 1 }" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                         Back
@@ -187,7 +187,7 @@
                 </div>
 
                 <!-- Main Questionnaire Box -->
-                <div x-show="!showingSubStep" class="bg-[#f2fdf7] border border-green-100 rounded-3xl p-8 relative overflow-hidden">
+                <div x-show="!showingSubStep && !showingSubStepNo" class="bg-[#f2fdf7] border border-green-100 rounded-3xl p-8 relative overflow-hidden">
                     
                     <div class="flex items-center gap-3 mb-6">
                         <div class="bg-green-100 text-green-700 font-bold text-xs px-3 py-1 rounded-full whitespace-nowrap">
@@ -212,7 +212,7 @@
                     </div>
                 </div>
                 
-                <p x-show="!showingSubStep" class="text-xs text-slate-400 text-center mt-6 px-8 flex items-start justify-center gap-1.5">
+                <p x-show="!showingSubStep && !showingSubStepNo" class="text-xs text-slate-400 text-center mt-6 px-8 flex items-start justify-center gap-1.5">
                     <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Selecting "No" will establish this as your current stage and complete your profile.
                 </p>
