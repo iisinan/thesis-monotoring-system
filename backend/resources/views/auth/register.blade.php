@@ -48,7 +48,7 @@
             </div>
         @endif
 
-        <form method="POST" action="{{ route('register') }}" id="registrationForm">
+        <form method="POST" action="{{ route('register') }}" id="registrationForm" enctype="multipart/form-data">
             @csrf
             
             <!-- Hidden inputs to hold Alpine state for submission -->
@@ -339,6 +339,21 @@
                         </div>
                     </template>
 
+                    <div x-show="getCurrentSubStepType() === 'internal_defence_details'" x-cloak>
+                        <div class="mb-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Internal Defence</label>
+                                <input type="date" name="internal_defence_date" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'internal_defence')?.id)"
+                                       class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Upload Publication (PDF)</label>
+                                <input type="file" name="publication_file" accept=".pdf" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'internal_defence')?.id)"
+                                       class="w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition-colors">
+                            </div>
+                        </div>
+                    </div>
+
                     <button type="button" @click="saveSubStep()" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
                         <span x-text="getCurrentSubButtonText()"></span>
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
@@ -433,7 +448,7 @@
                 { id: serverMilestones.find(m => m.slug === 'proposal_defence')?.id, text: "Have you completed your", highlight: "Proposal Defence", textAfter: "?" },
                 { id: serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id, text: "Have you completed your", highlight: "Progress Presentation 1", textAfter: "?" },
                 { id: serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id, text: "Have you completed your", highlight: "Progress Presentation 2", textAfter: "?" },
-                { id: serverMilestones.find(m => m.slug === 'internal_defence')?.id, text: "Have you completed your", highlight: "Internal Defence", textAfter: "?" },
+                { id: serverMilestones.find(m => m.slug === 'internal_defence')?.id, text: "Have you completed your", highlight: "Internal Defence", textAfter: "?", subStep: "internal_defence_details", title: "Internal Defence<br>Details", desc: "Since you have completed your Internal Defence, please provide the date and upload your publication.", btnText: "Save Details & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?" }
             ],
 

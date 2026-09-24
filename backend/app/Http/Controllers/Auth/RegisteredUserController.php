@@ -45,6 +45,8 @@ class RegisteredUserController extends Controller
             'new_supervisors' => 'nullable|array',
             'completed_milestones' => 'nullable|array',
             'completed_milestones.*' => 'exists:milestone_templates,id',
+            'internal_defence_date' => 'nullable|date',
+            'publication_file' => 'nullable|file|mimes:pdf|max:10240',
         ]);
 
         DB::beginTransaction();
@@ -179,7 +181,7 @@ class RegisteredUserController extends Controller
             foreach ($templates as $template) {
                 $isCompleted = in_array($template->id, $completedIds);
                 
-                StudentMilestone::create([
+                $sm = StudentMilestone::create([
                     'thesis_project_id' => $thesis->id,
                     'milestone_template_id' => $template->id,
                     'status' => $isCompleted ? 'approved' : 'not_started',
@@ -187,6 +189,22 @@ class RegisteredUserController extends Controller
                     'submitted_at' => $isCompleted ? now() : null,
                     'date_approved_at' => clone now(), // Bypass if date was required
                 ]);
+
+                if ($isCompleted && $template->slug === 'internal_defence') {
+                    if ($request->has('internal_defence_date')) {
+                        $sm->update(['defence_date' => $request->internal_defence_date]);
+                    }
+                    if ($request->hasFile('publication_file')) {
+                        $path = $request->file('publication_file')->store('publications', 'public');
+                        \App\Models\Submission::create([
+                            'student_milestone_id' => $sm->id,
+                            'version' => 1,
+                            'file_url' => $path,
+                            'submitted_by' => $user->id,
+                            'description' => 'Publication uploaded during registration',
+                        ]);
+                    }
+                }
             }
 
             // Sync project status based on highest completed milestone
