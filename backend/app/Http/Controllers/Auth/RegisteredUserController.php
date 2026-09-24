@@ -261,14 +261,18 @@ class RegisteredUserController extends Controller
             foreach ($templates as $template) {
                 $isCompleted = in_array($template->id, $completedIds);
                 
-                $sm = StudentMilestone::create([
-                    'thesis_project_id' => $thesis->id,
-                    'milestone_template_id' => $template->id,
-                    'status' => $isCompleted ? 'approved' : 'not_started',
-                    'due_date' => $isCompleted ? null : now()->addDays(30),
-                    'submitted_at' => $isCompleted ? now() : null,
-                    'date_approved_at' => clone now(), // Bypass if date was required
-                ]);
+                $sm = StudentMilestone::updateOrCreate(
+                    [
+                        'thesis_project_id' => $thesis->id,
+                        'milestone_template_id' => $template->id,
+                    ],
+                    [
+                        'status' => $isCompleted ? 'approved' : 'not_started',
+                        'due_date' => $isCompleted ? null : now()->addDays(30),
+                        'submitted_at' => $isCompleted ? now() : null,
+                        'date_approved_at' => clone now(), // Bypass if date was required
+                    ]
+                );
 
                 if ($isCompleted) {
                     if ($template->slug === 'seminar_as_a_course' && $request->has('seminar_grade')) {

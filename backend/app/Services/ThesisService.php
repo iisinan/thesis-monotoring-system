@@ -40,14 +40,8 @@ class ThesisService
                       ->orWhereNull('program_id');
             })->orderBy('order')->get();
 
-            foreach ($templates as $template) {
-                \App\Models\StudentMilestone::create([
-                    'thesis_project_id' => $project->id,
-                    'milestone_template_id' => $template->id,
-                    'status' => 'not_started',
-                    // due_date calculation logic could go here based on start_date
-                ]);
-            }
+            // Note: Milestones are already generated via ThesisProjectObserver->syncMilestones()
+            // We no longer need to create them manually here.
 
             return $project;
         });
