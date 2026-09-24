@@ -350,7 +350,7 @@
                     <div x-show="getCurrentSubStepType() === 'proposal_defence_details'" x-cloak>
                         <div class="mb-6">
                             <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Proposal Defence</label>
-                            <input type="date" name="proposal_defence_date" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'proposal_defence')?.id)"
+                            <input type="date" name="proposal_defence_date"
                                    class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                         </div>
                     </div>
@@ -358,7 +358,7 @@
                     <div x-show="getCurrentSubStepType() === 'progress_presentation_1_details'" x-cloak>
                         <div class="mb-6">
                             <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Progress Presentation 1</label>
-                            <input type="date" name="progress_presentation_1_date" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id)"
+                            <input type="date" name="progress_presentation_1_date"
                                    class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                         </div>
                     </div>
@@ -366,7 +366,7 @@
                     <div x-show="getCurrentSubStepType() === 'progress_presentation_2_details'" x-cloak>
                         <div class="mb-6">
                             <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Progress Presentation 2</label>
-                            <input type="date" name="progress_presentation_2_date" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id)"
+                            <input type="date" name="progress_presentation_2_date"
                                    class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                         </div>
                     </div>
@@ -375,12 +375,12 @@
                         <div class="mb-6 space-y-4">
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Internal Defence</label>
-                                <input type="date" name="internal_defence_date" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'internal_defence')?.id)"
+                                <input type="date" name="internal_defence_date"
                                        class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                             </div>
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Upload Publication (PDF)</label>
-                                <input type="file" name="publication_files[]" multiple accept=".pdf" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'internal_defence')?.id)"
+                                <input type="file" name="publication_files[]" multiple accept=".pdf"
                                        class="w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition-colors">
                             </div>
                         </div>
