@@ -56,8 +56,8 @@ class RegisteredUserController extends Controller
             'publications.*.title' => 'nullable|string|max:255',
             'publications.*.doi' => 'nullable|string|max:255',
             'publications.*.file' => 'nullable|file|mimes:pdf|max:10240',
-            'progress_presentation_1_ppt' => 'nullable|file|max:10240',
-            'progress_presentation_2_ppt' => 'nullable|file|max:10240',
+            'progress_presentation_1_ppt' => 'nullable|file|mimes:pdf|max:10240',
+            'progress_presentation_2_ppt' => 'nullable|file|mimes:pdf|max:10240',
             'thesis_title' => 'nullable|string|max:255',
             'thesis_abstract' => 'nullable|string',
             'internal_examiner_id' => 'nullable',
@@ -311,7 +311,7 @@ class RegisteredUserController extends Controller
                         if ($request->has('viva_date')) {
                             $sm->update(['defence_date' => $request->viva_date]);
                         }
-                        if ($request->hasFile('final_thesis_file')) {
+                        if ($request->hasFile('final_thesis_file') && $request->file('final_thesis_file')->getPathname()) {
                             $path = $request->file('final_thesis_file')->store('theses', 'public');
                             \App\Models\Submission::create([
                                 'student_milestone_id' => $sm->id,

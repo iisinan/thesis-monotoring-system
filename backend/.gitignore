@@ -29,3 +29,7 @@ thesis_mobile_app/scratch/
 **/caddy
 frankenphp
 frankenphp-worker.php
+*.ppt
+test*.php
+test*.pdf
+output*.html
