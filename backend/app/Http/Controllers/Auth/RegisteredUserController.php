@@ -323,7 +323,7 @@ class RegisteredUserController extends Controller
                         }
                     }
                 } else {
-                    if ($template->slug === 'progress_presentation_1' && $request->hasFile('progress_presentation_1_ppt')) {
+                    if ($template->slug === 'progress_presentation_1' && $request->hasFile('progress_presentation_1_ppt')&& $request->hasFile('progress_presentation_1_ppt') $request->hasFile('progress_presentation_1_ppt') && $request->file('progress_presentation_1_ppt')->getPathname()&& $request->hasFile('progress_presentation_1_ppt')&& $request->hasFile('progress_presentation_1_ppt') $request->hasFile('progress_presentation_1_ppt') && $request->file('progress_presentation_1_ppt')->getPathname() $request->hasFile('progress_presentation_1_ppt') && $request->file('progress_presentation_1_ppt')->getPathname()) {
                         $path = $request->file('progress_presentation_1_ppt')->store('presentations', 'public');
                         \App\Models\Submission::create([
                             'student_milestone_id' => $sm->id,
@@ -333,7 +333,7 @@ class RegisteredUserController extends Controller
                             'description' => 'Presentation slide (PPT) uploaded for scheduling',
                         ]);
                         $sm->update(['status' => 'pending_review', 'submitted_at' => now()]);
-                    } elseif ($template->slug === 'progress_presentation_2' && $request->hasFile('progress_presentation_2_ppt')) {
+                    } elseif ($template->slug === 'progress_presentation_2' && $request->hasFile('progress_presentation_2_ppt')&& $request->hasFile('progress_presentation_2_ppt') $request->hasFile('progress_presentation_2_ppt') && $request->file('progress_presentation_2_ppt')->getPathname()&& $request->hasFile('progress_presentation_2_ppt')&& $request->hasFile('progress_presentation_2_ppt') $request->hasFile('progress_presentation_2_ppt') && $request->file('progress_presentation_2_ppt')->getPathname() $request->hasFile('progress_presentation_2_ppt') && $request->file('progress_presentation_2_ppt')->getPathname()) {
                         $path = $request->file('progress_presentation_2_ppt')->store('presentations', 'public');
                         \App\Models\Submission::create([
                             'student_milestone_id' => $sm->id,
