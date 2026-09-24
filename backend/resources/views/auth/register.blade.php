@@ -212,10 +212,7 @@
                     </div>
                 </div>
                 
-                <p x-show="!showingSubStep && !showingSubStepNo" class="text-xs text-slate-400 text-center mt-6 px-8 flex items-start justify-center gap-1.5">
-                    <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    Selecting "No" will establish this as your current stage and complete your profile.
-                </p>
+
 
                 <!-- Sub-step (Grade or Supervisors) -->
                 <div x-show="showingSubStep" x-cloak>
