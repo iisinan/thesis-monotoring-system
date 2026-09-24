@@ -193,7 +193,7 @@
                 
                 <!-- Main Sub-header -->
                 <div x-show="!showingSubStep" class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
-                    <button type="button" @click="step = 1" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
+                    <button type="button" @click="if(milestoneStep > 1) { milestoneStep-- } else { step = 1 }" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                         Back
                     </button>
@@ -351,7 +351,7 @@
             <div x-show="step === 3" x-cloak x-transition.opacity.duration.300ms>
                 
                 <div class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
-                    <button type="button" @click="step = 2; milestoneStep = milestoneStep > 1 ? milestoneStep - 1 : 1" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
+                    <button type="button" @click="step = 2" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                         Back
                     </button>
@@ -499,11 +499,16 @@
             },
 
             nextStep() {
-                if (this.validateStep1()) {
-                    this.step = 2;
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                } else {
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                try {
+                    let valid = this.validateStep1();
+                    if (valid) {
+                        this.step = 2;
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    } else {
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                } catch (e) {
+                    alert('JS Error: ' + e.message);
                 }
             },
 
