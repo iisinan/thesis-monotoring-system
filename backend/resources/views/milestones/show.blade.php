@@ -286,10 +286,10 @@
                                 @if(in_array('ppt', $milestone->template->submission_type))
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Upload PPT / Presentation Slide Deck (PPT, PPTX, PDF)
+                                        Upload Presentation Slide Deck (PDF Only)
                                     </label>
                                     <div class="relative w-full">
-                                        <input type="file" name="ppt" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                        <input type="file" name="ppt" accept=".pdf" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
                                             @change="
                                                 const file = $event.target.files[0];
                                                 document.getElementById('ppt-name').textContent = file ? file.name : 'Click or drop to select PPT';
@@ -308,10 +308,10 @@
                                 @if(in_array('file', $milestone->template->submission_type))
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Upload Manuscript (PDF, DOCX)
+                                        Upload Manuscript (PDF Only)
                                     </label>
                                     <div class="relative w-full">
-                                        <input type="file" name="file" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                        <input type="file" name="file" accept=".pdf" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
                                             @change="
                                                 const file = $event.target.files[0];
                                                 document.getElementById('file-name').textContent = file ? file.name : 'Click or drop to select file';
@@ -339,10 +339,10 @@
                                 @if(in_array('publication', $milestone->template->submission_type))
                                 <div>
                                     <label class="block text-sm font-semibold text-gray-700 mb-2">
-                                        Upload Publications (Select one or more)
+                                        Upload Publications (PDF Only, Select one or more)
                                     </label>
                                     <div class="relative w-full">
-                                        <input type="file" name="publications[]" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                        <input type="file" name="publications[]" accept=".pdf" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
                                             @change="
                                                 const files = $event.target.files;
                                                 document.getElementById('pub-name').textContent = files.length > 0 ? files.length + ' files selected' : 'Click or drop to select publications';
