@@ -183,3 +183,17 @@ Route::get('/debug/send-test-email', function() {
 
 
 
+
+Route::get('/debug-log', function() {
+    return response()->file(storage_path('logs/laravel.log'));
+});
+
+Route::get('/debug-s3', function() {
+    try {
+        $disk = \Illuminate\Support\Facades\Storage::disk('public');
+        $disk->put('test.txt', 'Hello World');
+        return "SUCCESS! Wrote test.txt. Driver: " . config('filesystems.disks.public.driver');
+    } catch (\Exception $e) {
+        return "ERROR: " . $e->getMessage() . "\n\n" . $e->getTraceAsString();
+    }
+});
