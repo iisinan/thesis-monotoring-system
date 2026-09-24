@@ -460,6 +460,7 @@
                     'program_id': 'Programme'
                 };
                 
+                // Tailwind Safelist: ring-red-500 border-red-500 bg-red-50
                 let isValid = true;
 
                 // Reset existing highlights
