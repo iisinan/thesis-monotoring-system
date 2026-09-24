@@ -460,19 +460,23 @@
                     'program_id': 'Programme'
                 };
                 
-                // Tailwind Safelist: ring-red-500 border-red-500 bg-red-50
+                // Tailwind Safelist: !ring-2 !ring-red-500 !border-red-500 !bg-red-50
                 let isValid = true;
 
                 // Reset existing highlights
                 requiredFields.forEach(field => {
                     let el = document.querySelector(`[name="${field}"]`);
-                    if(el) el.classList.remove('ring-2', 'ring-red-500', 'border-red-500', 'bg-red-50');
+                    if(el) {
+                        el.classList.remove('!ring-2', '!ring-red-500', '!border-red-500', '!bg-red-50');
+                        el.classList.add('border-slate-200', 'bg-slate-50');
+                    }
                 });
 
                 for(let field of requiredFields) {
                     let el = document.querySelector(`[name="${field}"]`);
                     if(el && !el.value) {
-                        el.classList.add('ring-2', 'ring-red-500', 'border-red-500', 'bg-red-50');
+                        el.classList.remove('border-slate-200', 'bg-slate-50');
+                        el.classList.add('!ring-2', '!ring-red-500', '!border-red-500', '!bg-red-50');
                         isValid = false;
                     }
                 }
@@ -485,7 +489,8 @@
                 let pw = document.querySelector(`[name="password"]`);
                 let pw_conf = document.querySelector(`[name="password_confirmation"]`);
                 if(pw && pw_conf && pw.value !== pw_conf.value) {
-                    pw_conf.classList.add('ring-2', 'ring-red-500', 'border-red-500', 'bg-red-50');
+                    pw_conf.classList.remove('border-slate-200', 'bg-slate-50');
+                    pw_conf.classList.add('!ring-2', '!ring-red-500', '!border-red-500', '!bg-red-50');
                     this.errorMessage = 'The passwords you entered do not match.';
                     return false;
                 }
