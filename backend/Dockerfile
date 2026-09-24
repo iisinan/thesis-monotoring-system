@@ -40,6 +40,13 @@ RUN { \
     echo 'opcache.enable_cli=1'; \
 } > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
+# Increase PHP upload limits
+RUN { \
+    echo 'upload_max_filesize=50M'; \
+    echo 'post_max_size=50M'; \
+    echo 'memory_limit=512M'; \
+} > /usr/local/etc/php/conf.d/uploads.ini
+
 # Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
