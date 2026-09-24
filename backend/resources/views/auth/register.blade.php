@@ -227,6 +227,12 @@
                         <h2 class="text-lg font-bold text-slate-900 leading-tight" x-html="getCurrentSubTitle()"></h2>
                     </div>
 
+                    <!-- Error Banner -->
+                    <div x-show="errorMessage" x-cloak class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-xl flex items-center gap-2 font-medium" x-transition>
+                        <svg class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <span x-text="errorMessage"></span>
+                    </div>
+
                     <p class="text-sm text-slate-500 mb-6 font-medium" x-text="getCurrentSubDesc()"></p>
                     
                     <!-- Dynamic Sub-step Content -->
@@ -401,6 +407,12 @@
                         </button>
                         <div class="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm shrink-0" x-text="milestoneStep"></div>
                         <h3 class="text-lg font-black text-slate-800 leading-tight">Schedule<br>Presentation</h3>
+                    </div>
+
+                    <!-- Error Banner -->
+                    <div x-show="errorMessage" x-cloak class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-xl flex items-center gap-2 font-medium" x-transition>
+                        <svg class="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <span x-text="errorMessage"></span>
                     </div>
                     
                     <p class="text-slate-500 font-medium text-sm mb-6">Please upload your Presentation file (PPT) to be scheduled for the next available presentation slot.</p>
@@ -637,6 +649,7 @@
             },
 
             answerYes() {
+                this.errorMessage = '';
                 let currentQ = this.questions[this.milestoneStep - 1];
                 if (currentQ.subStep) {
                     this.showingSubStep = true;
@@ -646,6 +659,7 @@
             },
             
             answerNo() {
+                this.errorMessage = '';
                 let currentQ = this.questions[this.milestoneStep - 1];
                 if (currentQ.subStepNo) {
                     this.showingSubStepNo = true;
@@ -655,18 +669,21 @@
             },
             
             saveSubStep() {
+                this.errorMessage = '';
                 let type = this.getCurrentSubStepType();
                 
                 if (type === 'grade') {
                     let gradeInput = document.querySelector('input[name="seminar_grade"]');
                     if (gradeInput && !gradeInput.value.trim()) {
-                        alert('Please provide your Seminar Course Grade.');
+                        this.errorMessage = 'Please provide your Seminar Course Grade.';
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
                         gradeInput.focus();
                         return;
                     }
                 } else if (type === 'supervisors') {
                     if (!this.form.principal_supervisor_id && !this.form.new_principal_name.trim()) {
-                        alert('Please select or enter a Principal Supervisor.');
+                        this.errorMessage = 'Please select or enter a Principal Supervisor.';
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
                         return;
                     }
                 } else if (type === 'proposal_defence_details' || type === 'progress_presentation_1_details' || type === 'progress_presentation_2_details' || type === 'internal_defence_details') {
@@ -674,7 +691,8 @@
                     if (activeBlock) {
                         let dateInput = activeBlock.querySelector('input[type="date"]');
                         if (dateInput && !dateInput.value.trim()) {
-                            alert('Please provide the required date.');
+                            this.errorMessage = 'Please provide the required date.';
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                             dateInput.focus();
                             return;
                         }
@@ -686,12 +704,14 @@
             },
             
             saveSubStepNo() {
+                this.errorMessage = '';
                 // Validate PPT upload
                 let activeBlock = document.querySelector('[x-show="getCurrentSubStepNoType() === \'' + this.getCurrentSubStepNoType() + '\'"]');
                 if (activeBlock) {
                     let fileInput = activeBlock.querySelector('input[type="file"]');
                     if (fileInput && !fileInput.value) {
-                        alert('Please upload your Presentation (PPT) file before continuing.');
+                        this.errorMessage = 'Please upload your Presentation (PPT) file before continuing.';
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
                         return;
                     }
                 }
