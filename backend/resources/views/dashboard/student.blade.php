@@ -108,7 +108,6 @@
                 ['label' => 'Approved', 'value' => $stats['completed_milestones'], 'color' => 'emerald', 'path' => 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'],
                 ['label' => 'Pending Review', 'value' => $stats['pending_milestones'], 'color' => 'amber', 'path' => 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'],
                 ['label' => 'Inbox Messages', 'value' => $stats['unread_inbox'], 'color' => 'blue', 'path' => 'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'],
-                ['label' => 'Chat Feedback', 'value' => $stats['unread_chat'], 'color' => 'emerald', 'path' => 'M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z'],
             ];
             $bgMap = ['green' => 'bg-green-50 border-green-100 text-green-600', 'emerald' => 'bg-emerald-50 border-emerald-100 text-emerald-600', 'amber' => 'bg-amber-50 border-amber-100 text-amber-600', 'blue' => 'bg-blue-50 border-blue-100 text-blue-600'];
         @endphp
