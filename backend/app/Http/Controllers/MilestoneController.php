@@ -315,18 +315,18 @@ class MilestoneController extends Controller
         ];
 
         if (in_array('ppt', $subTypes)) {
-            $rules['ppt'] = ['required', 'file', 'mimes:ppt,pptx,pdf,key,odp', 'max:51200'];
+            $rules['ppt'] = ['required', 'file', 'mimes:pdf', 'max:51200'];
         }
 
         if (in_array('file', $subTypes)) {
-            $rules['file'] = ['required', 'file', $isFinalArchival ? 'mimes:pdf' : 'mimes:pdf,doc,docx,jpg,jpeg,png,webp', 'max:51200'];
+            $rules['file'] = ['required', 'file', 'mimes:pdf', 'max:51200'];
         }
 
         if (in_array('publication', $subTypes)) {
             $existingCount = $milestone->submissions()->where('type', 'publication')->count();
             $maxAllowed = 5 - $existingCount;
             $rules['publications'] = [($existingCount > 0 ? 'nullable' : 'required'), 'array', 'min:1', "max:{$maxAllowed}"];
-            $rules['publications.*'] = 'file|mimes:pdf,doc,docx,jpg,jpeg,png,webp|max:51200';
+            $rules['publications.*'] = 'file|mimes:pdf|max:51200';
         }
 
         if ($isFinalArchival) {
@@ -639,7 +639,7 @@ class MilestoneController extends Controller
     {
         $request->validate([
             'similarity_score' => 'required|numeric|min:0|max:100',
-            'report_file' => 'nullable|file|mimes:pdf,docx,doc'
+            'report_file' => 'nullable|file|mimes:pdf'
         ]);
 
         if (!Auth::user()->hasAnyRole(['Admin', 'Program Coordinator'])) {
@@ -672,7 +672,7 @@ class MilestoneController extends Controller
     public function uploadMilestonePlagiarism(Request $request, \App\Models\StudentMilestone $milestone)
     {
         $request->validate([
-            'plagiarism_report' => 'required|file|mimes:pdf,docx,doc|max:51200',
+            'plagiarism_report' => 'required|file|mimes:pdf|max:51200',
             'similarity_score' => 'required|numeric|min:0|max:100'
         ]);
 
