@@ -1,10 +1,10 @@
-<x-admin-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Seminar Examinations') }}
-        </h2>
-    </x-slot>
+@extends('layouts.admin')
 
+@section('header')
+    Seminar Examinations
+@endsection
+
+@section('content')
     <div class="py-12" x-data="{
         selectedMilestones: [],
         selectAll: false,
@@ -16,7 +16,7 @@
             }
         }
     }">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8 space-y-6">
+        <div class="max-w-7xl mx-auto space-y-6">
             
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
                 <h3 class="text-lg font-bold text-gray-900 mb-4">Bulk Schedule Seminar Presentations</h3>
@@ -119,4 +119,4 @@
             </div>
         </div>
     </div>
-</x-admin-layout>
+@endsection
