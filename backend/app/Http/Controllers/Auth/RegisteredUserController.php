@@ -325,6 +325,11 @@ class RegisteredUserController extends Controller
                                     'student_milestone_id' => $sm->id,
                                     'version' => 1,
                                     'file_url' => $path,
+                                    'file_meta' => $request->hasFile("publications.{$index}.file") ? [
+                                        'original_name' => $request->file("publications.{$index}.file")->getClientOriginalName(),
+                                        'mime_type' => $request->file("publications.{$index}.file")->getMimeType(),
+                                        'size' => $request->file("publications.{$index}.file")->getSize(),
+                                    ] : null,
                                     'submitted_by' => $user->id,
                                     'description' => $desc,
                                 ]);
@@ -340,6 +345,11 @@ class RegisteredUserController extends Controller
                                 'student_milestone_id' => $sm->id,
                                 'version' => 1,
                                 'file_url' => $path,
+                                'file_meta' => [
+                                    'original_name' => $request->file('final_thesis_file')->getClientOriginalName(),
+                                    'mime_type' => $request->file('final_thesis_file')->getMimeType(),
+                                    'size' => $request->file('final_thesis_file')->getSize(),
+                                ],
                                 'submitted_by' => $user->id,
                                 'description' => 'Final Thesis Uploaded',
                             ]);
@@ -352,6 +362,11 @@ class RegisteredUserController extends Controller
                             'student_milestone_id' => $sm->id,
                             'version' => 1,
                             'file_url' => $path,
+                            'file_meta' => [
+                                'original_name' => $request->file('progress_presentation_1_ppt')->getClientOriginalName(),
+                                'mime_type' => $request->file('progress_presentation_1_ppt')->getMimeType(),
+                                'size' => $request->file('progress_presentation_1_ppt')->getSize(),
+                            ],
                             'submitted_by' => $user->id,
                             'description' => 'Presentation slide (PPT) uploaded for scheduling',
                         ]);
@@ -362,6 +377,11 @@ class RegisteredUserController extends Controller
                             'student_milestone_id' => $sm->id,
                             'version' => 1,
                             'file_url' => $path,
+                            'file_meta' => [
+                                'original_name' => $request->file('progress_presentation_2_ppt')->getClientOriginalName(),
+                                'mime_type' => $request->file('progress_presentation_2_ppt')->getMimeType(),
+                                'size' => $request->file('progress_presentation_2_ppt')->getSize(),
+                            ],
                             'submitted_by' => $user->id,
                             'description' => 'Presentation slide (PPT) uploaded for scheduling',
                         ]);
