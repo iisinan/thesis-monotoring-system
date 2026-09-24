@@ -548,6 +548,8 @@
     // Pass the PHP milestones array to JS
     const serverMilestones = @json($milestones);
     const serverSupervisors = @json($supervisors->map(function($s) { return ['id' => $s->id, 'name' => $s->user->name]; }));
+    const serverInternalExaminers = @json($internalExaminers->map(function($e) { return ['id' => $e->id, 'user' => ['name' => $e->user->name]]; }));
+    const serverExternalExaminers = @json($externalExaminers->map(function($e) { return ['id' => $e->id, 'user' => ['name' => $e->user->name]]; }));
     const serverLevels = @json($levels);
     const serverPrograms = @json($programs);
 
