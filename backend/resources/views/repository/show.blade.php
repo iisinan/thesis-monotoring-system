@@ -2,7 +2,7 @@
 
 @section('content')
 <style>
-    body { font-family: 'Outfit', sans-serif; }
+    body { font-family: 'Figtree', sans-serif; }
 
     .show-header {
         background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 70%, #f8fffe 100%);

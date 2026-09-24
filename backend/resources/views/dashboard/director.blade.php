@@ -601,7 +601,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    Chart.defaults.font.family = "'Outfit','Inter',sans-serif";
+    Chart.defaults.font.family = "'Figtree','Inter',sans-serif";
     Chart.defaults.font.weight = '700';
     Chart.defaults.color = '#94a3b8';
 

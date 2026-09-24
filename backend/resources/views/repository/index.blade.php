@@ -16,7 +16,7 @@
     }
 
     .scholar-logo-text {
-        font-family: 'Outfit', sans-serif;
+        font-family: 'Figtree', sans-serif;
         font-weight: 900;
         font-size: 24px;
         color: #5f6368;

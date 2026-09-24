@@ -2,7 +2,7 @@
 
 @section('content')
 <style>
-    body { font-family: 'Outfit', sans-serif; }
+    body { font-family: 'Figtree', sans-serif; }
 
     .news-header {
         background: linear-gradient(135deg, #f8fafc 0%, #ffffff 50%, #f0fdf4 100%);

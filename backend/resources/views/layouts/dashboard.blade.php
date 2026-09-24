@@ -8,6 +8,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="user-id" content="{{ auth()->id() }}">
 
+        <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <title>{{ config('app.name', 'TMS Dashboard') }}</title>
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#16a34a">
