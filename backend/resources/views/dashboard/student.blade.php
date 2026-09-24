@@ -141,9 +141,7 @@
                     <div class="w-1 h-6 bg-green-500 rounded-full"></div>
                     <h3 class="text-base font-black text-slate-800 tracking-tight">Milestone Progress</h3>
                 </div>
-                @if($active_thesis)
-                    <a href="{{ route('theses.show', $active_thesis) }}" class="text-xs font-semibold text-green-600 hover:text-green-700 transition-colors">View all →</a>
-                @endif
+
             </div>
 
             <div class="p-6">
