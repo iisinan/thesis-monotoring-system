@@ -417,6 +417,7 @@
             errorMessage: '',
             form: {
                 completed_milestones: [],
+                supervisor_ids: [],
                 principal_supervisor_id: '',
                 new_principal_name: '',
                 new_principal_email: '',
