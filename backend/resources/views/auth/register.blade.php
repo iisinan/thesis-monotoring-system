@@ -386,6 +386,8 @@
     </div>
 </div>
 
+<div class="hidden !ring-2 !ring-red-500 !border-red-500 !bg-red-50 border-slate-200 bg-slate-50"></div>
+
 <style>
     [x-cloak] { display: none !important; }
     .custom-scrollbar::-webkit-scrollbar { width: 6px; }
