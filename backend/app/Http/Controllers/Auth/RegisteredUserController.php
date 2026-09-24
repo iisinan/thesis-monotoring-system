@@ -257,20 +257,39 @@ class RegisteredUserController extends Controller
             // 6. Setup Milestones
             $templates = MilestoneTemplate::orderBy('order')->get();
             $completedIds = $request->completed_milestones ?? [];
-            
+
+            // Determine the active milestone: the first template (by order) that is NOT completed.
+            // All completed ones → 'approved'. The first non-completed → 'in_progress'. The rest → 'not_started'.
+            $activeMilestoneId = null;
+            foreach ($templates as $template) {
+                if (!in_array($template->id, $completedIds)) {
+                    $activeMilestoneId = $template->id;
+                    break;
+                }
+            }
+
             foreach ($templates as $template) {
                 $isCompleted = in_array($template->id, $completedIds);
-                
+                $isActive    = ($template->id === $activeMilestoneId);
+
+                if ($isCompleted) {
+                    $milestoneStatus = 'approved';
+                } elseif ($isActive) {
+                    $milestoneStatus = 'in_progress';
+                } else {
+                    $milestoneStatus = 'not_started';
+                }
+
                 $sm = StudentMilestone::updateOrCreate(
                     [
-                        'thesis_project_id' => $thesis->id,
-                        'milestone_template_id' => $template->id,
+                        'thesis_project_id'       => $thesis->id,
+                        'milestone_template_id'   => $template->id,
                     ],
                     [
-                        'status' => $isCompleted ? 'approved' : 'not_started',
-                        'due_date' => $isCompleted ? null : now()->addDays(30),
-                        'submitted_at' => $isCompleted ? now() : null,
-                        'date_approved_at' => clone now(), // Bypass if date was required
+                        'status'           => $milestoneStatus,
+                        'due_date'         => $isCompleted ? null : now()->addDays(30),
+                        'submitted_at'     => $isCompleted ? now() : null,
+                        'date_approved_at' => $isCompleted ? now() : null,
                     ]
                 );
 
