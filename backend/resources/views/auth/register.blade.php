@@ -339,6 +339,30 @@
                         </div>
                     </template>
 
+                    <div x-show="getCurrentSubStepType() === 'proposal_defence_details'" x-cloak>
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Proposal Defence</label>
+                            <input type="date" name="proposal_defence_date" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'proposal_defence')?.id)"
+                                   class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                        </div>
+                    </div>
+
+                    <div x-show="getCurrentSubStepType() === 'progress_presentation_1_details'" x-cloak>
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Progress Presentation 1</label>
+                            <input type="date" name="progress_presentation_1_date" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id)"
+                                   class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                        </div>
+                    </div>
+
+                    <div x-show="getCurrentSubStepType() === 'progress_presentation_2_details'" x-cloak>
+                        <div class="mb-6">
+                            <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Progress Presentation 2</label>
+                            <input type="date" name="progress_presentation_2_date" :disabled="!form.completed_milestones.includes(serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id)"
+                                   class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
+                        </div>
+                    </div>
+
                     <div x-show="getCurrentSubStepType() === 'internal_defence_details'" x-cloak>
                         <div class="mb-6 space-y-4">
                             <div>
@@ -445,9 +469,9 @@
             questions: [
                 { id: serverMilestones.find(m => m.slug === 'seminar_as_a_course')?.id, text: "Have you completed your", highlight: "Seminar Course", textAfter: "?", subStep: "grade", title: "Seminar<br>Course<br>Grade", desc: "Since you have completed your Seminar Course, please provide your grade below.", btnText: "Save Grade & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'supervisors_assigned')?.id, text: "Has your", highlight: "Supervisory Committee", textAfter: " been assigned?", subStep: "supervisors", title: "Assign<br>Supervisors", desc: "Since your committee is assigned, please select them below.", btnText: "Save Supervisors & Continue" },
-                { id: serverMilestones.find(m => m.slug === 'proposal_defence')?.id, text: "Have you completed your", highlight: "Proposal Defence", textAfter: "?" },
-                { id: serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id, text: "Have you completed your", highlight: "Progress Presentation 1", textAfter: "?" },
-                { id: serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id, text: "Have you completed your", highlight: "Progress Presentation 2", textAfter: "?" },
+                { id: serverMilestones.find(m => m.slug === 'proposal_defence')?.id, text: "Have you completed your", highlight: "Proposal Defence", textAfter: "?", subStep: "proposal_defence_details", title: "Proposal Defence<br>Details", desc: "Please provide the date of your Proposal Defence.", btnText: "Save Date & Continue" },
+                { id: serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id, text: "Have you completed your", highlight: "Progress Presentation 1", textAfter: "?", subStep: "progress_presentation_1_details", title: "Progress Presentation 1<br>Details", desc: "Please provide the date of your Progress Presentation 1.", btnText: "Save Date & Continue" },
+                { id: serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id, text: "Have you completed your", highlight: "Progress Presentation 2", textAfter: "?", subStep: "progress_presentation_2_details", title: "Progress Presentation 2<br>Details", desc: "Please provide the date of your Progress Presentation 2.", btnText: "Save Date & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'internal_defence')?.id, text: "Have you completed your", highlight: "Internal Defence", textAfter: "?", subStep: "internal_defence_details", title: "Internal Defence<br>Details", desc: "Since you have completed your Internal Defence, please provide the date and upload your publication.", btnText: "Save Details & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?" }
             ],

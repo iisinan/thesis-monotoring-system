@@ -36,7 +36,7 @@ class RegisteredUserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|confirmed|min:8',
-            'matric_number' => 'required|string|max:255|unique:student_profiles,student_id_number',
+            'matric_number' => ['required', 'string', 'max:255', 'unique:student_profiles,student_id_number', new \App\Rules\ValidMatricNumber],
             'program_id' => 'required|exists:programs,id',
             'thesis_title' => 'nullable|string|max:255',
             'thesis_abstract' => 'nullable|string',
@@ -45,6 +45,9 @@ class RegisteredUserController extends Controller
             'new_supervisors' => 'nullable|array',
             'completed_milestones' => 'nullable|array',
             'completed_milestones.*' => 'exists:milestone_templates,id',
+            'proposal_defence_date' => 'nullable|date',
+            'progress_presentation_1_date' => 'nullable|date',
+            'progress_presentation_2_date' => 'nullable|date',
             'internal_defence_date' => 'nullable|date',
             'publication_file' => 'nullable|file|mimes:pdf|max:10240',
         ]);
@@ -190,19 +193,27 @@ class RegisteredUserController extends Controller
                     'date_approved_at' => clone now(), // Bypass if date was required
                 ]);
 
-                if ($isCompleted && $template->slug === 'internal_defence') {
-                    if ($request->has('internal_defence_date')) {
-                        $sm->update(['defence_date' => $request->internal_defence_date]);
-                    }
-                    if ($request->hasFile('publication_file')) {
-                        $path = $request->file('publication_file')->store('publications', 'public');
-                        \App\Models\Submission::create([
-                            'student_milestone_id' => $sm->id,
-                            'version' => 1,
-                            'file_url' => $path,
-                            'submitted_by' => $user->id,
-                            'description' => 'Publication uploaded during registration',
-                        ]);
+                if ($isCompleted) {
+                    if ($template->slug === 'proposal_defence' && $request->has('proposal_defence_date')) {
+                        $sm->update(['defence_date' => $request->proposal_defence_date]);
+                    } elseif ($template->slug === 'progress_presentation_1' && $request->has('progress_presentation_1_date')) {
+                        $sm->update(['defence_date' => $request->progress_presentation_1_date]);
+                    } elseif ($template->slug === 'progress_presentation_2' && $request->has('progress_presentation_2_date')) {
+                        $sm->update(['defence_date' => $request->progress_presentation_2_date]);
+                    } elseif ($template->slug === 'internal_defence') {
+                        if ($request->has('internal_defence_date')) {
+                            $sm->update(['defence_date' => $request->internal_defence_date]);
+                        }
+                        if ($request->hasFile('publication_file')) {
+                            $path = $request->file('publication_file')->store('publications', 'public');
+                            \App\Models\Submission::create([
+                                'student_milestone_id' => $sm->id,
+                                'version' => 1,
+                                'file_url' => $path,
+                                'submitted_by' => $user->id,
+                                'description' => 'Publication uploaded during registration',
+                            ]);
+                        }
                     }
                 }
             }
