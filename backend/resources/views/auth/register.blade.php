@@ -451,52 +451,52 @@
             validateStep1() {
                 this.errorMessage = '';
                 const requiredFields = ['name', 'email', 'password', 'password_confirmation', 'matric_number', 'program_id'];
-                
-                // Maps input names to readable labels for better error messages
-                const fieldNames = {
-                    'name': 'Full Name',
-                    'email': 'Email Address',
-                    'password': 'Password',
-                    'password_confirmation': 'Confirm Password',
-                    'matric_number': 'Matriculation Number',
-                    'program_id': 'Programme'
-                };
-                
-                // Tailwind Safelist: !ring-2 !ring-red-500 !border-red-500 !bg-red-50
+
                 let isValid = true;
 
-                // Reset existing highlights
+                const setError = (el) => {
+                    el.style.outline = '2px solid #ef4444';
+                    el.style.outlineOffset = '0px';
+                    el.style.borderColor = '#ef4444';
+                    el.style.backgroundColor = '#fff1f2';
+                };
+
+                const clearError = (el) => {
+                    el.style.outline = '';
+                    el.style.outlineOffset = '';
+                    el.style.borderColor = '';
+                    el.style.backgroundColor = '';
+                };
+
+                // Reset all fields first
                 requiredFields.forEach(field => {
                     let el = document.querySelector(`[name="${field}"]`);
-                    if(el) {
-                        el.classList.remove('!ring-2', '!ring-red-500', '!border-red-500', '!bg-red-50');
-                        el.classList.add('border-slate-200', 'bg-slate-50');
-                    }
+                    if(el) clearError(el);
                 });
 
+                // Highlight empty required fields
                 for(let field of requiredFields) {
                     let el = document.querySelector(`[name="${field}"]`);
                     if(el && !el.value) {
-                        el.classList.remove('border-slate-200', 'bg-slate-50');
-                        el.classList.add('!ring-2', '!ring-red-500', '!border-red-500', '!bg-red-50');
+                        setError(el);
                         isValid = false;
                     }
                 }
-                
+
                 if(!isValid) {
-                    this.errorMessage = 'Please fill all highlighted fields in red before continuing.';
+                    this.errorMessage = 'Please fill all highlighted fields before continuing.';
                     return false;
                 }
-                
+
+                // Check passwords match
                 let pw = document.querySelector(`[name="password"]`);
                 let pw_conf = document.querySelector(`[name="password_confirmation"]`);
                 if(pw && pw_conf && pw.value !== pw_conf.value) {
-                    pw_conf.classList.remove('border-slate-200', 'bg-slate-50');
-                    pw_conf.classList.add('!ring-2', '!ring-red-500', '!border-red-500', '!bg-red-50');
+                    setError(pw_conf);
                     this.errorMessage = 'The passwords you entered do not match.';
                     return false;
                 }
-                
+
                 return true;
             },
 
