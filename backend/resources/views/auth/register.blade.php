@@ -37,7 +37,10 @@
             @csrf
             
             <!-- Hidden inputs to hold Alpine state for submission -->
-            <input type="hidden" name="completed_milestones[]" x-model="form.completed_milestones" />
+            <!-- Hidden inputs to hold Alpine state for submission — one per completed milestone -->
+            <template x-for="mid in form.completed_milestones" :key="mid">
+                <input type="hidden" name="completed_milestones[]" :value="mid" />
+            </template>
             <input type="hidden" name="supervisor_ids[]" x-model="form.principal_supervisor_id" />
             <input type="hidden" name="new_supervisors[0][name]" x-model="form.new_principal_name" />
             <input type="hidden" name="new_supervisors[0][email]" x-model="form.new_principal_email" />
