@@ -194,9 +194,9 @@
                 }
 
                 if ($isCompleted) {
-                    $conf = ['color' => 'emerald', 'label' => 'Validated', 'pulse' => false];
+                    $conf = ['color' => 'emerald', 'label' => 'Approved', 'pulse' => false];
                 } elseif ($isPendingMatch) {
-                    $conf = ['color' => 'amber', 'label' => 'Validate', 'pulse' => true];
+                    $conf = ['color' => 'amber', 'label' => 'Under Review', 'pulse' => true];
                 } elseif ($isActive) {
                     $conf = ['color' => 'blue', 'label' => 'Ongoing', 'pulse' => true];
                 } else {

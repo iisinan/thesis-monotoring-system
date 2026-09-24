@@ -228,6 +228,14 @@ class StudentMilestone extends Model
 
         $percentage = count($tasks) > 0 ? floor(($completedTasks / count($tasks)) * 100) : 100;
         
+        if ($this->status === 'approved') {
+            $percentage = 100;
+            $completedTasks = count($tasks);
+            foreach ($tasks as &$task) {
+                $task['completed'] = true;
+            }
+        }
+
         return [
             'tasks' => $tasks,
             'total' => count($tasks),
