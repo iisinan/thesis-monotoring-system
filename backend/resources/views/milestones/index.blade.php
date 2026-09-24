@@ -1096,42 +1096,7 @@
 
                             <!-- Right: Activity & Artifact Hub -->
                             <div class="flex-1 space-y-8">
-                                <!-- WhatsApp-Style Institutional Comm-Link -->
-                                @if($milestone->template?->has_chat)
-                                    @php $hasAssignments = $thesis->assignments->where('status', 'active')->count() > 0; @endphp
-                                    @if($milestone->template?->show_supervisor_assignment && !$hasAssignments && auth()->user()->hasRole('Student'))
-                                        <div class="p-10 bg-gray-50 border border-gray-100 rounded-3xl flex flex-col items-center justify-center text-center">
-                                            <div class="w-12 h-12 rounded-2xl bg-white border border-gray-100 flex items-center justify-center text-gray-200 mb-4 shadow-sm">
-                                                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                                            </div>
-                                            <h5 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Chat Disabled</h5>
-                                            <p class="text-[11px] text-gray-300 font-medium mt-2 max-w-xs">Chat access will be available upon successful supervisor allocation.</p>
-                                        </div>
-                                    @else
-                                        @php
-                                            $approverRoles = $milestone->template?->required_approvers ?? [];
-                                            $mentions = collect();
-                                            
-                                            if (in_array('Supervisor', $approverRoles)) {
-                                                foreach($supervisors as $s) { if($s?->user) $mentions->push($s->user); }
-                                            }
-                                            if (in_array('Program Coordinator', $approverRoles)) {
-                                                foreach($coordinators as $c) { if($c?->user) $mentions->push($c->user); }
-                                            }
-                                            if (in_array('Internal Examiner', $approverRoles) && isset($internalExaminer) && $internalExaminer) {
-                                                if($internalExaminer?->user) $mentions->push($internalExaminer->user);
-                                            }
-                                            // Ensure uniqueness
-                                            $mentions = $mentions->unique('id');
-                                        @endphp
-                                        <x-comm-link :messages="$milestone->messages" 
-                                                    :thesisId="$thesis->id" 
-                                                    :milestoneId="$milestone->id" 
-                                                    :potentialMentions="$mentions"
-                                                    title="Institutional Peer Review"
-                                                    height="300px" />
-                                    @endif
-                                @endif
+
 
                                 <!-- Files Repository -->
                                 <div class="p-10 bg-white rounded-[3rem] border border-gray-100 shadow-sm relative overflow-hidden">
