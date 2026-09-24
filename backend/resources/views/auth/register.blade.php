@@ -459,15 +459,32 @@
                     'matric_number': 'Matriculation Number',
                     'program_id': 'Programme'
                 };
+                
+                let isValid = true;
+
+                // Reset existing highlights
+                requiredFields.forEach(field => {
+                    let el = document.querySelector(`[name="${field}"]`);
+                    if(el) el.classList.remove('ring-2', 'ring-red-500', 'border-red-500', 'bg-red-50');
+                });
 
                 for(let field of requiredFields) {
-                    if(!document.querySelector(`[name="${field}"]`).value) {
-                        this.errorMessage = `Please provide your ${fieldNames[field]} before continuing.`;
-                        return false;
+                    let el = document.querySelector(`[name="${field}"]`);
+                    if(el && !el.value) {
+                        el.classList.add('ring-2', 'ring-red-500', 'border-red-500', 'bg-red-50');
+                        isValid = false;
                     }
                 }
                 
-                if(document.querySelector(`[name="password"]`).value !== document.querySelector(`[name="password_confirmation"]`).value) {
+                if(!isValid) {
+                    this.errorMessage = 'Please fill all highlighted fields in red before continuing.';
+                    return false;
+                }
+                
+                let pw = document.querySelector(`[name="password"]`);
+                let pw_conf = document.querySelector(`[name="password_confirmation"]`);
+                if(pw && pw_conf && pw.value !== pw_conf.value) {
+                    pw_conf.classList.add('ring-2', 'ring-red-500', 'border-red-500', 'bg-red-50');
                     this.errorMessage = 'The passwords you entered do not match.';
                     return false;
                 }
