@@ -493,9 +493,17 @@
                         </div>
                     </div>
 
-                    <button type="button" @click="saveSubStep()" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
-                        <span x-text="getCurrentSubButtonText()"></span>
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
+                    <button type="button" @click="saveSubStep()" :disabled="isSubmitting" :class="{'opacity-75 cursor-not-allowed': isSubmitting}" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                        <span x-show="!isSubmitting" x-text="getCurrentSubButtonText()"></span>
+                        <svg x-show="!isSubmitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
+                        
+                        <span x-show="isSubmitting" style="display: none;" class="flex items-center gap-2">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Uploading...
+                        </span>
                     </button>
                 </div>
                 
@@ -538,9 +546,17 @@
                         </div>
                     </div>
                     
-                    <button type="button" @click="saveSubStepNo()" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
-                        <span>Save & Complete Registration</span>
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
+                    <button type="button" @click="saveSubStepNo()" :disabled="isSubmitting" :class="{'opacity-75 cursor-not-allowed': isSubmitting}" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                        <span x-show="!isSubmitting">Save & Complete Registration</span>
+                        <svg x-show="!isSubmitting" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
+                        
+                        <span x-show="isSubmitting" style="display: none;" class="flex items-center gap-2">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Uploading...
+                        </span>
                     </button>
                 </div>
 
@@ -577,6 +593,7 @@
             milestoneStep: 1,
             showingSubStep: false,
             showingSubStepNo: false,
+            isSubmitting: false,
             
             errorMessage: '',
             form: {
@@ -740,6 +757,7 @@
                 if (currentQ.subStepNo) {
                     this.showingSubStepNo = true;
                 } else {
+                    this.isSubmitting = true;
                     this.$el.closest('form').submit();
                 }
             },
@@ -825,6 +843,7 @@
                 }
                 
                 this.showingSubStepNo = false;
+                this.isSubmitting = true;
                 this.$el.closest('form').submit();
             },
             
@@ -838,6 +857,7 @@
                 if (this.milestoneStep < 7) {
                     this.milestoneStep++;
                 } else {
+                    this.isSubmitting = true;
                     this.$el.closest('form').submit();
                 }
             },
