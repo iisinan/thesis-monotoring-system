@@ -371,18 +371,42 @@
                         </div>
                     </div>
 
-                    <div x-show="getCurrentSubStepType() === 'internal_defence_details'" x-cloak>
+                    <div x-show="getCurrentSubStepType() === 'internal_defence_details'" x-cloak x-data="{ pubs: [1] }">
                         <div class="mb-6 space-y-4">
                             <div>
                                 <label class="block text-sm font-bold text-slate-700 mb-1.5">Date of Internal Defence</label>
                                 <input type="date" name="internal_defence_date"
                                        class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                             </div>
-                            <div>
-                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Upload Publication (PDF)</label>
-                                <input type="file" name="publication_files[]" multiple accept=".pdf"
-                                       class="w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition-colors">
-                            </div>
+                        </div>
+
+                        <div class="mb-2 flex items-center justify-between">
+                            <label class="block text-sm font-bold text-slate-700">Publications</label>
+                            <button type="button" @click="pubs.push(pubs.length + 1)" class="text-xs font-bold text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg transition-colors">+ Add Publication</button>
+                        </div>
+                        
+                        <div class="space-y-4 mb-6">
+                            <template x-for="(pub, index) in pubs" :key="index">
+                                <div class="p-4 border border-slate-200 rounded-xl bg-slate-50 relative">
+                                    <button x-show="pubs.length > 1" @click="pubs.splice(index, 1)" type="button" class="absolute top-3 right-3 text-slate-400 hover:text-red-500">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                    </button>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <input type="text" :name="'publications[' + index + '][title]'" placeholder="Publication Title (Optional)"
+                                                   class="w-full rounded-lg border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm py-2 px-3">
+                                        </div>
+                                        <div>
+                                            <input type="text" :name="'publications[' + index + '][doi]'" placeholder="DOI or Link (Optional)"
+                                                   class="w-full rounded-lg border-slate-200 bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm py-2 px-3">
+                                        </div>
+                                        <div>
+                                            <input type="file" :name="'publications[' + index + '][file]'" accept=".pdf"
+                                                   class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-green-100 file:text-green-700 hover:file:bg-green-200 transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </div>
 

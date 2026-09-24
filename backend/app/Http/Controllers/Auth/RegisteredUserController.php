@@ -49,8 +49,10 @@ class RegisteredUserController extends Controller
             'progress_presentation_1_date' => 'nullable|date',
             'progress_presentation_2_date' => 'nullable|date',
             'internal_defence_date' => 'nullable|date',
-            'publication_files' => 'nullable|array',
-            'publication_files.*' => 'nullable|file|mimes:pdf|max:10240',
+            'publications' => 'nullable|array',
+            'publications.*.title' => 'nullable|string|max:255',
+            'publications.*.doi' => 'nullable|string|max:255',
+            'publications.*.file' => 'nullable|file|mimes:pdf|max:10240',
         ]);
 
         DB::beginTransaction();
@@ -205,15 +207,27 @@ class RegisteredUserController extends Controller
                         if ($request->has('internal_defence_date')) {
                             $sm->update(['defence_date' => $request->internal_defence_date]);
                         }
-                        if ($request->hasFile('publication_files')) {
-                            foreach ($request->file('publication_files') as $file) {
-                                $path = $file->store('publications', 'public');
+                        if ($request->has('publications')) {
+                            foreach ($request->input('publications', []) as $index => $pubData) {
+                                if (empty($pubData['title']) && empty($pubData['doi']) && !$request->hasFile("publications.{$index}.file")) {
+                                    continue;
+                                }
+                                
+                                $path = null;
+                                if ($request->hasFile("publications.{$index}.file")) {
+                                    $path = $request->file("publications.{$index}.file")->store('publications', 'public');
+                                }
+                                
+                                $desc = "Publication";
+                                if (!empty($pubData['title'])) $desc .= ": " . $pubData['title'];
+                                if (!empty($pubData['doi'])) $desc .= " (DOI: " . $pubData['doi'] . ")";
+
                                 \App\Models\Submission::create([
                                     'student_milestone_id' => $sm->id,
                                     'version' => 1,
                                     'file_url' => $path,
                                     'submitted_by' => $user->id,
-                                    'description' => 'Publication uploaded during registration',
+                                    'description' => $desc,
                                 ]);
                             }
                         }
