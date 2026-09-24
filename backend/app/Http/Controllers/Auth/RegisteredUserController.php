@@ -332,7 +332,7 @@ class RegisteredUserController extends Controller
                             'submitted_by' => $user->id,
                             'description' => 'Presentation slide (PPT) uploaded for scheduling',
                         ]);
-                        $sm->update(['status' => 'pending_review', 'submitted_at' => now()]);
+                        $sm->update(['status' => 'submitted', 'submitted_at' => now()]);
                     } elseif ($template->slug === 'progress_presentation_2' && $request->hasFile('progress_presentation_2_ppt') && $request->file('progress_presentation_2_ppt')->getPathname()) {
                         $path = $request->file('progress_presentation_2_ppt')->store('presentations', 'public');
                         \App\Models\Submission::create([
@@ -342,7 +342,7 @@ class RegisteredUserController extends Controller
                             'submitted_by' => $user->id,
                             'description' => 'Presentation slide (PPT) uploaded for scheduling',
                         ]);
-                        $sm->update(['status' => 'pending_review', 'submitted_at' => now()]);
+                        $sm->update(['status' => 'submitted', 'submitted_at' => now()]);
                     }
                 }
             }
