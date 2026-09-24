@@ -3,7 +3,7 @@
 @section('title', 'Student Registration - Thesis Monitoring System')
 
 @section('content')
-<div class="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" x-data="registrationWizard()">
+<div class="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" x-data="registrationWizard">
     
     <div class="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 relative overflow-hidden">
         
@@ -399,17 +399,12 @@
 <script>
     // Pass the PHP milestones array to JS
     const serverMilestones = @json($milestones);
-    
-    
-    
     const serverSupervisors = @json($supervisors->map(function($s) { return ['id' => $s->id, 'name' => $s->user->name]; }));
     const serverLevels = @json($levels);
     const serverPrograms = @json($programs);
-    
-    function registrationWizard() {
 
-
-        return {
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('registrationWizard', () => ({
             step: 1,
             milestoneStep: 1,
             showingSubStep: false,
@@ -561,7 +556,7 @@
                     this.form.supervisor_ids.push(id);
                 }
             }
-        }
-    }
+        }));
+    });
 </script>
 @endsection
