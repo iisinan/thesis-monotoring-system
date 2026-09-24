@@ -257,9 +257,14 @@
                                     
                                     <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                                         <template x-for="supervisor in serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))">
-                                            <div @click="form.principal_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_principal_name=''; form.new_principal_email='';" 
-                                                 class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
-                                                 x-text="supervisor.name"></div>
+                                            <div @click="
+                                                    if (supervisor.id === form.co_supervisor_id || supervisor.id === form.third_supervisor_id) { return; }
+                                                    form.principal_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_principal_name=''; form.new_principal_email='';"
+                                                 class="px-4 py-3 text-sm font-medium border-b border-slate-100 last:border-0 flex items-center justify-between"
+                                                 :class="(supervisor.id === form.co_supervisor_id || supervisor.id === form.third_supervisor_id) ? 'opacity-40 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-50 cursor-pointer text-slate-700'">
+                                                <span x-text="supervisor.name"></span>
+                                                <span x-show="supervisor.id === form.co_supervisor_id || supervisor.id === form.third_supervisor_id" class="text-xs text-rose-500 font-bold ml-2">Already selected</span>
+                                            </div>
                                         </template>
                                         <div x-show="serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">
                                             No supervisors found.
@@ -284,9 +289,14 @@
                                     
                                     <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                                         <template x-for="supervisor in serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))">
-                                            <div @click="form.co_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_co_name=''; form.new_co_email='';" 
-                                                 class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
-                                                 x-text="supervisor.name"></div>
+                                            <div @click="
+                                                    if (supervisor.id === form.principal_supervisor_id || supervisor.id === form.third_supervisor_id) { return; }
+                                                    form.co_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_co_name=''; form.new_co_email='';"
+                                                 class="px-4 py-3 text-sm font-medium border-b border-slate-100 last:border-0 flex items-center justify-between"
+                                                 :class="(supervisor.id === form.principal_supervisor_id || supervisor.id === form.third_supervisor_id) ? 'opacity-40 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-50 cursor-pointer text-slate-700'">
+                                                <span x-text="supervisor.name"></span>
+                                                <span x-show="supervisor.id === form.principal_supervisor_id || supervisor.id === form.third_supervisor_id" class="text-xs text-rose-500 font-bold ml-2">Already selected</span>
+                                            </div>
                                         </template>
                                         <div x-show="serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">
                                             No supervisors found.
@@ -311,9 +321,14 @@
                                     
                                     <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                                         <template x-for="supervisor in serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase()))">
-                                            <div @click="form.third_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_third_name=''; form.new_third_email='';" 
-                                                 class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
-                                                 x-text="supervisor.name"></div>
+                                            <div @click="
+                                                    if (supervisor.id === form.principal_supervisor_id || supervisor.id === form.co_supervisor_id) { return; }
+                                                    form.third_supervisor_id = supervisor.id; search = supervisor.name; open = false; form.new_third_name=''; form.new_third_email='';"
+                                                 class="px-4 py-3 text-sm font-medium border-b border-slate-100 last:border-0 flex items-center justify-between"
+                                                 :class="(supervisor.id === form.principal_supervisor_id || supervisor.id === form.co_supervisor_id) ? 'opacity-40 cursor-not-allowed bg-slate-50' : 'hover:bg-slate-50 cursor-pointer text-slate-700'">
+                                                <span x-text="supervisor.name"></span>
+                                                <span x-show="supervisor.id === form.principal_supervisor_id || supervisor.id === form.co_supervisor_id" class="text-xs text-rose-500 font-bold ml-2">Already selected</span>
+                                            </div>
                                         </template>
                                         <div x-show="serverSupervisors.filter(s => s.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">
                                             No supervisors found.

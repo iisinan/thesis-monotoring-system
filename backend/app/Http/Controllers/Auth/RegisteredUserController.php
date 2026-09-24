@@ -43,7 +43,7 @@ class RegisteredUserController extends Controller
             'thesis_title' => 'nullable|string|max:255',
             'thesis_abstract' => 'nullable|string',
             'supervisor_ids' => 'nullable|array',
-            'supervisor_ids.*' => 'nullable',
+            'supervisor_ids.*' => 'nullable|distinct',
             'new_supervisors' => 'nullable|array',
             'completed_milestones' => 'nullable|array',
             'completed_milestones.*' => 'exists:milestone_templates,id',
