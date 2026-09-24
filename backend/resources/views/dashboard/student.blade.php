@@ -65,13 +65,7 @@
                 </div>
 
                 <div class="flex flex-wrap gap-3 pt-1">
-                    @if($active_thesis)
-                        <a href="{{ route('theses.show', $active_thesis) }}"
-                           class="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold rounded-xl shadow-sm transition-all duration-200 group">
-                            View My Thesis
-                            <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                        </a>
-                    @endif
+
                     <a href="{{ route('inbox.index') }}"
                        class="inline-flex items-center gap-2 px-5 py-2.5 bg-white hover:bg-green-50 text-slate-700 text-sm font-bold rounded-xl border border-slate-200 transition-all duration-200 relative group">
                         <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
