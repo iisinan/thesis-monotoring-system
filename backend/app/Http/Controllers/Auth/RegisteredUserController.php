@@ -53,6 +53,8 @@ class RegisteredUserController extends Controller
             'publications.*.title' => 'nullable|string|max:255',
             'publications.*.doi' => 'nullable|string|max:255',
             'publications.*.file' => 'nullable|file|mimes:pdf|max:10240',
+            'progress_presentation_1_ppt' => 'nullable|file|max:10240',
+            'progress_presentation_2_ppt' => 'nullable|file|max:10240',
         ]);
 
         DB::beginTransaction();
@@ -231,6 +233,28 @@ class RegisteredUserController extends Controller
                                 ]);
                             }
                         }
+                    }
+                } else {
+                    if ($template->slug === 'progress_presentation_1' && $request->hasFile('progress_presentation_1_ppt')) {
+                        $path = $request->file('progress_presentation_1_ppt')->store('presentations', 'public');
+                        \App\Models\Submission::create([
+                            'student_milestone_id' => $sm->id,
+                            'version' => 1,
+                            'file_url' => $path,
+                            'submitted_by' => $user->id,
+                            'description' => 'Presentation slide (PPT) uploaded for scheduling',
+                        ]);
+                        $sm->update(['status' => 'pending_review', 'submitted_at' => now()]);
+                    } elseif ($template->slug === 'progress_presentation_2' && $request->hasFile('progress_presentation_2_ppt')) {
+                        $path = $request->file('progress_presentation_2_ppt')->store('presentations', 'public');
+                        \App\Models\Submission::create([
+                            'student_milestone_id' => $sm->id,
+                            'version' => 1,
+                            'file_url' => $path,
+                            'submitted_by' => $user->id,
+                            'description' => 'Presentation slide (PPT) uploaded for scheduling',
+                        ]);
+                        $sm->update(['status' => 'pending_review', 'submitted_at' => now()]);
                     }
                 }
             }

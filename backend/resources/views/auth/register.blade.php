@@ -415,6 +415,45 @@
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
                     </button>
                 </div>
+                
+                <!-- Sub-step for NO answer (PPT Upload) -->
+                <div x-show="showingSubStepNo" x-cloak>
+                    <div class="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                        <button type="button" @click="showingSubStepNo = false" class="text-slate-400 hover:text-slate-600 flex items-center gap-1 text-sm font-semibold">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                            Back
+                        </button>
+                        <div class="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm shrink-0" x-text="milestoneStep"></div>
+                        <h3 class="text-lg font-black text-slate-800 leading-tight">Schedule<br>Presentation</h3>
+                    </div>
+                    
+                    <p class="text-slate-500 font-medium text-sm mb-6">Please upload your Presentation file (PPT) to be scheduled for the next available presentation slot.</p>
+
+                    <div x-show="getCurrentSubStepNoType() === 'progress_presentation_1_schedule'" x-cloak>
+                        <div class="mb-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Upload Progress Presentation 1 (PPT)</label>
+                                <input type="file" name="progress_presentation_1_ppt" accept=".ppt,.pptx,.pdf"
+                                       class="w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition-colors">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="getCurrentSubStepNoType() === 'progress_presentation_2_schedule'" x-cloak>
+                        <div class="mb-6 space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 mb-1.5">Upload Progress Presentation 2 (PPT)</label>
+                                <input type="file" name="progress_presentation_2_ppt" accept=".ppt,.pptx,.pdf"
+                                       class="w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100 transition-colors">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" @click="saveSubStepNo()" class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
+                        <span>Save & Complete Registration</span>
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
+                    </button>
+                </div>
 
             </div>
 
@@ -479,6 +518,7 @@
             step: 1,
             milestoneStep: 1,
             showingSubStep: false,
+            showingSubStepNo: false,
             
             errorMessage: '',
             form: {
@@ -502,8 +542,8 @@
                 { id: serverMilestones.find(m => m.slug === 'seminar_as_a_course')?.id, text: "Have you completed your", highlight: "Seminar Course", textAfter: "?", subStep: "grade", title: "Seminar<br>Course<br>Grade", desc: "Since you have completed your Seminar Course, please provide your grade below.", btnText: "Save Grade & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'supervisors_assigned')?.id, text: "Has your", highlight: "Supervisory Committee", textAfter: " been assigned?", subStep: "supervisors", title: "Assign<br>Supervisors", desc: "Since your committee is assigned, please select them below.", btnText: "Save Supervisors & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'proposal_defence')?.id, text: "Have you completed your", highlight: "Proposal Defence", textAfter: "?", subStep: "proposal_defence_details", title: "Proposal Defence<br>Details", desc: "Please provide the date of your Proposal Defence.", btnText: "Save Date & Continue" },
-                { id: serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id, text: "Have you completed your", highlight: "Progress Presentation 1", textAfter: "?", subStep: "progress_presentation_1_details", title: "Progress Presentation 1<br>Details", desc: "Please provide the date of your Progress Presentation 1.", btnText: "Save Date & Continue" },
-                { id: serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id, text: "Have you completed your", highlight: "Progress Presentation 2", textAfter: "?", subStep: "progress_presentation_2_details", title: "Progress Presentation 2<br>Details", desc: "Please provide the date of your Progress Presentation 2.", btnText: "Save Date & Continue" },
+                { id: serverMilestones.find(m => m.slug === 'progress_presentation_1')?.id, text: "Have you completed your", highlight: "Progress Presentation 1", textAfter: "?", subStep: "progress_presentation_1_details", subStepNo: "progress_presentation_1_schedule", title: "Progress Presentation 1<br>Details", desc: "Please provide the date of your Progress Presentation 1.", btnText: "Save Date & Continue" },
+                { id: serverMilestones.find(m => m.slug === 'progress_presentation_2')?.id, text: "Have you completed your", highlight: "Progress Presentation 2", textAfter: "?", subStep: "progress_presentation_2_details", subStepNo: "progress_presentation_2_schedule", title: "Progress Presentation 2<br>Details", desc: "Please provide the date of your Progress Presentation 2.", btnText: "Save Date & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'internal_defence')?.id, text: "Have you completed your", highlight: "Internal Defence", textAfter: "?", subStep: "internal_defence_details", title: "Internal Defence<br>Details", desc: "Since you have completed your Internal Defence, please provide the date and upload your publication.", btnText: "Save Details & Continue" },
                 { id: serverMilestones.find(m => m.slug === 'viva')?.id, text: "Have you completed your", highlight: "Viva", textAfter: "?" }
             ],
@@ -612,6 +652,10 @@
                 return this.questions[this.milestoneStep - 1].subStep;
             },
             
+            getCurrentSubStepNoType() {
+                return this.questions[this.milestoneStep - 1].subStepNo;
+            },
+            
             getCurrentSubButtonText() {
                 return this.questions[this.milestoneStep - 1].btnText;
             },
@@ -626,12 +670,48 @@
             },
             
             answerNo() {
-                this.step = 3;
+                let currentQ = this.questions[this.milestoneStep - 1];
+                if (currentQ.subStepNo) {
+                    this.showingSubStepNo = true;
+                } else {
+                    this.step = 3;
+                }
             },
             
             saveSubStep() {
+                // Validate visible inputs inside the active sub-step block
+                let activeBlock = document.querySelector('[x-show="getCurrentSubStepType() === \'' + this.getCurrentSubStepType() + '\'"]');
+                if (activeBlock) {
+                    let inputs = activeBlock.querySelectorAll('input[type="date"], input[type="text"]');
+                    for (let input of inputs) {
+                        if (!input.value.trim() && input.name !== 'publications[0][doi]' && input.name !== 'publications[0][title]') {
+                            // Basic required validation (ignoring dynamic arrays for now except if we specifically made them required)
+                            if (input.name.includes('date') || input.name === 'thesis_abstract') {
+                                alert('Please fill in the required field.');
+                                input.focus();
+                                return;
+                            }
+                        }
+                    }
+                }
+                
                 let currentQ = this.questions[this.milestoneStep - 1];
                 this.recordMilestoneAndNext(currentQ.id);
+            },
+            
+            saveSubStepNo() {
+                // Validate PPT upload
+                let activeBlock = document.querySelector('[x-show="getCurrentSubStepNoType() === \'' + this.getCurrentSubStepNoType() + '\'"]');
+                if (activeBlock) {
+                    let fileInput = activeBlock.querySelector('input[type="file"]');
+                    if (fileInput && !fileInput.value) {
+                        alert('Please upload your Presentation (PPT) file before continuing.');
+                        return;
+                    }
+                }
+                
+                this.showingSubStepNo = false;
+                this.step = 3;
             },
             
             recordMilestoneAndNext(id) {
