@@ -28,7 +28,7 @@ class RegisterRequest extends FormRequest
             'role' => 'required|string|in:Student,Supervisor',
             
             // Student specific
-            'student_id_number' => 'required_if:role,Student|string|unique:student_profiles,student_id_number',
+            'student_id_number' => ['required_if:role,Student', 'string', 'unique:student_profiles,student_id_number', new \App\Rules\ValidMatricNumber],
             'program_id' => 'required_if:role,Student|exists:programs,id',
             'cohort_id' => 'required_if:role,Student|exists:cohorts,id',
             

@@ -25,7 +25,7 @@ class RegisterStudentRequest extends FormRequest
             'type' => 'required|in:single,bulk',
             'name' => 'required_if:type,single|nullable|string|max:255',
             'email' => 'required_if:type,single|nullable|email|unique:users,email',
-            'matrix_number' => 'required_if:type,single|nullable|string|unique:student_profiles,student_id_number',
+            'matrix_number' => ['required_if:type,single', 'nullable', 'string', 'unique:student_profiles,student_id_number', new \App\Rules\ValidMatricNumber],
             'program_id' => 'required_if:type,single|nullable|exists:programs,id',
             'csv_file' => 'required_if:type,bulk|nullable|file|mimes:csv,txt',
         ];

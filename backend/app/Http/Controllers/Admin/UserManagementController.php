@@ -102,7 +102,7 @@ class UserManagementController extends Controller
                 'cohort_id' => 'required|exists:cohorts,id',
                 'program_id' => 'required|exists:programs,id',
                 'level_id' => 'required|exists:levels,id',
-                'student_id_number' => 'required|string|unique:student_profiles,student_id_number',
+                'student_id_number' => ['required', 'string', 'unique:student_profiles,student_id_number', new \App\Rules\ValidMatricNumber],
             ]);
         }
 
@@ -288,7 +288,7 @@ class UserManagementController extends Controller
                 'cohort_id' => 'required|exists:cohorts,id',
                 'program_id' => 'required|exists:programs,id',
                 'level_id' => 'required|exists:levels,id',
-                'student_id_number' => ['required', 'string', Rule::unique('student_profiles')->ignore($user->studentProfile?->id)],
+                'student_id_number' => ['required', 'string', Rule::unique('student_profiles')->ignore($user->studentProfile?->id), new \App\Rules\ValidMatricNumber],
             ]);
         }
 
@@ -492,6 +492,12 @@ class UserManagementController extends Controller
             }
 
             $studentIdNumber = trim($rowData['matric_number']);
+            
+            if (strlen($studentIdNumber) < 6 || !in_array(substr($studentIdNumber, 5, 1), ['1', '2'])) {
+                $errors[] = "Row $i: Invalid Matric Number format. After the year, it must be 1 or 2.";
+                continue;
+            }
+
             if (\App\Models\StudentProfile::where('student_id_number', $studentIdNumber)->exists()) {
                  $errors[] = "Row $i: Matric Number '{$studentIdNumber}' already in use.";
                  continue;

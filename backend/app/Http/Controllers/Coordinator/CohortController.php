@@ -244,7 +244,11 @@ class CohortController extends Controller
                     $errors[] = "Unknown program: {$programSearch} for {$email}";
                     continue;
                 }
-                
+                if (strlen($matrixNumber) < 6 || !in_array(substr($matrixNumber, 5, 1), ['1', '2'])) {
+                    $errors[] = "Invalid Matric Number format: {$matrixNumber} for {$email}. After the year, it must be 1 or 2.";
+                    continue;
+                }
+
                 if (\App\Models\User::where('email', $email)->exists()) {
                     $errors[] = "Duplicate email: {$email}";
                     continue;

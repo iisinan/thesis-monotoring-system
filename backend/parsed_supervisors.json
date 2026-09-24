@@ -1,0 +1,810 @@
+[
+  {
+    "name": "Unnamed: 1",
+    "title": "",
+    "email": "Unnamed: 2",
+    "phone": "Unnamed: 3",
+    "rank": "Lecturer",
+    "program": "Unknown"
+  },
+  {
+    "name": "Rufai Yauri",
+    "title": "Professor",
+    "email": "rufaialeey@yahoo.com",
+    "phone": "8069499614",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Ambrose Azeta",
+    "title": "Professor",
+    "email": "ambrose.azeta@covenantuniversity.edu.ng",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Lucy Agpeyoung",
+    "title": "Professor",
+    "email": "lucy.agyepong@acity.edu.gh",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Olufunke Vincent",
+    "title": "Dr",
+    "email": "vincent.rebecca@gmail.com",
+    "phone": "7037832842",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Francisca Oladipo",
+    "title": "Professor",
+    "email": "francisca.oladipo@fulokoja.edu.ng",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Muhtar Alhassan",
+    "title": "Dr",
+    "email": "malhassan@noun.edu.ng",
+    "phone": "8033145223",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Olufade Onifade",
+    "title": "Dr",
+    "email": "fadowilly@yahoo.com",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Adebayo Abayomi-Alli",
+    "title": "Dr",
+    "email": "abayomiallia@funaab.edu.ng",
+    "phone": "7030672420",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Ibrahim Adeyanju",
+    "title": "Dr",
+    "email": "Ibrahim.adeyanju@fuoye.edu.ng",
+    "phone": "8132876689",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Osondu Oguike",
+    "title": "Dr",
+    "email": "osondu.oguike@unn.edu.ng",
+    "phone": "08035405100",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Adeola Opesade",
+    "title": "Dr",
+    "email": "adeolaopesade@yahoo.com",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Gregory Onwodi",
+    "title": "Dr",
+    "email": "gonwodi@noun.edu.ng",
+    "phone": "8023006365",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Amina Sambo-Magaji",
+    "title": "Dr",
+    "email": "asambo@nitda.gov.ng",
+    "phone": "8033512019",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Aminu Muhammad Bui",
+    "title": "Dr",
+    "email": "aminu.muhd@udusok.edu.ng",
+    "phone": "9033760371",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Abdulkadir Ahmed",
+    "title": "Dr",
+    "email": "ahmedstatistics@gmail.com",
+    "phone": "8034423803",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Mohammed Abdulkarim",
+    "title": "Dr",
+    "email": "mmmhammmad@gmail.com",
+    "phone": "9066306406",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Tunde Adegbola",
+    "title": "Dr",
+    "email": "taintransit@hotmail.com",
+    "phone": "8034019398",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Salisu Aliyu",
+    "title": "Dr",
+    "email": "aliyusalisu@abu.edu.ng",
+    "phone": "8067993631",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Janet Adekanbi",
+    "title": "Dr",
+    "email": "janet.adekanki@yahoo.com",
+    "phone": "8033610774",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Muhammad Aliyu Suleiman",
+    "title": "Dr",
+    "email": "muhalisu@gmail.com",
+    "phone": "8140097682",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Falilat Jimoh",
+    "title": "Dr",
+    "email": "fjimoh@nitda.gov.ng",
+    "phone": "8091402213",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Oyelade Olaide",
+    "title": "Dr",
+    "email": "olaide_oyelade@yahoo.com",
+    "phone": "7080437699",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Deborah Ebem",
+    "title": "Dr",
+    "email": "deborah.ebem@unn.edu.ng",
+    "phone": "8052810722",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Paul Olomolaiye",
+    "title": "Professor",
+    "email": "paul.olomolaiye@uwe.ac.uk",
+    "phone": "44(0)1173283069, 08033512019",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Sandip Rakshit",
+    "title": "Professor",
+    "email": "sandip.rakshit@aun.edu.ng",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Nwojo Agu Nnnanna",
+    "title": "Professor",
+    "email": "nagwu@nileuniversity.edu.ng",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Benjamin Aribisala",
+    "title": "Professor",
+    "email": "benjamin.aribisala@gmail.com",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Oludele Awodele",
+    "title": "Professor",
+    "email": "awodeleo@babcock.edu.ng",
+    "phone": "8091402213",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Adewale Adesina",
+    "title": "Dr",
+    "email": "aadesina@noun.edu.nd",
+    "phone": "08033974604",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Mohammed Hassan",
+    "title": "Dr",
+    "email": "mhassan.se@buk.edu.ng",
+    "phone": "8037807927",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Emmanuel Agu",
+    "title": "Professor",
+    "email": "emmanuel@wpi.edu",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Emmanuel Adetiba",
+    "title": "Dr",
+    "email": "emmanueladetiba@gmail.com",
+    "phone": "2347033397788",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Ms Jennie Glennie",
+    "title": "",
+    "email": "info@saide.org.za",
+    "phone": "",
+    "rank": "Lecturer",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Bakary Diallo",
+    "title": "Dr",
+    "email": "bdiallo@avu.org)",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Mr Ibrahim Bashir",
+    "title": "",
+    "email": "ibashir@atv.com",
+    "phone": "7062374526",
+    "rank": "Lecturer",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Mr Adamu Garba",
+    "title": "",
+    "email": "adamu.garba@ipigroupng.com",
+    "phone": "9050096593",
+    "rank": "Lecturer",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Ismaila Idris Sinan",
+    "title": "Dr",
+    "email": "isinan@noun.edu.ng",
+    "phone": "8033670352",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "O.F.W Onifade",
+    "title": "Dr",
+    "email": "olufadeo@gmail.com",
+    "phone": "8032841817",
+    "rank": "Dr",
+    "program": "Artificial Intelligence"
+  },
+  {
+    "name": "Abayomi Jegede",
+    "title": "Dr",
+    "email": "jegedea@unijos.edu.ng",
+    "phone": "7012670029",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Edward Santiago",
+    "title": "Professor",
+    "email": "esantiago@sunysullivan.edu",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Francis Osang",
+    "title": "Dr",
+    "email": "fosang@noun.edu.ng",
+    "phone": "7057129566",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Kana Donfack",
+    "title": "Dr",
+    "email": "donfack@gmail.com",
+    "phone": "8039381132",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "John K. Alhassan",
+    "title": "Dr",
+    "email": "jkalhassan@futminna.edu.ng",
+    "phone": "8035961620",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Julius Olatunji Okesola",
+    "title": "Professor",
+    "email": "olatunjiokesola@tech-u.edu.ng",
+    "phone": "08029570422, 08053943600",
+    "rank": "Professor",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Friday Wada",
+    "title": "Professor",
+    "email": "friwada@yahoo.com",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Ibrahim Alhaji Lawal",
+    "title": "Dr",
+    "email": "ibrahimlawal14@yahoo.com",
+    "phone": "8035991532",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Idris Ismaila",
+    "title": "Dr",
+    "email": "ismi.idris@futminna.edu.ng",
+    "phone": "7035880979",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Shafi Abdulhamad",
+    "title": "Dr",
+    "email": "shafiihamidu@futminna.edu.ng",
+    "phone": "8036317187",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Olawale Surajudeen Adebayo",
+    "title": "Dr",
+    "email": "waleadebayo@futminna.edu.ng",
+    "phone": "803210034",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Umar Dauda",
+    "title": "Dr",
+    "email": "dauda.umar@futminna.edu.ng",
+    "phone": "8065286650",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Mohammad Aminu Ahmad",
+    "title": "Dr",
+    "email": "muhdaminu@kasu.edu.ng",
+    "phone": "8066256878",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Adenrele Afolorunso",
+    "title": "Dr",
+    "email": "aafolorunsho@noun.edu.ng",
+    "phone": "8033288154",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Vivian Nwaocha",
+    "title": "Dr",
+    "email": "onwaocha@noun.edu.ng",
+    "phone": "7033157862",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Olumide Longe",
+    "title": "Professor",
+    "email": "longeolumide@fulbrightmail.org",
+    "phone": "8160900893",
+    "rank": "Professor",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Adamu Mohammed Noma",
+    "title": "Dr",
+    "email": "adamnoma@gmail.com",
+    "phone": "8065847010",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Ahmed Aliyu",
+    "title": "Dr",
+    "email": "ahmedaliyu8513@gmail.com",
+    "phone": "8065286650",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Ayodele Oloyede",
+    "title": "Dr",
+    "email": "ayo.adebiyi@covenantuniversity.edu.ng",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Joseph Ojeniyi",
+    "title": "Dr",
+    "email": "ojeniyija@futminna.edu.ng",
+    "phone": "8105518722",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Mustapha Bagiwa",
+    "title": "Dr",
+    "email": "mstphaminu@yahoo.com",
+    "phone": "8183789616",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Grace Oletu",
+    "title": "Dr",
+    "email": "oletugrace@gmail.com",
+    "phone": "2349051651274",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Zareefa Mustafa",
+    "title": "Dr",
+    "email": "zmustafa@nitda.gov.ng",
+    "phone": "08037633290 08098744221",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Adebukola Onashoga",
+    "title": "Professor",
+    "email": "onashogasa@gmail.com",
+    "phone": "8033537505",
+    "rank": "Professor",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Adesina Sodiya",
+    "title": "Professor",
+    "email": "sodiyaas@funaab.edu.ng",
+    "phone": "8034551851",
+    "rank": "Professor",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Muhammed Aminu Ahmad",
+    "title": "Dr",
+    "email": "muhdaminu@kasu.edu.ng",
+    "phone": "8066256878",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Morufu Olalere",
+    "title": "Dr",
+    "email": "lerejide@futminna.edu.ng",
+    "phone": "8034680087",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Baale Abimbola",
+    "title": "Dr",
+    "email": "aabaale@lautech.edu.ng",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Mr Olusanya Akinola Adekunle",
+    "title": "",
+    "email": "kunlesanya2002@gmail.com",
+    "phone": "",
+    "rank": "Lecturer",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Mr Awwal Isiaku",
+    "title": "",
+    "email": "ishiakua@gmail.com",
+    "phone": "",
+    "rank": "Lecturer",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Mr Augustine Yusuf",
+    "title": "",
+    "email": "austinyusuf@gmail.com",
+    "phone": "",
+    "rank": "Lecturer",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Mr Adewale John",
+    "title": "",
+    "email": "john15adex@gmail.com",
+    "phone": "",
+    "rank": "Lecturer",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Kingsley Eghonghon Ukhurebor",
+    "title": "",
+    "email": "ukeghonghon@gmail.com",
+    "phone": "8035383194",
+    "rank": "Lecturer",
+    "program": "Cyber Security"
+  },
+  {
+    "name": "Afolayan Obiniyi",
+    "title": "Professor",
+    "email": "aaobiniyi@yahoo.com",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Juliana Ndunagu",
+    "title": "Dr",
+    "email": "jndunagu@noun.edu.ng",
+    "phone": "8033532416",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Chidi Ononiwu",
+    "title": "Dr",
+    "email": "chidi.ononiwu@aun.edu.ng",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Rasheed Jimoh",
+    "title": "Professor",
+    "email": "Jimoh_rasheed@unilorin.edu.ng",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Samuel Utulu",
+    "title": "Dr",
+    "email": "samuel.utulu@aun.edu.ng",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Ibrahim Abdullahi",
+    "title": "Dr",
+    "email": "ibrojay01@ibbu.edu.ng",
+    "phone": "8035991532",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Sahalu Junaidu",
+    "title": "Professor",
+    "email": "sahalu@abu.edu.ng",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Abubakar Dahiru",
+    "title": "Dr",
+    "email": "aadahiru@nitda.gov.ng",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Shefiu Ganiyu",
+    "title": "Dr",
+    "email": "shefiu.ganiyu@futminna.edu.ng",
+    "phone": "8061601131",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Khalid Haruna",
+    "title": "Dr",
+    "email": "kharuna.cs@buk.edu.ng",
+    "phone": "8035775777",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Usman Ali",
+    "title": "Dr",
+    "email": "usmanali@fcetgombe.edu.ng",
+    "phone": "8068171481",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Bilikisu Larai Bello",
+    "title": "Dr",
+    "email": "bilkisu_bello@futminna.edu.ng",
+    "phone": "8126817264",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Yusuf Sahabi",
+    "title": "Dr",
+    "email": "sahabiali@yahoo.com",
+    "phone": "7037685941",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Theophilus Enem",
+    "title": "Dr",
+    "email": "enemtheophilus@gmail.com",
+    "phone": "8033327801",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Isiaq Alabi",
+    "title": "Dr",
+    "email": "isiaq.alabi@yahoo.co.uk",
+    "phone": "8169474675",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Naeem Balogun",
+    "title": "Dr",
+    "email": "neembaloo@yahoo.com",
+    "phone": "7038892927",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Mohamad Abdullahi",
+    "title": "Dr",
+    "email": "muham08@gmail.com",
+    "phone": "8067804447",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Baronia Ahmad",
+    "title": "Dr",
+    "email": "barroonia@yahoo.co.uk",
+    "phone": "8063238793",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Chigozirim Ajaegbu",
+    "title": "Dr",
+    "email": "chigozirim.ajaegbu@gmail.com",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Usman Joda",
+    "title": "Dr",
+    "email": "umjoda@gmail.com",
+    "phone": "8032508279",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Rexford Assasie Oppong",
+    "title": "Professor",
+    "email": "ipo@knust.edu.gh",
+    "phone": "+233(0)322063944",
+    "rank": "Professor",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Richard Boateng",
+    "title": "Professor",
+    "email": "richboateng@ug.edu.gh",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Ayo Adebiyi",
+    "title": "Professor",
+    "email": "ayo.adebiyi@covenantuniversity.edu.ng",
+    "phone": "",
+    "rank": "Professor",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Muhamad Abdullahi",
+    "title": "Dr",
+    "email": "muham08@gmail.com",
+    "phone": "8067804447",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Mr Fred Akintunwa",
+    "title": "",
+    "email": "ade_fred@feghas.com;",
+    "phone": "8033229539",
+    "rank": "Lecturer",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Femi Adeluyi",
+    "title": "Dr",
+    "email": "oadeluyi@nitda.gov.ng",
+    "phone": "8137962366",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Usman Abdullahi",
+    "title": "Dr",
+    "email": "uabdullahi@nitda.gov.ng",
+    "phone": "7083893415",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Uyinomen Ekong",
+    "title": "Dr",
+    "email": "uyiekong@yahoo.com",
+    "phone": "",
+    "rank": "Dr",
+    "program": "Management Information System"
+  },
+  {
+    "name": "Igwe Joseph Sunday",
+    "title": "Dr",
+    "email": "sundayeleojoor@gmail.com",
+    "phone": "7089713878",
+    "rank": "Dr",
+    "program": "Management Information System"
+  }
+]

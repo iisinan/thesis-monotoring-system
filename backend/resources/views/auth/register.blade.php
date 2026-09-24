@@ -524,6 +524,18 @@
                     return false;
                 }
 
+                // Check matric number format
+                let matricEl = document.querySelector(`[name="matric_number"]`);
+                if(matricEl && matricEl.value) {
+                    let val = matricEl.value.trim();
+                    if(val.length < 6 || (val.charAt(5) !== '1' && val.charAt(5) !== '2')) {
+                        setError(matricEl);
+                        this.errorMessage = 'Invalid Matriculation Number. The batch indicator (6th character) must be 1 or 2.';
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        return false;
+                    }
+                }
+
                 // Check passwords match
                 let pw = document.querySelector(`[name="password"]`);
                 let pw_conf = document.querySelector(`[name="password_confirmation"]`);

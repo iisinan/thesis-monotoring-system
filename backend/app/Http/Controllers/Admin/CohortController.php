@@ -238,6 +238,12 @@ class CohortController extends Controller
                     continue;
                 }
 
+                // Check for Matric Number Format
+                if (strlen($matrixNumber) < 6 || !in_array(substr($matrixNumber, 5, 1), ['1', '2'])) {
+                    $errors[] = "Invalid Matric Number format ($matrixNumber) for $email skipped. After the year, it must be 1 or 2.";
+                    continue;
+                }
+
                 // Check for Matric Number duplication
                 if (\App\Models\StudentProfile::where('student_id_number', $matrixNumber)->exists()) {
                     $errors[] = "Duplicate Matric Number ($matrixNumber) for $email skipped.";

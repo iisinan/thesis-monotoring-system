@@ -133,7 +133,7 @@ class UserController extends Controller
             'program_id' => ['nullable', 'exists:programs,id'],
             'level_id' => ['nullable', 'exists:levels,id'],
             'cohort_id' => ['nullable', 'exists:cohorts,id'],
-            'student_id_number' => ['nullable', 'string', 'max:50'],
+            'student_id_number' => ['nullable', 'string', 'max:50', new \App\Rules\ValidMatricNumber],
             'coordinator_programs' => ['nullable', 'array'],
             'coordinator_programs.*' => ['nullable', 'exists:programs,id'],
         ];
