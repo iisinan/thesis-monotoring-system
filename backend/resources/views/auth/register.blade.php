@@ -3,7 +3,7 @@
 @section('title', 'Student Registration - Thesis Monitoring System')
 
 @section('content')
-<div class="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" x-data="registrationWizard">
+<div class="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" x-data="registrationWizard()">
     
     <div class="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 relative overflow-hidden">
         
@@ -179,7 +179,7 @@
                     </div>
 
                     <div class="pt-4">
-                        <button type="button" @click="if(validateStep1()) step = 2" 
+                        <button type="button" @click="nextStep()" 
                                 class="w-full bg-[#18a04b] text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 hover:bg-green-700 hover:shadow-green-700/30 transition-all flex items-center justify-center gap-2">
                             Continue to Questionnaire
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7m0 0l-7 7m7-7H6"/></svg>
@@ -403,8 +403,8 @@
     const serverLevels = @json($levels);
     const serverPrograms = @json($programs);
 
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('registrationWizard', () => ({
+    window.registrationWizard = function() {
+        return {
             step: 1,
             milestoneStep: 1,
             showingSubStep: false,
@@ -481,6 +481,7 @@
 
                 if(!isValid) {
                     this.errorMessage = 'Please fill all highlighted fields before continuing.';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                     return false;
                 }
 
@@ -490,10 +491,20 @@
                 if(pw && pw_conf && pw.value !== pw_conf.value) {
                     setError(pw_conf);
                     this.errorMessage = 'The passwords you entered do not match.';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                     return false;
                 }
 
                 return true;
+            },
+
+            nextStep() {
+                if (this.validateStep1()) {
+                    this.step = 2;
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
             },
 
             getCurrentQuestionHtml() {
@@ -556,7 +567,7 @@
                     this.form.supervisor_ids.push(id);
                 }
             }
-        }));
-    });
+        };
+    }
 </script>
 @endsection
