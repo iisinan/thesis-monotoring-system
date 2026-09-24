@@ -20,30 +20,7 @@
             <h1 class="text-2xl font-bold text-slate-900">ACETEL Postgraduate</h1>
             <h2 class="text-xl font-bold text-green-600">Registration</h2>
             
-            <!-- Progress Bar -->
-            <div class="mt-8 relative px-4">
-                <div class="absolute top-1/2 left-8 right-8 h-1 -translate-y-1/2 bg-slate-200 z-0 rounded-full">
-                    <div class="h-full bg-green-600 rounded-full transition-all duration-300" :style="'width: ' + ((step - 1) * 50) + '%'"></div>
-                </div>
-                
-                <div class="relative z-10 flex justify-between">
-                    <div class="flex flex-col items-center">
-                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
-                             :class="step >= 1 ? 'bg-green-600 text-white' : 'bg-white border-2 border-slate-200 text-slate-400'">1</div>
-                        <span class="text-xs font-semibold mt-2" :class="step >= 1 ? 'text-green-600' : 'text-slate-400'">Profile</span>
-                    </div>
-                    <div class="flex flex-col items-center">
-                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
-                             :class="step >= 2 ? 'bg-green-600 text-white' : 'bg-white border-2 border-slate-200 text-slate-400'">2</div>
-                        <span class="text-xs font-semibold mt-2" :class="step >= 2 ? 'text-green-600' : 'text-slate-400'">Milestones</span>
-                    </div>
-                    <div class="flex flex-col items-center">
-                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors"
-                             :class="step >= 3 ? 'bg-green-600 text-white' : 'bg-white border-2 border-slate-200 text-slate-400'">3</div>
-                        <span class="text-xs font-semibold mt-2" :class="step >= 3 ? 'text-slate-400' : 'text-slate-400'">Thesis</span>
-                    </div>
-                </div>
-            </div>
+
         </div>
 
         @if ($errors->any())
@@ -254,15 +231,15 @@
                     <p class="text-sm text-slate-500 mb-6 font-medium" x-text="getCurrentSubDesc()"></p>
                     
                     <!-- Dynamic Sub-step Content -->
-                    <template x-if="getCurrentSubStepType() === 'grade'">
+                    <div x-show="getCurrentSubStepType() === 'grade'" x-cloak>
                         <div class="mb-6">
                             <label class="block text-sm font-bold text-slate-700 mb-1.5">Course Grade</label>
-                            <input type="text" placeholder="e.g. A, B+, 75%"
+                            <input type="text" name="seminar_grade" placeholder="e.g. A, B+, 75%"
                                    class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                         </div>
-                    </template>
+                    </div>
                     
-                    <template x-if="getCurrentSubStepType() === 'supervisors'">
+                    <div x-show="getCurrentSubStepType() === 'supervisors'" x-cloak>
                         <div class="mb-6 space-y-4">
                             <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false, selectedName: '' }" @click.away="open = false">
                                 <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
@@ -345,7 +322,7 @@
                                 </div>
                             </div>
                         </div>
-                    </template>
+                    </div>
 
                     <div x-show="getCurrentSubStepType() === 'proposal_defence_details'" x-cloak>
                         <div class="mb-6">
@@ -476,13 +453,13 @@
                 <div class="space-y-6">
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-1.5">Thesis Title</label>
-                        <input type="text" name="thesis_title" placeholder="Enter your approved thesis title"
+                        <input type="text" name="thesis_title" placeholder="Enter your approved thesis title" required
                                class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                     </div>
                     
                     <div>
                         <label class="block text-sm font-bold text-slate-700 mb-1.5">Thesis Abstract</label>
-                        <textarea name="thesis_abstract" rows="5" placeholder="Paste your approved abstract here..."
+                        <textarea name="thesis_abstract" rows="5" placeholder="Paste your approved abstract here..." required
                                class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors"></textarea>
                     </div>
 
@@ -679,18 +656,28 @@
             },
             
             saveSubStep() {
-                // Validate visible inputs inside the active sub-step block
-                let activeBlock = document.querySelector('[x-show="getCurrentSubStepType() === \'' + this.getCurrentSubStepType() + '\'"]');
-                if (activeBlock) {
-                    let inputs = activeBlock.querySelectorAll('input[type="date"], input[type="text"]');
-                    for (let input of inputs) {
-                        if (!input.value.trim() && input.name !== 'publications[0][doi]' && input.name !== 'publications[0][title]') {
-                            // Basic required validation (ignoring dynamic arrays for now except if we specifically made them required)
-                            if (input.name.includes('date') || input.name === 'thesis_abstract') {
-                                alert('Please fill in the required field.');
-                                input.focus();
-                                return;
-                            }
+                let type = this.getCurrentSubStepType();
+                
+                if (type === 'grade') {
+                    let gradeInput = document.querySelector('input[name="seminar_grade"]');
+                    if (gradeInput && !gradeInput.value.trim()) {
+                        alert('Please provide your Seminar Course Grade.');
+                        gradeInput.focus();
+                        return;
+                    }
+                } else if (type === 'supervisors') {
+                    if (!this.form.principal_supervisor_id && !this.form.new_principal_name.trim()) {
+                        alert('Please select or enter a Principal Supervisor.');
+                        return;
+                    }
+                } else if (type === 'proposal_defence_details' || type === 'progress_presentation_1_details' || type === 'progress_presentation_2_details' || type === 'internal_defence_details') {
+                    let activeBlock = document.querySelector('[x-show="getCurrentSubStepType() === \'' + type + '\'"]');
+                    if (activeBlock) {
+                        let dateInput = activeBlock.querySelector('input[type="date"]');
+                        if (dateInput && !dateInput.value.trim()) {
+                            alert('Please provide the required date.');
+                            dateInput.focus();
+                            return;
                         }
                     }
                 }

@@ -45,6 +45,7 @@ class RegisteredUserController extends Controller
             'new_supervisors' => 'nullable|array',
             'completed_milestones' => 'nullable|array',
             'completed_milestones.*' => 'exists:milestone_templates,id',
+            'seminar_grade' => 'nullable|string|max:50',
             'proposal_defence_date' => 'nullable|date',
             'progress_presentation_1_date' => 'nullable|date',
             'progress_presentation_2_date' => 'nullable|date',
@@ -199,7 +200,9 @@ class RegisteredUserController extends Controller
                 ]);
 
                 if ($isCompleted) {
-                    if ($template->slug === 'proposal_defence' && $request->has('proposal_defence_date')) {
+                    if ($template->slug === 'seminar_as_a_course' && $request->has('seminar_grade')) {
+                        $sm->update(['remark' => 'Course Grade: ' . $request->seminar_grade]);
+                    } elseif ($template->slug === 'proposal_defence' && $request->has('proposal_defence_date')) {
                         $sm->update(['defence_date' => $request->proposal_defence_date]);
                     } elseif ($template->slug === 'progress_presentation_1' && $request->has('progress_presentation_1_date')) {
                         $sm->update(['defence_date' => $request->progress_presentation_1_date]);
