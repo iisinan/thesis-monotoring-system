@@ -39,7 +39,7 @@ return [
         ],
 
         'public' => [
-            'driver' => env('PUBLIC_FILESYSTEM_DISK', env('CLOUDFLARE_R2_ACCESS_KEY_ID' ? 's3' : 'local')),
+            'driver' => env('PUBLIC_FILESYSTEM_DISK', env('CLOUDFLARE_R2_ACCESS_KEY_ID') ? 's3' : 'local'),
             'key' => env('R2_ACCESS_KEY_ID', env('CLOUDFLARE_R2_ACCESS_KEY_ID')),
             'secret' => env('R2_SECRET_ACCESS_KEY', env('CLOUDFLARE_R2_SECRET_ACCESS_KEY')),
             'region' => 'auto',
