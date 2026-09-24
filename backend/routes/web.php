@@ -127,6 +127,9 @@ Route::middleware('auth')->group(function () {
         // Supervisor Student Management
         Route::get('/supervisor/candidates', [App\Http\Controllers\Supervisor\StudentController::class, 'index'])->name('supervisor.students.index');
         
+        Route::get('/supervisor/seminar-examinations', [App\Http\Controllers\Supervisor\SeminarExaminationController::class, 'index'])->name('supervisor.seminars.index');
+        Route::post('/supervisor/seminar-examinations/{event}/score', [App\Http\Controllers\Supervisor\SeminarExaminationController::class, 'storeScore'])->name('supervisor.seminars.score');
+        
     });
     
     Route::post('/users/{user}/reset-password', [App\Http\Controllers\UserController::class, 'resetPassword'])->name('users.reset_password');

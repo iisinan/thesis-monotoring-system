@@ -80,3 +80,8 @@ Route::get('students/{student}/milestones/{milestone}/edit', [StudentMilestoneCo
 Route::put('students/{student}/milestones/{milestone}', [StudentMilestoneController::class, 'update'])->name('students.milestones.update');
 Route::post('students/{student}/sync-milestones', [StudentMilestoneController::class, 'sync'])->name('students.sync-milestones');
 
+
+use App\Http\Controllers\Admin\SeminarController;
+Route::get('seminars', [SeminarController::class, 'index'])->name('seminars.index');
+Route::post('seminars/schedule', [SeminarController::class, 'schedule'])->name('seminars.schedule');
+Route::post('seminars/{milestone}/assign-examiner', [SeminarController::class, 'assignExaminer'])->name('seminars.assign-examiner');
