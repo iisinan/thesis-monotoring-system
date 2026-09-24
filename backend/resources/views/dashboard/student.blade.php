@@ -299,32 +299,7 @@
             </div>
             @endif
 
-            {{-- Quick Links --}}
-            <div class="bg-gradient-to-br from-green-600 to-green-700 rounded-2xl p-5 text-white shadow-sm">
-                <h3 class="text-sm font-black mb-4 tracking-tight">Quick Access</h3>
-                <div class="space-y-2">
-                    @if($active_thesis)
-                        <a href="{{ route('theses.show', $active_thesis) }}"
-                           class="flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200 group">
-                            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253"/></svg>
-                            <span class="text-xs font-semibold">My Thesis</span>
-                            <svg class="w-3 h-3 ml-auto transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                        </a>
-                    @endif
-                    <a href="{{ route('inbox.index') }}"
-                       class="inline-flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200 group">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-                        <span class="text-xs font-semibold">Messages</span>
-                        <svg class="w-3 h-3 ml-auto transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    </a>
-                    <a href="{{ route('profile.edit') }}"
-                       class="flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all duration-200 group">
-                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
-                        <span class="text-xs font-semibold">My Profile</span>
-                        <svg class="w-3 h-3 ml-auto transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    </a>
-                </div>
-            </div>
+
 
         </div>
     </div>
