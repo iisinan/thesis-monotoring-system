@@ -409,7 +409,7 @@ class RegisteredUserController extends Controller
             Auth::login($user);
             return redirect()->route('dashboard');
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
             return back()->withInput()->withErrors(['error' => 'An error occurred during registration. Please try again. ' . $e->getMessage()]);
         }
