@@ -206,49 +206,60 @@ class RegisteredUserController extends Controller
             ]);
 
             // 5. Assign Supervisors
-            $finalSupIds = [];
-            if ($request->has('supervisor_ids')) {
-                $finalSupIds = array_filter($request->supervisor_ids, fn($v) => !empty($v));
-            }
+            $finalSups = []; 
+            $submittedSupIds = $request->input('supervisor_ids', []);
+            $submittedNewSups = $request->input('new_supervisors', []);
 
-            if ($request->has('new_supervisors')) {
-                foreach ($request->new_supervisors as $newSup) {
-                    if (!empty($newSup['name']) && !empty($newSup['email'])) {
-                        // Create User
-                        $supUser = User::firstOrCreate(
-                            ['email' => $newSup['email']],
-                            [
-                                'name' => $newSup['name'],
-                                'password' => Hash::make(Str::random(12)), // random password
-                            ]
-                        );
-                        if (!$supUser->hasRole('Supervisor')) {
-                            $supUser->assignRole('Supervisor');
-                        }
+            for ($i = 0; $i < 3; $i++) {
+                $role = ($i === 0) ? 'primary' : 'secondary';
+                $supId = null;
 
-                        // Create SupervisorProfile
-                        $supProfile = SupervisorProfile::firstOrCreate(
-                            ['user_id' => $supUser->id],
-                            [
-                                'department' => 'Assigned',
-                                'title' => 'Supervisor',
-                                'max_load' => 5,
-                            ]
-                        );
-                        $finalSupIds[] = $supProfile->id;
+                if (!empty($submittedSupIds[$i])) {
+                    $supId = $submittedSupIds[$i];
+                } elseif (!empty($submittedNewSups[$i]['name']) && !empty($submittedNewSups[$i]['email'])) {
+                    $newSup = $submittedNewSups[$i];
+                    // Create User
+                    $supUser = User::firstOrCreate(
+                        ['email' => $newSup['email']],
+                        [
+                            'name' => $newSup['name'],
+                            'password' => Hash::make(Str::random(12)), // random password
+                        ]
+                    );
+                    if (!$supUser->hasRole('Supervisor')) {
+                        $supUser->assignRole('Supervisor');
                     }
+
+                    // Create SupervisorProfile
+                    $supProfile = SupervisorProfile::firstOrCreate(
+                        ['user_id' => $supUser->id],
+                        [
+                            'department' => 'Assigned',
+                            'title' => 'Supervisor',
+                            'max_load' => 5,
+                        ]
+                    );
+                    $supId = $supProfile->id;
+                }
+
+                if ($supId) {
+                    $finalSups[] = [
+                        'id' => $supId,
+                        'role' => $role
+                    ];
                 }
             }
 
-            foreach ($finalSupIds as $supId) {
+            foreach ($finalSups as $sup) {
                 SupervisionAssignment::create([
                     'thesis_project_id' => $thesis->id,
-                    'supervisor_profile_id' => $supId,
+                    'supervisor_profile_id' => $sup['id'],
+                    'role' => $sup['role'],
                     'status' => 'active',
                     'assigned_at' => now(),
                 ]);
                 
-                $supProfile = SupervisorProfile::find($supId);
+                $supProfile = SupervisorProfile::find($sup['id']);
                 if ($supProfile) {
                     $supProfile->increment('current_load');
                 }
