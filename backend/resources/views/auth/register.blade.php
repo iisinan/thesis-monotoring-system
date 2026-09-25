@@ -400,12 +400,24 @@
                                     <input type="text" x-model="search" @focus="open = true" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4" placeholder="Search internal examiner...">
                                     
                                     <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                                        <template x-for="examiner in serverInternalExaminers.filter(e => e.user.name.toLowerCase().includes(search.toLowerCase()))">
-                                            <div @click="form.internal_examiner_id = examiner.id; search = examiner.user.name; open = false; form.new_internal_examiner_name=''; form.new_internal_examiner_email='';" 
+                                        <template x-for="examiner in allInternalExaminers.filter(e => e.name.toLowerCase().includes(search.toLowerCase()))">
+                                            <div @click="
+                                                    if (examiner.type === 'examiner') {
+                                                        form.internal_examiner_id = examiner.id;
+                                                        form.new_internal_examiner_name = '';
+                                                        form.new_internal_examiner_email = '';
+                                                    } else {
+                                                        form.internal_examiner_id = '';
+                                                        form.new_internal_examiner_name = examiner.name;
+                                                        form.new_internal_examiner_email = examiner.email;
+                                                    }
+                                                    search = examiner.name; 
+                                                    open = false;
+                                                 " 
                                                  class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
-                                                 x-text="examiner.user.name"></div>
+                                                 x-text="examiner.name + (examiner.type === 'supervisor' ? ' (Supervisor)' : '')"></div>
                                         </template>
-                                        <div x-show="serverInternalExaminers.filter(e => e.user.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">No examiners found.</div>
+                                        <div x-show="allInternalExaminers.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">No examiners found.</div>
                                     </div>
                                     <input type="hidden" name="internal_examiner_id" :value="form.internal_examiner_id">
                                 </div>
@@ -468,12 +480,24 @@
                                     <input type="text" x-model="search" @focus="open = true" class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4" placeholder="Search external examiner...">
                                     
                                     <div x-show="open" class="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                                        <template x-for="examiner in serverExternalExaminers.filter(e => e.user.name.toLowerCase().includes(search.toLowerCase()))">
-                                            <div @click="form.external_examiner_id = examiner.id; search = examiner.user.name; open = false; form.new_external_examiner_name=''; form.new_external_examiner_email='';" 
+                                        <template x-for="examiner in allExternalExaminers.filter(e => e.name.toLowerCase().includes(search.toLowerCase()))">
+                                            <div @click="
+                                                    if (examiner.type === 'examiner') {
+                                                        form.external_examiner_id = examiner.id;
+                                                        form.new_external_examiner_name = '';
+                                                        form.new_external_examiner_email = '';
+                                                    } else {
+                                                        form.external_examiner_id = '';
+                                                        form.new_external_examiner_name = examiner.name;
+                                                        form.new_external_examiner_email = examiner.email;
+                                                    }
+                                                    search = examiner.name; 
+                                                    open = false;
+                                                 " 
                                                  class="px-4 py-3 hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b border-slate-100 last:border-0" 
-                                                 x-text="examiner.user.name"></div>
+                                                 x-text="examiner.name + (examiner.type === 'supervisor' ? ' (Supervisor)' : '')"></div>
                                         </template>
-                                        <div x-show="serverExternalExaminers.filter(e => e.user.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">No examiners found.</div>
+                                        <div x-show="allExternalExaminers.filter(e => e.name.toLowerCase().includes(search.toLowerCase())).length === 0" class="px-4 py-3 text-sm text-slate-500">No examiners found.</div>
                                     </div>
                                     <input type="hidden" name="external_examiner_id" :value="form.external_examiner_id">
                                 </div>
@@ -583,9 +607,9 @@
 <script>
     // Pass the PHP milestones array to JS
     const serverMilestones = @json($milestones);
-    const serverSupervisors = @json($supervisors->map(function($s) { return ['id' => $s->id, 'name' => $s->user->name]; }));
-    const serverInternalExaminers = @json($internalExaminers->map(function($e) { return ['id' => $e->id, 'user' => ['name' => $e->user->name]]; }));
-    const serverExternalExaminers = @json($externalExaminers->map(function($e) { return ['id' => $e->id, 'user' => ['name' => $e->user->name]]; }));
+    const serverSupervisors = @json($supervisors->map(function($s) { return ['id' => $s->id, 'name' => $s->user->name, 'email' => $s->user->email]; }));
+    const serverInternalExaminers = @json($internalExaminers->map(function($e) { return ['id' => $e->id, 'user' => ['name' => $e->user->name, 'email' => $e->user->email]]; }));
+    const serverExternalExaminers = @json($externalExaminers->map(function($e) { return ['id' => $e->id, 'user' => ['name' => $e->user->name, 'email' => $e->user->email]]; }));
     const serverLevels = @json($levels);
     const serverPrograms = @json($programs);
 
@@ -596,6 +620,16 @@
             showingSubStep: false,
             showingSubStepNo: false,
             isSubmitting: false,
+            
+            allInternalExaminers: [
+                ...serverInternalExaminers.map(e => ({ id: e.id, name: e.user.name, email: e.user.email, type: 'examiner' })),
+                ...serverSupervisors.map(s => ({ id: s.id, name: s.name, email: s.email, type: 'supervisor' }))
+            ],
+            
+            allExternalExaminers: [
+                ...serverExternalExaminers.map(e => ({ id: e.id, name: e.user.name, email: e.user.email, type: 'examiner' })),
+                ...serverSupervisors.map(s => ({ id: s.id, name: s.name, email: s.email, type: 'supervisor' }))
+            ],
             
             errorMessage: '',
             form: {
