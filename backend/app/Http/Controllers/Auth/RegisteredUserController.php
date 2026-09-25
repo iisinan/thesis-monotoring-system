@@ -208,7 +208,7 @@ class RegisteredUserController extends Controller
             // 5. Assign Supervisors
             $finalSupIds = [];
             if ($request->has('supervisor_ids')) {
-                $finalSupIds = array_filter($request->supervisor_ids, fn($v) => is_numeric($v));
+                $finalSupIds = array_filter($request->supervisor_ids, fn($v) => !empty($v));
             }
 
             if ($request->has('new_supervisors')) {
