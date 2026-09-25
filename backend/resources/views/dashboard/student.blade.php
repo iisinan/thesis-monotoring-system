@@ -223,13 +223,27 @@
                     @if($active_thesis && $supervisors->count() > 0)
                         <div class="space-y-3">
                             @foreach($supervisors as $assignment)
-                            <div class="flex items-center gap-3 p-3 bg-green-50 border border-green-100 rounded-xl">
-                                <div class="w-9 h-9 rounded-xl bg-green-200 flex items-center justify-center font-black text-sm text-green-800 shrink-0">
-                                    {{ substr($assignment->supervisor->user->name ?? '?', 0, 1) }}
+                            <div class="flex items-center justify-between p-3 bg-green-50 border border-green-100 rounded-xl">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-9 h-9 rounded-xl bg-green-200 flex items-center justify-center font-black text-sm text-green-800 shrink-0">
+                                        {{ substr($assignment->supervisor->user->name ?? '?', 0, 1) }}
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-bold text-slate-800 truncate">{{ $assignment->supervisor->user->name ?? 'Not assigned' }}</p>
+                                        <p class="text-[10px] font-semibold text-green-600 uppercase tracking-wide">{{ ucfirst($assignment->role ?? 'Supervisor') }}</p>
+                                    </div>
                                 </div>
-                                <div class="min-w-0">
-                                    <p class="text-sm font-bold text-slate-800 truncate">{{ $assignment->supervisor->user->name ?? 'Not assigned' }}</p>
-                                    <p class="text-[10px] font-semibold text-green-600 uppercase tracking-wide">{{ ucfirst($assignment->role ?? 'Supervisor') }}</p>
+                                <div class="flex items-center gap-1 shrink-0 ml-2">
+                                    @if(isset($assignment->supervisor->user->email))
+                                    <a href="mailto:{{ $assignment->supervisor->user->email }}" title="Send Email" class="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 hover:text-green-600 hover:bg-green-100 transition-colors border border-slate-100 shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                    </a>
+                                    @endif
+                                    @if(isset($assignment->supervisor->user->id))
+                                    <a href="{{ route('inbox.compose', ['reply_to' => $assignment->supervisor->user->id]) }}" title="In-App Message" class="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 hover:text-green-600 hover:bg-green-100 transition-colors border border-slate-100 shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                                    </a>
+                                    @endif
                                 </div>
                             </div>
                             @endforeach
