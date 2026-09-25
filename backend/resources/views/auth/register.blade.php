@@ -725,9 +725,29 @@
                     }
                 }
 
+                // Check email format
+                let emailEl = document.querySelector(`[name="email"]`);
+                if(emailEl && emailEl.value) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(emailEl.value)) {
+                        setError(emailEl);
+                        this.errorMessage = 'Please enter a valid email address.';
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        return false;
+                    }
+                }
+
                 // Check passwords match
                 let pw = document.querySelector(`[name="password"]`);
                 let pw_conf = document.querySelector(`[name="password_confirmation"]`);
+                
+                if(pw && pw.value.length < 8) {
+                    setError(pw);
+                    this.errorMessage = 'The password field must be at least 8 characters.';
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return false;
+                }
+                
                 if(pw && pw_conf && pw.value !== pw_conf.value) {
                     setError(pw_conf);
                     this.errorMessage = 'The passwords you entered do not match.';
