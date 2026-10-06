@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create("seminar_grades", function (Blueprint $table) {
             $table->id();
             $table->foreignUuid("student_milestone_id")->constrained("student_milestones")->onDelete("cascade");
-            $table->foreignId("examiner_id")->constrained("users")->onDelete("cascade");
+            $table->foreignUuid("examiner_id")->constrained("users")->onDelete("cascade");
             $table->decimal("grade", 5, 2);
             $table->timestamps();
         });
