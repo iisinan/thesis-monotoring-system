@@ -40,11 +40,12 @@ RUN { \
     echo 'opcache.enable_cli=1'; \
 } > /usr/local/etc/php/conf.d/opcache-recommended.ini
 
-# Increase PHP upload limits
+# Increase PHP upload limits and disable execution timeout for long-running Octane daemons
 RUN { \
     echo 'upload_max_filesize=50M'; \
     echo 'post_max_size=50M'; \
     echo 'memory_limit=512M'; \
+    echo 'max_execution_time=0'; \
 } > /usr/local/etc/php/conf.d/uploads.ini
 
 # Install Composer
