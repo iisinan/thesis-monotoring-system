@@ -49,62 +49,70 @@ class MilestoneController extends Controller
         }
 
         if ($thesis) {
-            $thesis->load(['student.user', 'assignments.supervisor.user', 'internalExaminer.user']);
-            
-            $milestones = $thesis->milestones()
-                ->with(['template', 'submissions.submittedBy', 'messages.sender', 'unlockedBy'])
-                ->get()
-                ->sortBy('template.order');
-
-            $templatesCount = \App\Models\MilestoneTemplate::whereNull('program_id')
-                ->orWhere('program_id', $thesis->student->program_id ?? null)
-                ->count();
-
-            if ($milestones->count() < $templatesCount || $milestones->isEmpty()) {
-                $thesis->syncMilestones();
+            try {
+                $thesis->load(['student.user', 'assignments.supervisor.user', 'internalExaminer.user']);
+                
                 $milestones = $thesis->milestones()
                     ->with(['template', 'submissions.submittedBy', 'messages.sender', 'unlockedBy'])
                     ->get()
                     ->sortBy('template.order');
-            }
-            
-            // Get supervisors
-            $supervisors = $thesis->assignments->map(function ($assignment) {
-                return $assignment->supervisor;
-            })->filter();
 
-            // Always get program coordinators
-            $coordinators = collect();
-            if ($thesis->student && $thesis->student->program_id) {
-                $coordinators = \App\Models\CoordinatorProfile::where('program_id', '=', $thesis->student->program_id)
-                    ->where('active', '=', true)
-                    ->with('user')
-                    ->get();
-            }
+                $templatesCount = \App\Models\MilestoneTemplate::whereNull('program_id')
+                    ->orWhere('program_id', $thesis->student->program_id ?? null)
+                    ->count();
 
-            // Internal Examiner
-            $internalExaminer = $thesis->internalExaminer;
-
-            // All supervisors for assignment (Coordinators/Admins only) - Restricted by Program Scope
-            $allSupervisors = collect();
-            if ($user->hasAnyRole(['Program Coordinator', 'Admin']) && $thesis->student) {
-                $allSupervisors = \App\Models\SupervisorProfile::with('user')
-                    ->whereHas('programs', function($q) use ($thesis) {
-                        $q->where('programs.id', $thesis->student->program_id);
-                    })
-                    ->get();
-            }
-
-            // Identify the "Ongoing" milestone (first one that's not 100% complete)
-            $ongoingMilestoneId = null;
-            foreach ($milestones as $m) {
-                if (!$m->progress_track['is_fully_complete']) {
-                    $ongoingMilestoneId = $m->id;
-                    break;
+                if ($milestones->count() < $templatesCount || $milestones->isEmpty()) {
+                    $thesis->syncMilestones();
+                    $milestones = $thesis->milestones()
+                        ->with(['template', 'submissions.submittedBy', 'messages.sender', 'unlockedBy'])
+                        ->get()
+                        ->sortBy('template.order');
                 }
-            }
+                
+                // Get supervisors
+                $supervisors = $thesis->assignments->map(function ($assignment) {
+                    return $assignment->supervisor;
+                })->filter();
 
-            return view('milestones.index', compact('milestones', 'supervisors', 'coordinators', 'thesis', 'internalExaminer', 'allSupervisors', 'ongoingMilestoneId'));
+                // Always get program coordinators
+                $coordinators = collect();
+                if ($thesis->student && $thesis->student->program_id) {
+                    $coordinators = \App\Models\CoordinatorProfile::where('program_id', '=', $thesis->student->program_id)
+                        ->where('active', '=', true)
+                        ->with('user')
+                        ->get();
+                }
+
+                // Internal Examiner
+                $internalExaminer = $thesis->internalExaminer;
+
+                // All supervisors for assignment (Coordinators/Admins only) - Restricted by Program Scope
+                $allSupervisors = collect();
+                if ($user->hasAnyRole(['Program Coordinator', 'Admin']) && $thesis->student) {
+                    $allSupervisors = \App\Models\SupervisorProfile::with('user')
+                        ->whereHas('programs', function($q) use ($thesis) {
+                            $q->where('programs.id', $thesis->student->program_id);
+                        })
+                        ->get();
+                }
+
+                // Identify the "Ongoing" milestone (first one that's not 100% complete)
+                $ongoingMilestoneId = null;
+                foreach ($milestones as $m) {
+                    if (!$m->progress_track['is_fully_complete']) {
+                        $ongoingMilestoneId = $m->id;
+                        break;
+                    }
+                }
+
+                return response(view('milestones.index', compact('milestones', 'supervisors', 'coordinators', 'thesis', 'internalExaminer', 'allSupervisors', 'ongoingMilestoneId'))->render());
+            } catch (\Throwable $e) {
+                \Log::error('Milestones index failed: ' . $e->getMessage(), ['file' => $e->getFile(), 'line' => $e->getLine()]);
+                if ($user->hasRole('Admin')) {
+                    return response('<pre style="white-space:pre-wrap;font-size:12px">' . e(get_class($e) . ': ' . $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine() . "\n\n" . $e->getTraceAsString()) . '</pre>', 200);
+                }
+                throw $e;
+            }
         }
         
         return redirect()->route('dashboard');

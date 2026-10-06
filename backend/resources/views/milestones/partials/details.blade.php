@@ -646,43 +646,6 @@
                                                     View Document
                                                 </button>
                                                 
-                                                @if(auth()->user()->hasRole(['Supervisor', 'Admin']))
-                                                    @if($submission->feedback && in_array($submission->feedback->decision, ['approved', 'revision_required']))
-                                                        @if($submission->feedback->decision === 'approved')
-                                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                                                                Upload Accepted
-                                                            </span>
-                                                        @else
-                                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                                                Upload Rejected
-                                                            </span>
-                                                        @endif
-                                                    @endif
-                                                @endif
-                                            </div>
-
-                                            @if(auth()->user()->hasRole(['Supervisor', 'Admin']) && (!$submission->feedback || !in_array($submission->feedback->decision, ['approved', 'revision_required'])))
-                                                <form method="POST" x-data="{ remarks: '' }" @submit="if(!remarks.trim()) { alert('A comment is required to accept or reject the upload.'); event.preventDefault(); }" class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 shadow-sm w-full max-w-sm mt-1">
-                                                    @csrf
-                                                    <textarea name="remarks" x-model="remarks" rows="2" class="w-full text-xs rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 mb-2 p-2.5 shadow-sm resize-none bg-white placeholder:text-slate-400" placeholder="Required: Explain your decision..." required></textarea>
-                                                    
-                                                    <div class="flex gap-2">
-                                                        <button type="submit" formaction="{{ route('milestones.accept_upload', $milestone) }}" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold transition-colors">
-                                                            Accept Upload
-                                                        </button>
-                                                        <button type="submit" formaction="{{ route('milestones.reject_upload', $milestone) }}" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-xl text-xs font-bold transition-colors">
-                                                            Reject Upload
-                                                        </button>
-                                                    </div>
-                                                </form>
-                                            @endif
-                                        </div>
-                                                        </span>
-                                                    @endif
-                                                @endif
-                                            @else
                                                 @if($submission->feedback && $submission->feedback->decision === 'approved')
                                                     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
                                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
@@ -694,6 +657,28 @@
                                                         Upload Rejected
                                                     </span>
                                                 @endif
+                                            </div>
+
+                                            @if($submission->feedback && in_array($submission->feedback->decision, ['approved', 'revision_required']) && !empty($submission->feedback->remarks))
+                                                <div class="w-full max-w-sm text-xs rounded-xl p-3 border {{ $submission->feedback->decision === 'approved' ? 'bg-emerald-50/60 border-emerald-100 text-emerald-900' : 'bg-rose-50/60 border-rose-100 text-rose-900' }}">
+                                                    <p class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Supervisor Comment</p>
+                                                    <p class="whitespace-pre-line">{{ $submission->feedback->remarks }}</p>
+                                                </div>
+                                            @endif
+
+                                            @if(auth()->user()->hasRole(['Supervisor', 'Admin']) && (!$submission->feedback || !in_array($submission->feedback->decision, ['approved', 'revision_required'])))
+                                                <form method="POST" x-data="{ remarks: '' }" @submit="if(!remarks.trim()) { alert('A comment is required to accept or reject the upload.'); $event.preventDefault(); }" class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 shadow-sm w-full max-w-sm mt-1">
+                                                    @csrf
+                                                    <textarea name="remarks" x-model="remarks" rows="2" class="w-full text-xs rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 mb-2 p-2.5 shadow-sm resize-none bg-white placeholder:text-slate-400" placeholder="Required: Explain your decision..." required></textarea>
+                                                    <div class="flex gap-2">
+                                                        <button type="submit" formaction="{{ route('milestones.accept_upload', $milestone) }}" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold transition-colors">
+                                                            Accept Upload
+                                                        </button>
+                                                        <button type="submit" formaction="{{ route('milestones.reject_upload', $milestone) }}" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-xl text-xs font-bold transition-colors">
+                                                            Reject Upload
+                                                        </button>
+                                                    </div>
+                                                </form>
                                             @endif
                                         </div>
                                     </div>
