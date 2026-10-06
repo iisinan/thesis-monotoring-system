@@ -120,12 +120,18 @@ class MilestoneController extends Controller
             abort(403, 'Unauthorized. Only the assigned supervisor or an administrator can review uploaded documents.');
         }
 
+        $request->validate([
+            'remarks' => 'required|string|max:2000'
+        ], [
+            'remarks.required' => 'A comment is required to explain your decision.'
+        ]);
+
         $workflowService = app(\App\Services\MilestoneWorkflowService::class);
         $summary = $workflowService->recordSupervisorReview(
             $milestone,
             $user,
             'approved',
-            $request->input('remarks', 'Document accepted by supervisor.')
+            $request->input('remarks')
         );
 
         $workflowService->notifyUpdate($milestone, "Supervisor {$user->name} accepted the uploaded document for: {$milestone->template->name}");
@@ -144,14 +150,18 @@ class MilestoneController extends Controller
             abort(403, 'Unauthorized. Only the assigned supervisor or an administrator can review uploaded documents.');
         }
 
-        $remarks = $request->input('remarks', 'Document requires revision. Please check supervisor notes and upload a new version.');
+        $request->validate([
+            'remarks' => 'required|string|max:2000'
+        ], [
+            'remarks.required' => 'A comment is required to explain your decision.'
+        ]);
 
         $workflowService = app(\App\Services\MilestoneWorkflowService::class);
         $workflowService->recordSupervisorReview(
             $milestone,
             $user,
             'rejected',
-            $remarks
+            $request->input('remarks')
         );
 
         $workflowService->notifyUpdate($milestone, "Supervisor {$user->name} requested revisions for: {$milestone->template->name}");

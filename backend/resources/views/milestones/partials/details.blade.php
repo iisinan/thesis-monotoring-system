@@ -633,55 +633,52 @@
                                                 </div>
                                             @endif
                                         </div>
-                                        <div class="flex items-center gap-2">
-                                            <button type="button"
-                                                @click.prevent="$dispatch('open-document-preview', { 
-                                                    url: '{{ Storage::url($submission->file_url) }}', 
-                                                    title: 'Submission v.0{{ $submission->version }}',
-                                                    type: '{{ str_ends_with(strtolower($submission->file_url), '.pdf') ? 'pdf' : 'document' }}'
-                                                })"
-                                                class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors shadow-xl shadow-slate-200/40 w-fit">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                                                View Document
-                                            </button>
-                                            
-                                            @if(auth()->user()->hasRole(['Supervisor', 'Admin']))
-                                                @if(!$submission->feedback || !in_array($submission->feedback->decision, ['approved', 'revision_required']))
-                                                    <div class="mt-2 w-full" x-data="{ showReviewForm: false, remarks: '' }">
-                                                        <button x-show="!showReviewForm" @click="showReviewForm = true" type="button" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-colors shadow-xl shadow-indigo-600/20">
-                                                            Review Document
+                                        <div class="flex flex-col items-end gap-3 w-full">
+                                            <div class="flex items-center gap-2">
+                                                <button type="button"
+                                                    @click.prevent="$dispatch('open-document-preview', { 
+                                                        url: '{{ Storage::url($submission->file_url) }}', 
+                                                        title: 'Submission v.0{{ $submission->version }}',
+                                                        type: '{{ str_ends_with(strtolower($submission->file_url), '.pdf') ? 'pdf' : 'document' }}'
+                                                    })"
+                                                    class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors shadow-xl shadow-slate-200/40 w-fit">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                                    View Document
+                                                </button>
+                                                
+                                                @if(auth()->user()->hasRole(['Supervisor', 'Admin']))
+                                                    @if($submission->feedback && in_array($submission->feedback->decision, ['approved', 'revision_required']))
+                                                        @if($submission->feedback->decision === 'approved')
+                                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                                                                Upload Accepted
+                                                            </span>
+                                                        @else
+                                                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                                                Upload Rejected
+                                                            </span>
+                                                        @endif
+                                                    @endif
+                                                @endif
+                                            </div>
+
+                                            @if(auth()->user()->hasRole(['Supervisor', 'Admin']) && (!$submission->feedback || !in_array($submission->feedback->decision, ['approved', 'revision_required'])))
+                                                <form method="POST" x-data="{ remarks: '' }" @submit="if(!remarks.trim()) { alert('A comment is required to accept or reject the upload.'); event.preventDefault(); }" class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 shadow-sm w-full max-w-sm mt-1">
+                                                    @csrf
+                                                    <textarea name="remarks" x-model="remarks" rows="2" class="w-full text-xs rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 mb-2 p-2.5 shadow-sm resize-none bg-white placeholder:text-slate-400" placeholder="Required: Explain your decision..." required></textarea>
+                                                    
+                                                    <div class="flex gap-2">
+                                                        <button type="submit" formaction="{{ route('milestones.accept_upload', $milestone) }}" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold transition-colors">
+                                                            Accept Upload
                                                         </button>
-                                                        
-                                                        <form x-show="showReviewForm" style="display: none;" method="POST" @submit="if(!remarks.trim()) { alert('A comment is required to accept or reject the upload.'); event.preventDefault(); }" class="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-sm mt-2 w-full max-w-md">
-                                                            @csrf
-                                                            <label class="block text-xs font-bold text-slate-700 mb-1">Supervisor Comment <span class="text-rose-500">*</span></label>
-                                                            <textarea name="remarks" x-model="remarks" rows="2" class="w-full text-xs rounded-lg border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 mb-2 p-2 shadow-sm" placeholder="Explain your decision..." required></textarea>
-                                                            
-                                                            <div class="flex gap-2">
-                                                                <button type="submit" formaction="{{ route('milestones.accept_upload', $milestone) }}" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-1.5 rounded-lg text-xs font-bold transition-colors inline-flex items-center justify-center gap-1 shadow-sm">
-                                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                                                    Accept Upload
-                                                                </button>
-                                                                <button type="submit" formaction="{{ route('milestones.reject_upload', $milestone) }}" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-1.5 rounded-lg text-xs font-bold transition-colors inline-flex items-center justify-center gap-1 shadow-sm">
-                                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                                                    Reject Upload
-                                                                </button>
-                                                            </div>
-                                                            <div class="mt-2 text-center">
-                                                                <button type="button" @click="showReviewForm = false" class="text-[10px] font-bold text-slate-500 hover:text-slate-700 uppercase tracking-widest transition-colors">Cancel</button>
-                                                            </div>
-                                                        </form>
+                                                        <button type="submit" formaction="{{ route('milestones.reject_upload', $milestone) }}" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-xl text-xs font-bold transition-colors">
+                                                            Reject Upload
+                                                        </button>
                                                     </div>
-                                                @else
-                                                    @if($submission->feedback->decision === 'approved')
-                                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                                                            Upload Accepted
-                                                        </span>
-                                                    @else
-                                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                                            Upload Rejected
+                                                </form>
+                                            @endif
+                                        </div>
                                                         </span>
                                                     @endif
                                                 @endif

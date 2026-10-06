@@ -272,31 +272,20 @@
                     </div>
 
                     @if(!$isSupervisorApproved && (auth()->user()->hasRole('Supervisor') || auth()->user()->hasRole('Admin')) && $milestone->submissions()->exists())
-                        <div x-data="{ showReview: false }" class="mt-3">
-                            <button x-show="!showReview" @click="showReview = true" type="button" class="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm">
-                                Review Document
-                            </button>
+                        <form method="POST" x-data="{ remarks: '' }" @submit="if(!remarks.trim()) { alert('A comment is required to accept or reject the upload.'); event.preventDefault(); }" class="mt-4 pt-4 border-t border-slate-100">
+                            @csrf
+                            <label class="block text-xs font-bold text-slate-700 mb-1.5">Review Decision <span class="text-rose-500">*</span></label>
+                            <textarea name="remarks" x-model="remarks" rows="2" class="w-full text-xs rounded-xl border-slate-200 focus:ring-indigo-500 focus:border-indigo-500 p-2.5 mb-2 shadow-sm resize-none bg-white placeholder:text-slate-400" placeholder="Required: Explain your decision..." required></textarea>
                             
-                            <form x-show="showReview" style="display: none;" method="POST" x-data="{ remarks: '' }" @submit="if(!remarks.trim()) { alert('A comment is required to accept or reject the upload.'); event.preventDefault(); }" class="bg-slate-50 p-3 rounded-xl border border-slate-200 shadow-inner">
-                                @csrf
-                                <label class="block text-xs font-bold text-slate-700 mb-1">Supervisor Comment <span class="text-rose-500">*</span></label>
-                                <textarea name="remarks" x-model="remarks" rows="2" class="w-full text-xs rounded-lg border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 mb-2 p-2 shadow-sm" placeholder="Please explain your decision..." required></textarea>
-                                
-                                <div class="flex gap-2">
-                                    <button type="submit" formaction="{{ route('milestones.accept_upload', $milestone) }}" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 rounded-lg text-xs font-bold transition-colors inline-flex items-center justify-center gap-1 shadow-sm">
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                        Accept
-                                    </button>
-                                    <button type="submit" formaction="{{ route('milestones.reject_upload', $milestone) }}" class="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-1.5 rounded-lg text-xs font-bold transition-colors inline-flex items-center justify-center gap-1 shadow-sm">
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                        Reject
-                                    </button>
-                                </div>
-                                <div class="mt-2 text-center">
-                                    <button type="button" @click="showReview = false" class="text-[10px] font-bold text-slate-500 hover:text-slate-700 uppercase tracking-widest transition-colors">Cancel</button>
-                                </div>
-                            </form>
-                        </div>
+                            <div class="flex gap-2">
+                                <button type="submit" formaction="{{ route('milestones.accept_upload', $milestone) }}" class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-xl text-xs font-bold transition-colors">
+                                    Accept Upload
+                                </button>
+                                <button type="submit" formaction="{{ route('milestones.reject_upload', $milestone) }}" class="flex-1 bg-rose-500 hover:bg-rose-600 text-white py-2 rounded-xl text-xs font-bold transition-colors">
+                                    Reject Upload
+                                </button>
+                            </div>
+                        </form>
                     @endif
                 </div>
 
