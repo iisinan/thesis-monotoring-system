@@ -105,11 +105,11 @@ class MilestoneController extends Controller
                     }
                 }
 
-                return response(view('milestones.index', compact('milestones', 'supervisors', 'coordinators', 'thesis', 'internalExaminer', 'allSupervisors', 'ongoingMilestoneId'))->render());
+                return view('milestones.index', compact('milestones', 'supervisors', 'coordinators', 'thesis', 'internalExaminer', 'allSupervisors', 'ongoingMilestoneId'));
             } catch (\Throwable $e) {
-                \Log::error('Milestones index failed: ' . $e->getMessage(), ['file' => $e->getFile(), 'line' => $e->getLine()]);
+                \Log::error('Milestones index failed: ' . $e->getMessage(), ['file' => $e->getFile(), 'line' => $e->getLine(), 'trace' => $e->getTraceAsString()]);
                 if ($user->hasRole('Admin')) {
-                    return response('<pre style="white-space:pre-wrap;font-size:12px">' . e(get_class($e) . ': ' . $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine() . "\n\n" . $e->getTraceAsString()) . '</pre>', 200);
+                    return response('<pre style="white-space:pre-wrap;font-size:12px;background:#fef2f2;color:#991b1b;padding:16px;border-radius:12px;">' . e(get_class($e) . ': ' . $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine()) . '</pre>', 500);
                 }
                 throw $e;
             }
