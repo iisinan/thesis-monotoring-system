@@ -45,13 +45,15 @@ class UserAccountMergeService
             // 1. Locate source user with fallback search
             $sourceUser = User::whereRaw('LOWER(TRIM(email)) = ?', [$sourceEmailNorm])->first();
             if (!$sourceUser) {
-                $sourceUser = User::where('email', 'like', '%onashoga%gmail%')->first();
+                $sourceUsername = explode('@', $sourceEmailNorm)[0];
+                $sourceUser = User::whereRaw('LOWER(TRIM(email)) LIKE ?', ['%' . strtolower(trim($sourceUsername)) . '%'])->first();
             }
 
             // 2. Locate target user with fallback search
             $targetUser = User::whereRaw('LOWER(TRIM(email)) = ?', [$targetEmailNorm])->first();
             if (!$targetUser) {
-                $targetUser = User::where('email', 'like', '%onashoga%funaab%')->first();
+                $targetUsername = explode('@', $targetEmailNorm)[0];
+                $targetUser = User::whereRaw('LOWER(TRIM(email)) LIKE ?', ['%' . strtolower(trim($targetUsername)) . '%'])->first();
             }
 
             if (!$sourceUser) {
@@ -171,11 +173,14 @@ class UserAccountMergeService
                     ->where('status', 'active')
                     ->count();
 
-                $targetSup->update([
+                $updateData = [
                     'current_load' => $activeLoad,
                     'max_students' => max($targetSup->max_students ?? 5, $activeLoad, 10),
-                    'rank' => $targetSup->rank ?: 'Professor',
-                ]);
+                ];
+                if (Schema::hasColumn('supervisor_profiles', 'rank')) {
+                    $updateData['rank'] = $targetSup->rank ?: 'Professor';
+                }
+                $targetSup->update($updateData);
             }
 
             // 3. Internal Examiner Profiles
@@ -394,6 +399,16 @@ class UserAccountMergeService
 
             // 18. Other potential user foreign keys
             DB::table('users')->where('creator_id', $sourceUser->id)->update(['creator_id' => $targetUser->id]);
+
+            if (Schema::hasTable('announcements') && Schema::hasColumn('announcements', 'created_by')) {
+                DB::table('announcements')->where('created_by', $sourceUser->id)->update(['created_by' => $targetUser->id]);
+            }
+            if (Schema::hasTable('cohorts') && Schema::hasColumn('cohorts', 'created_by')) {
+                DB::table('cohorts')->where('created_by', $sourceUser->id)->update(['created_by' => $targetUser->id]);
+            }
+            if (Schema::hasTable('document_templates') && Schema::hasColumn('document_templates', 'created_by')) {
+                DB::table('document_templates')->where('created_by', $sourceUser->id)->update(['created_by' => $targetUser->id]);
+            }
 
             if (Schema::hasTable('notifications')) {
                 DB::table('notifications')
