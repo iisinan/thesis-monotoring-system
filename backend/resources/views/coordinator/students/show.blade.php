@@ -308,7 +308,7 @@
                                                 <option value="" data-rank="">Choose Supervisor...</option>
                                                 @foreach($availableSupervisors as $sup)
                                                     <option value="{{ $sup->id }}" data-rank="{{ $sup->rank ?? '' }}">
-                                                        {{ $sup->user->name }} [{{ $sup->rank ?? 'Lecturer' }}] ({{ $sup->assignments->count() }}/{{ $sup->max_students }} Load)
+                                                        {{ $sup->user->name }}{{ $sup->user->email ? ' (' . $sup->user->email . ')' : '' }} [{{ $sup->rank ?? 'Lecturer' }}] ({{ $sup->assignments->count() }}/{{ $sup->max_students }} Load)
                                                     </option>
                                                 @endforeach
                                             </select>
@@ -487,7 +487,7 @@
                         <div class="relative">
                             <select name="supervisor_id" class="w-full bg-slate-50 border-slate-100 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold focus:ring-4 focus:ring-acetel-500/10 focus:border-acetel-500 py-3.5 sm:py-4 pl-4 sm:pl-5 pr-10 sm:pr-12 appearance-none shadow-sm" x-model="changeSupervisorId">
                                 @foreach($availableSupervisors as $sup)
-                                    <option value="{{ $sup->id }}">{{ $sup->user->name }} ({{ $sup->assignments->where('status', 'active')->count() }}/{{ $sup->max_students }} Load)</option>
+                                    <option value="{{ $sup->id }}">{{ $sup->user->name }}{{ $sup->user->email ? ' (' . $sup->user->email . ')' : '' }} ({{ $sup->assignments->where('status', 'active')->count() }}/{{ $sup->max_students }} Load)</option>
                                 @endforeach
                             </select>
                             <div class="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-slate-400">

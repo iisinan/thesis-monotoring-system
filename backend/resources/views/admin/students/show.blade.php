@@ -189,9 +189,49 @@
                     ? $student->thesis->assignments->where('status', 'active')->values()
                     : collect();
                 $canManageSupervisors = auth()->user()->hasRole('Admin');
+                $supervisorsJson = ($availableSupervisors ?? collect())->map(function($sup) {
+                    $name = $sup->user?->name ?? 'Supervisor';
+                    $email = $sup->user?->email ?? '';
+                    $rank = $sup->rank ?? 'Faculty';
+                    $load = (int) ($sup->current_load ?? 0);
+                    $max = (int) ($sup->max_students ?? 5);
+                    return [
+                        'id' => (string) $sup->id,
+                        'name' => $name,
+                        'email' => $email,
+                        'rank' => $rank,
+                        'load' => $load,
+                        'max' => $max,
+                        'search_text' => strtolower($name . ' ' . $email . ' ' . $rank),
+                        'display' => $name . ($email ? ' — ' . $email : '') . ' [' . $rank . '] (Load: ' . $load . '/' . $max . ')',
+                    ];
+                })->values();
             @endphp
             <div class="bg-white border border-slate-100 rounded-[2rem] p-8 shadow-sm"
-                 x-data="{ editingAssignmentId: null, showAddSupervisor: false, supFilter: '' }">
+                 x-data="{
+                     editingAssignmentId: null,
+                     showAddSupervisor: false,
+                     supFilter: '',
+                     selectedSupervisorId: '',
+                     supervisorsList: {{ \Illuminate\Support\Js::from($supervisorsJson) }},
+                     get filteredSupervisors() {
+                         const q = (this.supFilter || '').toLowerCase().trim();
+                         if (!q) return this.supervisorsList;
+                         const terms = q.split(/\s+/).filter(Boolean);
+                         return this.supervisorsList.filter(s =>
+                             terms.every(t => s.search_text.includes(t))
+                         );
+                     },
+                     get selectedSupervisor() {
+                         return this.supervisorsList.find(s => s.id === this.selectedSupervisorId) || null;
+                     },
+                     selectSupervisor(id) {
+                         this.selectedSupervisorId = id;
+                     },
+                     clearSearch() {
+                         this.supFilter = '';
+                     }
+                 }">
                 <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
                     <div>
                         <h4 class="text-lg font-black text-slate-900 tracking-tight">Supervision Cluster</h4>
@@ -225,37 +265,117 @@
 
                 @if($canManageSupervisors)
                     {{-- Add Supervisor Form --}}
-                    <div x-show="showAddSupervisor" x-cloak class="mb-5 p-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl space-y-3">
-                        <p class="text-[10px] font-black text-indigo-900 uppercase tracking-wider">Add Supervisor to Committee</p>
-                        <input type="text"
-                               x-model="supFilter"
-                               placeholder="Search faculty by name or rank..."
-                               class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700" />
+                    <div x-show="showAddSupervisor" x-cloak class="mb-5 p-5 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-4">
+                        <div class="flex items-center justify-between">
+                            <p class="text-[10px] font-black text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                </svg>
+                                Add Supervisor to Committee
+                            </p>
+                            <span class="text-[10px] font-bold text-indigo-600/80" x-text="`${filteredSupervisors.length} of ${supervisorsList.length} faculty available`"></span>
+                        </div>
+
+                        {{-- Search Filter by Name or Email --}}
+                        <div class="space-y-1.5">
+                            <label class="block text-[10px] font-black uppercase tracking-wider text-slate-600">
+                                Search Supervisor by Name or Email
+                            </label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                </div>
+                                <input type="text"
+                                       x-model="supFilter"
+                                       placeholder="Type name (e.g. Bukola) or email (e.g. onashogasa@...)"
+                                       class="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm" />
+                                <button type="button"
+                                        x-show="supFilter"
+                                        @click="clearSearch()"
+                                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 text-sm font-bold cursor-pointer">
+                                    &times;
+                                </button>
+                            </div>
+                        </div>
+
+                        {{-- Quick Clickable Matching Results (when typing in search) --}}
+                        <div x-show="supFilter.trim().length > 0" x-cloak class="max-h-52 overflow-y-auto bg-white border border-indigo-200 rounded-xl p-2 space-y-1 shadow-sm">
+                            <div class="flex items-center justify-between px-2 py-1 text-[9px] font-black uppercase tracking-wider text-indigo-600">
+                                <span>Matching Results (Click to Select)</span>
+                                <span x-text="`${filteredSupervisors.length} found`"></span>
+                            </div>
+                            <template x-for="sup in filteredSupervisors" :key="sup.id">
+                                <button type="button"
+                                        @click="selectSupervisor(sup.id)"
+                                        class="w-full text-left p-2.5 rounded-lg border transition-all flex items-center justify-between gap-2.5 cursor-pointer"
+                                        :class="selectedSupervisorId === sup.id ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-400' : 'bg-slate-50/70 hover:bg-indigo-50/50 border-slate-200/80'">
+                                    <div class="min-w-0 flex items-center gap-2.5">
+                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0"
+                                             x-text="sup.name.charAt(0)"></div>
+                                        <div class="min-w-0">
+                                            <p class="text-xs font-bold text-slate-900 truncate" x-text="sup.name"></p>
+                                            <p class="text-[11px] font-medium text-indigo-700 truncate" x-text="sup.email || 'No email'"></p>
+                                        </div>
+                                    </div>
+                                    <div class="text-right shrink-0">
+                                        <span class="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 uppercase" x-text="sup.rank"></span>
+                                        <p class="text-[9px] text-slate-500 font-bold mt-0.5" x-text="`Load: ${sup.load}/${sup.max}`"></p>
+                                    </div>
+                                </button>
+                            </template>
+                            <div x-show="filteredSupervisors.length === 0" class="p-4 text-center text-xs text-slate-500">
+                                No supervisors found matching "<span class="font-bold text-slate-800" x-text="supFilter"></span>" by name or email.
+                            </div>
+                        </div>
+
                         <form action="{{ route('admin.students.supervisors.store', $student) }}" method="POST" class="space-y-3">
                             @csrf
                             <div>
-                                <label class="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1">Supervisor</label>
-                                <select name="supervisor_profile_id" required class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2.5 px-3">
+                                <label class="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1">
+                                    Supervisor
+                                </label>
+                                <select name="supervisor_profile_id"
+                                        x-model="selectedSupervisorId"
+                                        required
+                                        class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2.5 px-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                                     <option value="">-- Choose Supervisor --</option>
-                                    @foreach($availableSupervisors ?? [] as $sup)
-                                        @php
-                                            $supDisplay = ($sup->user?->name ?? 'Supervisor') . ' [' . ($sup->rank ?? 'Faculty') . '] (Load: ' . ($sup->current_load ?? 0) . '/' . ($sup->max_students ?? 5) . ')';
-                                        @endphp
-                                        <option value="{{ $sup->id }}"
-                                                x-show="!supFilter || '{{ strtolower(addslashes(($sup->user?->name ?? '') . ' ' . ($sup->rank ?? '') . ' ' . ($sup->user?->email ?? ''))) }}'.includes(supFilter.toLowerCase())">
-                                            {{ $supDisplay }}
-                                        </option>
-                                    @endforeach
+                                    <template x-for="sup in filteredSupervisors" :key="sup.id">
+                                        <option :value="sup.id"
+                                                :selected="selectedSupervisorId === sup.id"
+                                                x-text="sup.display"></option>
+                                    </template>
                                 </select>
                             </div>
+
+                            {{-- Selected Supervisor Preview Card --}}
+                            <template x-if="selectedSupervisor">
+                                <div class="p-3 bg-white border border-indigo-200 rounded-xl flex items-center justify-between gap-3 shadow-sm">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0"
+                                             x-text="selectedSupervisor.name.charAt(0)"></div>
+                                        <div class="min-w-0">
+                                            <p class="text-xs font-black text-slate-900 truncate" x-text="selectedSupervisor.name"></p>
+                                            <p class="text-[10px] text-indigo-700 font-medium truncate" x-text="`${selectedSupervisor.email} • ${selectedSupervisor.rank} (Load: ${selectedSupervisor.load}/${selectedSupervisor.max})`"></p>
+                                        </div>
+                                    </div>
+                                    <button type="button" @click="selectedSupervisorId = ''" class="text-[10px] font-bold text-slate-400 hover:text-rose-600 transition shrink-0 cursor-pointer">
+                                        Change
+                                    </button>
+                                </div>
+                            </template>
+
                             <div>
                                 <label class="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1">Role</label>
-                                <select name="role" class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2.5 px-3">
+                                <select name="role" class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2.5 px-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
                                     <option value="primary" {{ $activeAssignments->isEmpty() ? 'selected' : '' }}>Lead Supervisor (Primary)</option>
                                     <option value="secondary" {{ $activeAssignments->isNotEmpty() ? 'selected' : '' }}>Co-Supervisor (Secondary)</option>
                                 </select>
                             </div>
-                            <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer">
+                            <button type="submit"
+                                    :disabled="!selectedSupervisorId"
+                                    class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition cursor-pointer">
                                 Save Supervisor
                             </button>
                         </form>
@@ -309,18 +429,54 @@
                             </div>
 
                             @if($canManageSupervisors)
-                                <div x-show="editingAssignmentId === '{{ $assoc->id }}'" x-cloak class="pt-3 border-t border-slate-100">
-                                    <form action="{{ route('admin.students.supervisors.update', [$student, $assoc]) }}" method="POST" class="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                <div x-show="editingAssignmentId === '{{ $assoc->id }}'"
+                                     x-cloak
+                                     x-data="{
+                                         replaceFilter: '',
+                                         selectedReplaceId: '{{ (string) $assoc->supervisor_profile_id }}',
+                                         get filteredReplaceSupervisors() {
+                                             const q = (this.replaceFilter || '').toLowerCase().trim();
+                                             if (!q) return supervisorsList;
+                                             const terms = q.split(/\s+/).filter(Boolean);
+                                             return supervisorsList.filter(s =>
+                                                 terms.every(t => s.search_text.includes(t))
+                                             );
+                                         }
+                                     }"
+                                     class="pt-3 border-t border-slate-100">
+                                    <form action="{{ route('admin.students.supervisors.update', [$student, $assoc]) }}" method="POST" class="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                                         @csrf
                                         @method('PATCH')
                                         <div>
-                                            <label class="block text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1">Replace With Supervisor</label>
-                                            <select name="supervisor_profile_id" required class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2 px-2.5">
-                                                @foreach($availableSupervisors ?? [] as $sup)
-                                                    <option value="{{ $sup->id }}" {{ (string) $sup->id === (string) $assoc->supervisor_profile_id ? 'selected' : '' }}>
-                                                        {{ $sup->user?->name ?? 'Supervisor' }} [{{ $sup->rank ?? 'Faculty' }}] ({{ $sup->current_load ?? 0 }}/{{ $sup->max_students ?? 5 }})
-                                                    </option>
-                                                @endforeach
+                                            <label class="block text-[9px] font-black uppercase tracking-wider text-slate-600 mb-1">
+                                                Search & Select Replacement Supervisor (by Name or Email)
+                                            </label>
+                                            <div class="relative mb-2">
+                                                <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                    </svg>
+                                                </div>
+                                                <input type="text"
+                                                       x-model="replaceFilter"
+                                                       placeholder="Filter replacement by name or email..."
+                                                       class="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                                <button type="button"
+                                                        x-show="replaceFilter"
+                                                        @click="replaceFilter = ''"
+                                                        class="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer">
+                                                    &times;
+                                                </button>
+                                            </div>
+                                            <select name="supervisor_profile_id"
+                                                    x-model="selectedReplaceId"
+                                                    required
+                                                    class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2 px-2.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                                <template x-for="sup in filteredReplaceSupervisors" :key="sup.id">
+                                                    <option :value="sup.id"
+                                                            :selected="selectedReplaceId === sup.id"
+                                                            x-text="sup.display"></option>
+                                                </template>
                                             </select>
                                         </div>
                                         <div>
@@ -330,11 +486,11 @@
                                                 <option value="secondary" {{ !$isLead ? 'selected' : '' }}>Co-Supervisor (Secondary)</option>
                                             </select>
                                         </div>
-                                        <div class="flex items-center justify-end gap-2">
+                                        <div class="flex items-center justify-end gap-2 pt-1">
                                             <button type="button" @click="editingAssignmentId = null" class="px-3 py-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-700 cursor-pointer">
                                                 Cancel
                                             </button>
-                                            <button type="submit" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer">
+                                            <button type="submit" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer shadow-sm">
                                                 Save Changes
                                             </button>
                                         </div>
@@ -349,7 +505,36 @@
                     @endforelse
 
                     @if($student->thesis)
-                        <div class="mt-6 pt-6 border-t border-slate-100" x-data="{ openAssign: false }">
+                        @php
+                            $examinersJson = ($internalExaminers ?? collect())->map(function($iex) {
+                                $name = $iex->user->name ?? 'Examiner';
+                                $email = $iex->user->email ?? '';
+                                $prog = $iex->program->code ?? $iex->program->name ?? 'Faculty';
+                                return [
+                                    'id' => (string) $iex->id,
+                                    'name' => $name,
+                                    'email' => $email,
+                                    'program' => $prog,
+                                    'search_text' => strtolower($name . ' ' . $email . ' ' . $prog),
+                                    'display' => $name . ($email ? ' — ' . $email : '') . ' [' . $prog . ']',
+                                ];
+                            })->values();
+                        @endphp
+                        <div class="mt-6 pt-6 border-t border-slate-100"
+                             x-data="{
+                                 openAssign: false,
+                                 examinerFilter: '',
+                                 selectedExaminerId: '{{ (string) ($student->thesis->internal_examiner_profile_id ?? '') }}',
+                                 examinersList: {{ \Illuminate\Support\Js::from($examinersJson) }},
+                                 get filteredExaminers() {
+                                     const q = (this.examinerFilter || '').toLowerCase().trim();
+                                     if (!q) return this.examinersList;
+                                     const terms = q.split(/\s+/).filter(Boolean);
+                                     return this.examinersList.filter(e =>
+                                         terms.every(t => e.search_text.includes(t))
+                                     );
+                                 }
+                             }">
                             <div class="flex items-center justify-between mb-3">
                                 <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Institutional Internal Examiner</p>
                                 @if($student->thesis->internalExaminer)
@@ -367,7 +552,9 @@
                                         </div>
                                         <div class="min-w-0">
                                             <p class="text-xs font-black text-white truncate">{{ $student->thesis->internalExaminer->user->name ?? 'N/A' }}</p>
-                                            <p class="text-[10px] text-slate-400 font-medium truncate">{{ $student->thesis->internalExaminer->program->name ?? 'Institutional Examiner' }}</p>
+                                            <p class="text-[10px] text-slate-400 font-medium truncate">
+                                                {{ $student->thesis->internalExaminer->user->email ?? '' }} &bull; {{ $student->thesis->internalExaminer->program->name ?? 'Institutional Examiner' }}
+                                            </p>
                                         </div>
                                     </div>
                                     <div class="px-2 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[8px] font-black uppercase tracking-widest shrink-0">Active</div>
@@ -390,15 +577,35 @@
                                     @csrf
                                     <div>
                                         <label class="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1.5">
-                                            Select Internal Examiner
+                                            Select Internal Examiner (Search by Name or Email)
                                         </label>
-                                        <select name="internal_examiner_profile_id" required class="w-full text-xs font-medium bg-white rounded-xl border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 py-2.5">
+                                        <div class="relative mb-2">
+                                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                                </svg>
+                                            </div>
+                                            <input type="text"
+                                                   x-model="examinerFilter"
+                                                   placeholder="Search examiner by name or email..."
+                                                   class="w-full pl-8 pr-7 py-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                            <button type="button"
+                                                    x-show="examinerFilter"
+                                                    @click="examinerFilter = ''"
+                                                    class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer">
+                                                &times;
+                                            </button>
+                                        </div>
+                                        <select name="internal_examiner_profile_id"
+                                                x-model="selectedExaminerId"
+                                                required
+                                                class="w-full text-xs font-medium bg-white rounded-xl border-slate-300 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 py-2.5 px-3">
                                             <option value="">-- Choose Faculty / Internal Examiner --</option>
-                                            @foreach($internalExaminers as $iex)
-                                                <option value="{{ $iex->id }}" {{ $student->thesis->internal_examiner_profile_id === $iex->id ? 'selected' : '' }}>
-                                                    {{ $iex->user->name ?? 'Examiner' }} ({{ $iex->program->code ?? $iex->program->name ?? 'Faculty' }})
-                                                </option>
-                                            @endforeach
+                                            <template x-for="iex in filteredExaminers" :key="iex.id">
+                                                <option :value="iex.id"
+                                                        :selected="selectedExaminerId === iex.id"
+                                                        x-text="iex.display"></option>
+                                            </template>
                                         </select>
                                     </div>
                                     <div class="flex items-center gap-2">
