@@ -268,7 +268,7 @@
                                 @if($template->requires_approval)
                                     <span class="px-2 py-1 rounded-lg bg-emerald-50 text-[9px] font-black text-emerald-600 uppercase tracking-widest border border-emerald-100">Approval</span>
                                 @endif
-                                @if($template->allow_defence_date)
+                                @if($template->allow_defence_date && $template->slug !== 'supervisors_assigned')
                                      <span class="px-2 py-1 rounded-lg bg-rose-50 text-[9px] font-black text-rose-600 uppercase tracking-widest border border-rose-100">Defence</span>
                                 @endif
                                 @if($template->is_final_archival)
@@ -277,7 +277,7 @@
                             </div>
                         </td>
                         <td class="px-6 py-7 text-right">
-                            @if($template->allow_defence_date)
+                            @if($template->allow_defence_date && $template->slug !== 'supervisors_assigned')
                                 <div x-data="{ 
                                     showDatePicker: false, 
                                     localDate: '{{ $template->global_defence_date ? $template->global_defence_date->format('Y-m-d') : '' }}',
@@ -465,14 +465,29 @@
                                         <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Students</p>
                                         <p class="text-2xl font-black text-slate-900">{{ $template->studentMilestones->count() }}</p>
                                     </div>
-                                    <div class="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
-                                        <p class="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Scheduled</p>
-                                        <p class="text-2xl font-black text-emerald-700">{{ $template->studentMilestones->filter(fn($m) => !empty($m->defence_date))->count() }}</p>
-                                    </div>
-                                    <div class="bg-amber-50 rounded-xl p-4 border border-amber-100">
-                                        <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Not Scheduled</p>
-                                        <p class="text-2xl font-black text-amber-700">{{ $template->studentMilestones->filter(fn($m) => empty($m->defence_date))->count() }}</p>
-                                    </div>
+                                    @if($template->slug === 'supervisors_assigned')
+                                        @php
+                                            $allocatedStudentsCount = $template->studentMilestones->filter(fn($m) => $m->thesis && $m->thesis->assignments->where('status', 'active')->count() > 0)->count();
+                                            $awaitingAllocationCount = $template->studentMilestones->count() - $allocatedStudentsCount;
+                                        @endphp
+                                        <div class="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                                            <p class="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Supervisors Allocated</p>
+                                            <p class="text-2xl font-black text-emerald-700">{{ $allocatedStudentsCount }}</p>
+                                        </div>
+                                        <div class="bg-amber-50 rounded-xl p-4 border border-amber-100">
+                                            <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Awaiting Allocation</p>
+                                            <p class="text-2xl font-black text-amber-700">{{ $awaitingAllocationCount }}</p>
+                                        </div>
+                                    @else
+                                        <div class="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                                            <p class="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Scheduled</p>
+                                            <p class="text-2xl font-black text-emerald-700">{{ $template->studentMilestones->filter(fn($m) => !empty($m->defence_date))->count() }}</p>
+                                        </div>
+                                        <div class="bg-amber-50 rounded-xl p-4 border border-amber-100">
+                                            <p class="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-1">Not Scheduled</p>
+                                            <p class="text-2xl font-black text-amber-700">{{ $template->studentMilestones->filter(fn($m) => empty($m->defence_date))->count() }}</p>
+                                        </div>
+                                    @endif
                                     @if(in_array('Supervisor', $template->required_approvers ?? []) || in_array($template->slug, ['proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence']))
                                     @php
                                         $summaryWorkflow = app(\App\Services\MilestoneWorkflowService::class);
@@ -496,6 +511,16 @@
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                         Export CSV
                                     </a>
+                                    @if($template->studentMilestones->count() > 0)
+                                    <a href="{{ isset($isCoordinator) && $isCoordinator ? route('coordinator.milestone-templates.export-student-emails', $template->id) : route('admin.milestone-templates.export-student-emails', $template->id) }}" 
+                                        class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-2xs"
+                                        title="Download all students' email addresses, phone numbers, matric numbers, and assigned supervisors">
+                                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                        </svg>
+                                        <span>Download Student Emails</span>
+                                    </a>
+                                    @endif
                                     @if($template->studentMilestones->count() > 0 || $template->slug === 'internal_defence')
                                     <button type="button" 
                                         @click="openMessageModal('all', 'none')"
@@ -592,7 +617,7 @@
                                     @endif
 
 
-                                    @if($scheduledCount > 0)
+                                    @if($scheduledCount > 0 && $template->slug !== 'supervisors_assigned')
                                         @if(!isset($isCoordinator) || !$isCoordinator)
                                             <button type="button" @click="showStudents = true; $nextTick(() => $refs.scheduleForm?.scrollIntoView({ behavior: 'smooth', block: 'center' }))"
                                                 class="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm">
@@ -1564,7 +1589,7 @@
                                 @endif
 
                                 {{-- Schedule Form (Admin only) --}}
-                                @if($template->studentMilestones->count() > 0 && (!isset($isCoordinator) || !$isCoordinator))
+                                @if($template->studentMilestones->count() > 0 && (!isset($isCoordinator) || !$isCoordinator) && $template->slug !== 'supervisors_assigned')
                                 <div x-ref="scheduleForm" x-show="showStudents" x-cloak class="mb-6 bg-gradient-to-br from-slate-50 via-emerald-50/20 to-white p-5 rounded-2xl border border-emerald-100 shadow-sm">
                                     <form action="{{ route('admin.milestone-templates.schedule') }}" method="POST"
                                         x-data="{
@@ -1957,6 +1982,16 @@
                                                 <span>Email / Message All ({{ $template->studentMilestones->count() }})</span>
                                             </button>
 
+                                            {{-- Download All Student Emails --}}
+                                            <a href="{{ isset($isCoordinator) && $isCoordinator ? route('coordinator.milestone-templates.export-student-emails', $template->id) : route('admin.milestone-templates.export-student-emails', $template->id) }}"
+                                                class="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-bold transition active:scale-95 whitespace-nowrap cursor-pointer border border-emerald-200"
+                                                title="Download all students' email addresses, phone numbers, matric numbers, and assigned supervisors">
+                                                <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                                </svg>
+                                                <span>Download Student Emails</span>
+                                            </a>
+
                                             @if($template->slug === 'internal_defence' || $showDegreeFilter)
                                             <button type="button" 
                                                 @click="openMessageModal('all', degreeFilter === 'PhD' ? 'phd' : 'msc')"
@@ -2027,7 +2062,7 @@
                                                         <th class="px-4 py-3 font-semibold text-slate-700">Discipline Track</th>
                                                         @endif
                                                         <th class="px-4 py-3 font-semibold text-slate-700">Status</th>
-                                                        <th class="px-4 py-3 font-semibold text-slate-700">{{ $template->allow_defence_date ? 'Schedule & Meeting' : ($template->slug === 'supervisors_assigned' ? 'Assigned Supervisors' : 'Details') }}</th>
+                                                        <th class="px-4 py-3 font-semibold text-slate-700">{{ $template->slug === 'supervisors_assigned' ? 'Assigned Supervisors' : ($template->allow_defence_date ? 'Schedule & Meeting' : 'Details') }}</th>
                                                         @if(in_array($template->slug, ['seminar_as_a_course', 'proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence']))
                                                         <th class="px-4 py-3 font-semibold text-slate-700">Examiner(s)</th>
                                                         @if($template->slug === 'seminar_as_a_course')
@@ -2141,6 +2176,7 @@
                                                                 }
                                                             }
                                                             $studentName = $sm->thesis->student->user->name ?? 'N/A';
+                                                            $studentEmail = $sm->thesis->student->user->email ?? '';
                                                             $matricNo = $sm->thesis->student->student_id_number ?? 'N/A';
                                                             $cohortId = $sm->thesis->student->cohort_id ?? '';
                                                             $rawDegree = $sm->thesis?->student?->level?->name 
@@ -2150,7 +2186,7 @@
                                                             $isGraded = ($event && $event->evaluations->count() > 0) || $workflow->hasBeenGraded($sm);
                                                         @endphp
                                                         <tr data-milestone-id="{{ $sm->id }}" data-supervisor-approved="{{ $workflow->isSupervisorApproved($sm) ? '1' : '0' }}" class="hover:bg-slate-50/50 transition-colors" 
-                                                            x-show="(trackFilter === 'all' || trackFilter === '{{ $sm->discipline_group }}') && (degreeFilter === 'all' || degreeFilter === '{{ $rowDegreeType }}') && (cohortFilter === '' || cohortFilter == '{{ $cohortId }}') && (!search || '{{ strtolower($studentName) }}'.includes(search.toLowerCase()) || '{{ strtolower($matricNo) }}'.includes(search.toLowerCase()))">
+                                                            x-show="(trackFilter === 'all' || trackFilter === '{{ $sm->discipline_group }}') && (degreeFilter === 'all' || degreeFilter === '{{ $rowDegreeType }}') && (cohortFilter === '' || cohortFilter == '{{ $cohortId }}') && (!search || '{{ strtolower($studentName) }}'.includes(search.toLowerCase()) || '{{ strtolower($matricNo) }}'.includes(search.toLowerCase()) || '{{ strtolower($studentEmail) }}'.includes(search.toLowerCase()))">
                                                             @if((!isset($isCoordinator) || !$isCoordinator) || $template->slug === 'internal_defence')
                                                             <td class="px-4 py-3">
                                                                 <div class="flex items-center gap-1.5">
@@ -2173,6 +2209,9 @@
                                                                         {{ $rowDegreeType }}
                                                                     </span>
                                                                 </div>
+                                                                @if($studentEmail)
+                                                                <div class="text-[11px] text-slate-400 truncate max-w-[220px] mt-0.5" title="{{ $studentEmail }}">{{ $studentEmail }}</div>
+                                                                @endif
                                                             </td>
                                                             @if($template->slug === 'seminar_as_a_course')
                                                             <td class="px-4 py-3">
@@ -2388,7 +2427,7 @@
                                                                         </div>
                                                                         @if((!isset($isCoordinator) || !$isCoordinator) && $sm->status !== 'approved')
                                                                             <div class="p-1.5 border-b border-slate-100 space-y-1">
-                                                                                @if(!$isGraded && !$isPostDefRow)
+                                                                                @if(!$isGraded && !$isPostDefRow && $template->slug !== 'supervisors_assigned')
                                                                                     @if(!empty($sm->defence_date))
                                                                                     <button type="button" 
                                                                                         @click="menuOpen = false; slotModalOpen = true; slotStudentId = '{{ $sm->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($sm->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $sm->defence_time ? \Carbon\Carbon::parse($sm->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($sm->meeting_link ?? '') }}'; slotTrack = '{{ $sm->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $sm->id]) }}'"
@@ -2438,7 +2477,7 @@
                                                                                     <span>Assign Examiner(s)</span>
                                                                                 </button>
                                                                                 @endif
-                                                                                @if(!$isPostDefRow && (!empty($sm->defence_date) || in_array($template->slug, ['seminar_as_a_course', 'proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence'])))
+                                                                                @if(!$isPostDefRow && $template->slug !== 'supervisors_assigned' && (!empty($sm->defence_date) || in_array($template->slug, ['seminar_as_a_course', 'proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence'])))
                                                                                 <form action="{{ route('milestones.end_presentation', $sm) }}" method="POST">
                                                                                     @csrf
                                                                                     <button type="submit" 

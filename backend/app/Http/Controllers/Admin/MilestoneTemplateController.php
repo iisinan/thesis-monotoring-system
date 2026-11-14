@@ -500,6 +500,10 @@ class MilestoneTemplateController extends Controller
                 $template = $milestone->template;
                 $scheduledTemplate = $scheduledTemplate ?? $template;
 
+                if ($template && $template->slug === 'supervisors_assigned') {
+                    continue; // Presentation scheduling is not applicable on Supervisors Assigned milestone
+                }
+
                 if ($thesis && $template && $thesis->isExemptFromMilestone($template)) {
                     continue;
                 }
@@ -1136,6 +1140,10 @@ class MilestoneTemplateController extends Controller
 
         if ($milestone->milestone_template_id !== $template->id) {
             abort(404, 'Milestone does not belong to this template.');
+        }
+
+        if ($template->slug === 'supervisors_assigned') {
+            return back()->with('error', 'Presentation scheduling is not applicable to the Supervisors Assigned milestone.');
         }
 
         $request->validate([
@@ -2165,7 +2173,7 @@ class MilestoneTemplateController extends Controller
 
         $query = \App\Models\StudentMilestone::where('milestone_template_id', $template->id)
             ->whereIn('status', ['in_progress', 'submitted', 'revision_required', 'partially_approved'])
-            ->with(['thesis.student.user', 'thesis.student.program', 'thesis.student.level', 'thesis.defenceEvents.evaluations', 'submissions.feedback']);
+            ->with(['thesis.student.user', 'thesis.student.program', 'thesis.student.level', 'thesis.assignments.supervisor.user', 'thesis.defenceEvents.evaluations', 'submissions.feedback']);
             
         if ($isCoordinator) {
             $query->whereHas('thesis.student', function($sq) use ($coordinatorProgramId) {
@@ -2179,20 +2187,57 @@ class MilestoneTemplateController extends Controller
             
         $fileName = 'students_' . $template->slug . '.csv';
         $headers = [
-            "Content-type" => "text/csv",
+            "Content-type" => "text/csv; charset=UTF-8",
             "Content-Disposition" => "attachment; filename=$fileName",
             "Pragma" => "no-cache",
             "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
             "Expires" => "0"
         ];
 
-        $columns = ['Name', 'Matric Number', 'Status', 'Date Scheduled', 'Score'];
+        $isSupervisorsAssigned = $template->slug === 'supervisors_assigned';
+        $columns = $isSupervisorsAssigned
+            ? ['Name', 'Email', 'Matric Number', 'Phone Number', 'Degree Level', 'Program', 'Assigned Supervisors', 'Status']
+            : ['Name', 'Email', 'Matric Number', 'Status', 'Date Scheduled', 'Score'];
 
-        $callback = function() use($milestones, $columns, $template) {
+        $callback = function() use($milestones, $columns, $template, $isSupervisorsAssigned) {
             $file = fopen('php://output', 'w');
+            fwrite($file, "\xEF\xBB\xBF");
             fputcsv($file, $columns);
 
             foreach ($milestones as $milestone) {
+                $workflow = app(\App\Services\MilestoneWorkflowService::class);
+                if ($workflow->isPostDefencePhase($milestone)) {
+                    $statusLabel = $workflow->hasPostDefenceSubmission($milestone)
+                        ? 'Corrections Uploaded (Awaiting Examiner)'
+                        : 'Passed Presentation (Awaiting Corrections)';
+                } elseif ($workflow->isSupervisorApproved($milestone)) {
+                    $statusLabel = 'Approved by Supervisor';
+                } else {
+                    $statusLabel = ucfirst(str_replace('_', ' ', $milestone->status));
+                }
+
+                $student = $milestone->thesis?->student;
+                $studentUser = $student?->user;
+
+                if ($isSupervisorsAssigned) {
+                    $rawDegree = $student?->level?->name ?? $student?->program?->degree_type ?? ($student?->program?->name ?? '');
+                    $degreeType = str_contains(strtolower($rawDegree), 'phd') || str_contains(strtolower($rawDegree), 'doctor') ? 'PhD' : 'MSc';
+                    $activeAssignments = $milestone->thesis?->assignments?->where('status', 'active') ?? collect();
+                    $supNames = $activeAssignments->map(fn($a) => ($a->role === 'primary' ? '[Primary] ' : '') . ($a->supervisor?->user?->name ?? ''))->filter()->implode('; ');
+
+                    fputcsv($file, [
+                        $studentUser?->name ?? '',
+                        $studentUser?->email ?? '',
+                        $student?->student_id_number ?? '',
+                        $student?->phone_number ?? '',
+                        $degreeType,
+                        $student?->program?->name ?? ($student?->program?->code ?? ''),
+                        $supNames ?: 'Awaiting Allocation',
+                        $statusLabel,
+                    ]);
+                    continue;
+                }
+
                 $avgScore = 'N/A';
                 if ($template->slug === 'seminar_as_a_course') {
                     $event = current($milestone->thesis->defenceEvents->where('type', $template->defence_type ?? 'seminar')->all());
@@ -2233,23 +2278,105 @@ class MilestoneTemplateController extends Controller
                     }
                 }
 
-                $workflow = app(\App\Services\MilestoneWorkflowService::class);
-                if ($workflow->isPostDefencePhase($milestone)) {
-                    $statusLabel = $workflow->hasPostDefenceSubmission($milestone)
-                        ? 'Corrections Uploaded (Awaiting Examiner)'
-                        : 'Passed Presentation (Awaiting Corrections)';
-                } elseif ($workflow->isSupervisorApproved($milestone)) {
+                fputcsv($file, [
+                    $studentUser?->name ?? '',
+                    $studentUser?->email ?? '',
+                    $student?->student_id_number ?? '',
+                    $statusLabel,
+                    $milestone->defence_date ?? 'Not Scheduled',
+                    $avgScore
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function exportStudentEmails(MilestoneTemplate $template)
+    {
+        $user = auth()->user();
+        $isCoordinator = $user->hasRole('Program Coordinator');
+        $coordinatorProgramId = null;
+
+        if ($isCoordinator) {
+            $coordinatorProfile = $user->coordinatorProfiles()->where('active', true)->first();
+            $coordinatorProgramId = $coordinatorProfile ? $coordinatorProfile->program_id : -1;
+        }
+
+        $query = \App\Models\StudentMilestone::where('milestone_template_id', $template->id)
+            ->whereIn('status', ['in_progress', 'submitted', 'revision_required', 'partially_approved'])
+            ->with(['thesis.student.user', 'thesis.student.program', 'thesis.student.level', 'thesis.assignments.supervisor.user', 'submissions.feedback']);
+
+        if ($isCoordinator) {
+            $query->whereHas('thesis.student', function($sq) use ($coordinatorProgramId) {
+                $sq->where('program_id', $coordinatorProgramId);
+            });
+        }
+
+        $milestones = $query->get()
+            ->reject(fn($m) => $m->thesis && $m->thesis->isExemptFromMilestone($template))
+            ->values();
+
+        $fileName = 'student_emails_' . $template->slug . '_' . date('Y_m_d') . '.csv';
+        $headers = [
+            "Content-type" => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma" => "no-cache",
+            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
+            "Expires" => "0"
+        ];
+
+        $columns = [
+            'S/N',
+            'Student Name',
+            'Email Address',
+            'Matric Number',
+            'Phone Number',
+            'Degree Level',
+            'Program',
+            'Assigned Supervisor(s)',
+            'Supervisor Email(s)',
+            'Status',
+        ];
+
+        $callback = function() use($milestones, $columns) {
+            $file = fopen('php://output', 'w');
+            fwrite($file, "\xEF\xBB\xBF");
+            fputcsv($file, $columns);
+
+            $workflow = app(\App\Services\MilestoneWorkflowService::class);
+            $sn = 1;
+
+            foreach ($milestones as $milestone) {
+                $student = $milestone->thesis?->student;
+                $studentUser = $student?->user;
+                $rawDegree = $student?->level?->name ?? $student?->program?->degree_type ?? ($student?->program?->name ?? '');
+                $degreeType = str_contains(strtolower($rawDegree), 'phd') || str_contains(strtolower($rawDegree), 'doctor') ? 'PhD' : 'MSc';
+
+                $activeAssignments = $milestone->thesis?->assignments?->where('status', 'active') ?? collect();
+                $supNames = $activeAssignments->map(fn($a) => ($a->role === 'primary' ? '[Primary] ' : '') . ($a->supervisor?->user?->name ?? ''))->filter()->implode('; ');
+                $supEmails = $activeAssignments->map(fn($a) => $a->supervisor?->user?->email ?? '')->filter()->unique()->implode('; ');
+
+                if ($workflow->isSupervisorApproved($milestone)) {
                     $statusLabel = 'Approved by Supervisor';
+                } elseif ($milestone->submissions->isNotEmpty()) {
+                    $statusLabel = 'Doc Uploaded (Pending Review)';
                 } else {
                     $statusLabel = ucfirst(str_replace('_', ' ', $milestone->status));
                 }
 
                 fputcsv($file, [
-                    $milestone->thesis->student->user->name ?? '',
-                    $milestone->thesis->student->student_id_number ?? '',
+                    $sn++,
+                    $studentUser?->name ?? '',
+                    $studentUser?->email ?? '',
+                    $student?->student_id_number ?? '',
+                    $student?->phone_number ?? '',
+                    $degreeType,
+                    $student?->program?->name ?? ($student?->program?->code ?? ''),
+                    $supNames ?: 'Awaiting Allocation',
+                    $supEmails ?: 'N/A',
                     $statusLabel,
-                    $milestone->defence_date ?? 'Not Scheduled',
-                    $avgScore
                 ]);
             }
             fclose($file);

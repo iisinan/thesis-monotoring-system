@@ -106,6 +106,7 @@ Route::post('milestone-templates/{template}/date', [MilestoneTemplateController:
     Route::post('milestone-templates/{template}/bulk-assign-internal-examiner', [MilestoneTemplateController::class, 'bulkAssignInternalExaminer'])->name('milestone-templates.bulk-assign-internal-examiner');
     Route::get('milestone-templates/{template}/panel', [MilestoneTemplateController::class, 'showPanel'])->name('milestone-templates.panel');
     Route::get('milestone-templates/{template}/export-students', [MilestoneTemplateController::class, 'exportStudents'])->name('milestone-templates.export-students');
+    Route::get('milestone-templates/{template}/export-student-emails', [MilestoneTemplateController::class, 'exportStudentEmails'])->name('milestone-templates.export-student-emails');
     Route::get('milestone-templates/{template}/export-scheduled-scores', [MilestoneTemplateController::class, 'exportScheduledScores'])->name('milestone-templates.export-scheduled-scores');
     Route::get('milestone-templates/{template}/export-examiner-attendance', [MilestoneTemplateController::class, 'exportExaminerAttendance'])->name('milestone-templates.export-examiner-attendance');
     Route::get('milestone-templates/{template}/export-scheduled-pdf', [MilestoneTemplateController::class, 'exportScheduledPdf'])->name('milestone-templates.export-scheduled-pdf');
