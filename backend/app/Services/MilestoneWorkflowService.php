@@ -42,8 +42,8 @@ class MilestoneWorkflowService
             }
         }
 
-        // 1. Missing artifact
-        if ($template->requires_submission && $milestone->submissions()->count() === 0 && !$user->hasRole('Admin')) {
+        // 1. Missing artifact (Supervisors Assigned does not require a document upload once supervisors are attached or supplied)
+        if ($template->requires_submission && $template->slug !== 'supervisors_assigned' && $milestone->submissions()->count() === 0 && !$user->hasRole('Admin')) {
             return "Documentation Required: Student has not uploaded the required artifacts for this stage.";
         }
 
@@ -63,16 +63,12 @@ class MilestoneWorkflowService
             return "Submission Gated: Post-submission authorization is required before clearance.";
         }
 
-        // Supervisors Assigned validation: tentative proposal (or self-reported supervisors) + supervisor allocation
+        // Supervisors Assigned validation: student-supplied supervisors or coordinator-attached supervisors
         if ($template->slug === 'supervisors_assigned') {
-            $hasProposal = $milestone->submissions()->exists();
             $hasSupervisors = $milestone->thesis->assignments()->where('status', 'active')->exists();
             $hasSelfInserted = !empty($milestone->approvals['student_inserted_supervisors']);
-            if (!$hasProposal && !$hasSelfInserted && !$user->hasRole('Admin')) {
-                return "Tentative Proposal Required: Candidate must upload their tentative proposal or record existing supervisors before clearance.";
-            }
-            if (!$hasSupervisors && !$user->hasRole('Admin')) {
-                return "Supervision Required: Programme coordinator must assign supervisors before clearance.";
+            if (!$hasSupervisors && !$hasSelfInserted && !$user->hasRole('Admin')) {
+                return "Supervision Required: Candidate must supply their supervisors or have supervisors attached by the Program Coordinator before clearance.";
             }
         }
 
@@ -479,7 +475,12 @@ class MilestoneWorkflowService
      */
     public function hasBeenGraded(StudentMilestone $milestone): bool
     {
-        $type = $milestone->template?->defence_type ?? match($milestone->template?->slug) {
+        $slug = $milestone->template?->slug;
+        if ($slug === 'supervisors_assigned') {
+            return false;
+        }
+
+        $type = $milestone->template?->defence_type ?? match($slug) {
             'seminar_as_a_course' => 'seminar',
             'proposal_defence' => 'proposal',
             'progress_report_1' => 'progress_report_1',
@@ -489,12 +490,13 @@ class MilestoneWorkflowService
             default => null,
         };
 
+        if (!$type) {
+            return false;
+        }
+
         // 1. Check in-memory eager loaded defenceEvents to avoid N+1 queries
         if ($milestone->relationLoaded('thesis') && $milestone->thesis && $milestone->thesis->relationLoaded('defenceEvents')) {
-            $events = $milestone->thesis->defenceEvents;
-            if ($type) {
-                $events = $events->where('type', $type);
-            }
+            $events = $milestone->thesis->defenceEvents->where('type', $type);
             $hasEvals = $events->contains(function ($e) {
                 if ($e->relationLoaded('evaluations')) {
                     return $e->evaluations->isNotEmpty();
@@ -506,7 +508,7 @@ class MilestoneWorkflowService
             }
         } else {
             $events = $milestone->thesis?->defenceEvents()
-                ->when($type, fn($q) => $q->where('type', $type))
+                ->where('type', $type)
                 ->withCount('evaluations')
                 ->get() ?? collect();
 
@@ -515,14 +517,16 @@ class MilestoneWorkflowService
             }
         }
 
-        // 2. Check seminar_grades table if present
-        static $hasSeminarGradesTable = null;
-        if ($hasSeminarGradesTable === null) {
-            $hasSeminarGradesTable = \Illuminate\Support\Facades\Schema::hasTable('seminar_grades');
-        }
-        if ($hasSeminarGradesTable) {
-            if (\Illuminate\Support\Facades\DB::table('seminar_grades')->where('student_milestone_id', $milestone->id)->exists()) {
-                return true;
+        // 2. Check seminar_grades table if present (only for seminar_as_a_course)
+        if ($slug === 'seminar_as_a_course') {
+            static $hasSeminarGradesTable = null;
+            if ($hasSeminarGradesTable === null) {
+                $hasSeminarGradesTable = \Illuminate\Support\Facades\Schema::hasTable('seminar_grades');
+            }
+            if ($hasSeminarGradesTable) {
+                if (\Illuminate\Support\Facades\DB::table('seminar_grades')->where('student_milestone_id', $milestone->id)->exists()) {
+                    return true;
+                }
             }
         }
 
@@ -1290,9 +1294,10 @@ class MilestoneWorkflowService
 
     /**
      * Supervisors Assigned -> Proposal Defence.
-     * Advances automatically once active supervisors exist AND either:
-     *  (a) the student uploaded a tentative proposal (Coordinator-assigned flow), OR
-     *  (b) the student recorded their existing supervisors on the milestone.
+     * Advances automatically once the candidate is at Supervisors Assigned (or has completed earlier milestones)
+     * AND either:
+     *  (a) the student supplied their supervisors (2 for MSc, 3 for PhD), OR
+     *  (b) a Program Coordinator / Admin attached supervisor(s) to the student.
      */
     public function tryAutoAdvanceSupervisorsAssigned(?ThesisProject $project): bool
     {
@@ -1306,20 +1311,76 @@ class MilestoneWorkflowService
 
         if (!$milestone) return false;
 
-        // All earlier milestones (e.g. Seminar course) must be completed first.
-        $pendingEarlier = $project->milestones()
-            ->whereHas('template', fn($q) => $q->where('order', '<', $milestone->template->order))
-            ->where('status', '!=', 'approved')
-            ->exists();
-        if ($pendingEarlier) return false;
+        $isAlreadyAtStage = in_array($milestone->status, ['in_progress', 'submitted', 'partially_approved', 'revision_required'], true);
 
-        $hasProposal = $milestone->submissions()->exists();
-        $hasSelfInserted = !empty($milestone->approvals['student_inserted_supervisors']);
-        $hasSupervisors = $project->assignments()->where('status', 'active')->exists();
+        if (!$isAlreadyAtStage) {
+            // All earlier non-exempt milestones (e.g. Seminar course) must be completed first.
+            $earlierMilestones = $project->milestones()
+                ->with('template')
+                ->whereHas('template', fn($q) => $q->where('order', '<', $milestone->template->order))
+                ->where('status', '!=', 'approved')
+                ->get();
 
-        if ((!$hasProposal && !$hasSelfInserted) || !$hasSupervisors) return false;
+            $pendingEarlier = $earlierMilestones->contains(function ($m) use ($project) {
+                return !$project->isExemptFromMilestone($m->template);
+            });
+
+            if ($pendingEarlier) {
+                return false;
+            }
+        }
 
         $approvals = $milestone->approvals ?? [];
+        if (is_string($approvals)) {
+            $approvals = json_decode($approvals, true) ?: [];
+        }
+
+        $hasSelfInserted = !empty($approvals['student_inserted_supervisors']);
+
+        if ($hasSelfInserted && !$project->assignments()->where('status', 'active')->exists()) {
+            $insertedIds = $approvals['student_inserted_supervisors']['supervisor_profile_ids'] ?? [];
+            foreach (array_values(array_filter((array) $insertedIds)) as $idx => $supProfileId) {
+                if (\App\Models\SupervisorProfile::where('id', $supProfileId)->exists()) {
+                    SupervisionAssignment::firstOrCreate(
+                        [
+                            'thesis_project_id' => $project->id,
+                            'supervisor_profile_id' => $supProfileId,
+                        ],
+                        [
+                            'role' => $idx === 0 ? 'primary' : 'secondary',
+                            'status' => 'active',
+                            'assigned_at' => now(),
+                        ]
+                    );
+                }
+            }
+        }
+
+        $hasSupervisors = $project->assignments()->where('status', 'active')->exists();
+
+        if (!$hasSupervisors && !$hasSelfInserted) {
+            return false;
+        }
+
+        if ($isAlreadyAtStage) {
+            $earlierUnapproved = $project->milestones()
+                ->with('template')
+                ->whereHas('template', fn($q) => $q->where('order', '<', $milestone->template->order))
+                ->where('status', '!=', 'approved')
+                ->get();
+
+            foreach ($earlierUnapproved as $earlier) {
+                if ($project->isExemptFromMilestone($earlier->template)) {
+                    $earlier->delete();
+                } else {
+                    $earlier->update([
+                        'status' => 'approved',
+                        'approved_at' => $earlier->approved_at ?? now(),
+                    ]);
+                }
+            }
+        }
+
         if (($approvals['supervisor_request']['status'] ?? null) === 'pending') {
             $approvals['supervisor_request']['status'] = 'fulfilled';
             $approvals['supervisor_request']['fulfilled_at'] = now()->toDateTimeString();
@@ -1329,14 +1390,14 @@ class MilestoneWorkflowService
 
         $reason = $hasSelfInserted
             ? 'Auto-advanced: student recorded existing supervisory panel.'
-            : 'Auto-advanced: tentative proposal uploaded and supervisors assigned.';
+            : 'Auto-advanced: supervisors assigned to candidate.';
 
         $this->approveAndAdvance($milestone, $reason);
         $this->notifyUpdate(
             $milestone,
             $hasSelfInserted
                 ? 'Supervisory panel recorded — advanced to Proposal Defence.'
-                : 'Supervisors assigned and tentative proposal received — advanced to Proposal Defence.'
+                : 'Supervisors assigned — advanced to Proposal Defence.'
         );
 
         return true;

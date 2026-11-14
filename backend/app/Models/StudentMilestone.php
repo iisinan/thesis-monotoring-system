@@ -143,11 +143,11 @@ class StudentMilestone extends Model
             $tasks = [
                 [
                     'id' => 'tentative_proposal',
-                    'name' => $hasSelfInserted ? 'Supervisor Confirmation' : 'Tentative Proposal / Request',
-                    'completed' => $hasProposal || $hasSelfInserted || $isApproved,
+                    'name' => $hasSelfInserted ? 'Supervisor Confirmation' : 'Supervisor Allocation / Request',
+                    'completed' => $hasProposal || $hasSelfInserted || $hasSupervisors || $isApproved,
                     'details' => $hasSelfInserted
                         ? 'Existing supervisors inserted by candidate'
-                        : ($hasProposal ? 'Tentative proposal received' . ($requestPending ? ' & request sent to coordinator' : '') : 'Insert existing supervisors or upload tentative proposal (PDF)'),
+                        : ($hasSupervisors ? 'Supervisory panel allocated' : ($hasProposal ? 'Tentative proposal received' . ($requestPending ? ' & request sent to coordinator' : '') : 'Insert existing supervisors or upload tentative proposal (PDF)')),
                     'action_type' => 'none',
                 ],
                 [

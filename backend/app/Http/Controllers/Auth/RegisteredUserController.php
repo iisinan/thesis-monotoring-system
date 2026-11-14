@@ -533,6 +533,11 @@ class RegisteredUserController extends Controller
             // Sync project status based on highest completed milestone
             $this->syncProjectStatus($thesis, $completedIds, $templates);
 
+            // Auto-advance Supervisors Assigned -> Proposal Defence if candidate supplied their supervisors
+            if (!empty($finalSups)) {
+                app(\App\Services\MilestoneWorkflowService::class)->tryAutoAdvanceSupervisorsAssigned($thesis->fresh());
+            }
+
             DB::commit();
 
             Auth::login($user);

@@ -2116,15 +2116,18 @@
                                                                 $statusColor = 'bg-slate-100 text-slate-600';
                                                             }
                                                             
-                                                            $rowEventType = $template->defence_type ?? match($template->slug) {
-                                                                'seminar_as_a_course' => 'seminar',
-                                                                'proposal_defence' => 'proposal',
-                                                                'progress_report_1' => 'progress_report_1',
-                                                                'progress_report_2' => 'progress_report_2',
-                                                                'internal_defence' => 'internal',
-                                                                default => 'first_seminar',
-                                                            };
-                                                            $event = $sm->thesis ? current($sm->thesis->defenceEvents->where('type', $rowEventType)->all()) : null;
+                                                            $rowEventType = $template->slug === 'supervisors_assigned'
+                                                                ? null
+                                                                : ($template->defence_type ?? match($template->slug) {
+                                                                    'seminar_as_a_course' => 'seminar',
+                                                                    'proposal_defence' => 'proposal',
+                                                                    'progress_report_1' => 'progress_report_1',
+                                                                    'progress_report_2' => 'progress_report_2',
+                                                                    'internal_defence' => 'internal',
+                                                                    'viva' => 'external',
+                                                                    default => null,
+                                                                });
+                                                            $event = ($rowEventType && $sm->thesis) ? current($sm->thesis->defenceEvents->where('type', $rowEventType)->all()) : null;
                                                             $rowExaminers = $event ? $event->panelMembers->where('role', 'examiner') : collect();
                                                             if ($rowExaminers->isEmpty() && $template->slug === 'seminar_as_a_course') {
                                                                 $trackEx = match($sm->discipline_group) {
@@ -2183,17 +2186,19 @@
                                                                 ?? $sm->thesis?->student?->program?->degree_type 
                                                                 ?? ($sm->thesis?->student?->program?->name ?? '');
                                                             $rowDegreeType = str_contains(strtolower($rawDegree), 'phd') || str_contains(strtolower($rawDegree), 'doctor') ? 'PhD' : 'MSc';
-                                                            $isGraded = ($event && $event->evaluations->count() > 0) || $workflow->hasBeenGraded($sm);
+                                                            $isGraded = $template->slug !== 'supervisors_assigned'
+                                                                && $rowEventType !== null
+                                                                && (($event && $event->evaluations->count() > 0) || $workflow->hasBeenGraded($sm));
                                                         @endphp
                                                         <tr data-milestone-id="{{ $sm->id }}" data-supervisor-approved="{{ $workflow->isSupervisorApproved($sm) ? '1' : '0' }}" class="hover:bg-slate-50/50 transition-colors" 
                                                             x-show="(trackFilter === 'all' || trackFilter === '{{ $sm->discipline_group }}') && (degreeFilter === 'all' || degreeFilter === '{{ $rowDegreeType }}') && (cohortFilter === '' || cohortFilter == '{{ $cohortId }}') && (!search || '{{ strtolower($studentName) }}'.includes(search.toLowerCase()) || '{{ strtolower($matricNo) }}'.includes(search.toLowerCase()) || '{{ strtolower($studentEmail) }}'.includes(search.toLowerCase()))">
                                                             @if((!isset($isCoordinator) || !$isCoordinator) || $template->slug === 'internal_defence')
                                                             <td class="px-4 py-3">
                                                                 <div class="flex items-center gap-1.5">
-                                                                    @if(!$isGraded || $template->slug === 'internal_defence')
+                                                                    @if(!($isGraded && $template->slug === 'seminar_as_a_course'))
                                                                         <input type="checkbox" :value="'{{ $sm->id }}'" x-model="selected" class="rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer">
                                                                     @endif
-                                                                    @if($isGraded)
+                                                                    @if($isGraded && $template->slug === 'seminar_as_a_course')
                                                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200" title="Candidate already graded">Graded</span>
                                                                     @endif
                                                                 </div>

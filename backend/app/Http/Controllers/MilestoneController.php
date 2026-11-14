@@ -54,6 +54,7 @@ class MilestoneController extends Controller
 
         if ($thesis) {
             try {
+                app(\App\Services\MilestoneWorkflowService::class)->tryAutoAdvanceSupervisorsAssigned($thesis);
                 $thesis->load(['student.user', 'assignments.supervisor.user', 'internalExaminer.user']);
                 
                 $milestones = $thesis->milestones()

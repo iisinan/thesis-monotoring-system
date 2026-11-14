@@ -239,6 +239,8 @@ class SupervisorController extends Controller
                     'assigned_at' => now(),
                 ]);
             }
+
+            app(\App\Services\MilestoneWorkflowService::class)->tryAutoAdvanceSupervisorsAssigned($thesis->fresh());
             
             // Notifications logic
             $coordinatorId = auth()->id();

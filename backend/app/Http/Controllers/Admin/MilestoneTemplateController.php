@@ -67,6 +67,24 @@ class MilestoneTemplateController extends Controller
             $coordinatorProgramId = $coordinatorProfile ? $coordinatorProfile->program_id : -1;
         }
 
+        // Auto-advance any candidate currently on Supervisors Assigned who already has supervisors supplied/attached
+        try {
+            $workflow = app(\App\Services\MilestoneWorkflowService::class);
+            $readySupMilestones = \App\Models\StudentMilestone::whereHas('template', fn($q) => $q->where('slug', 'supervisors_assigned'))
+                ->whereIn('status', ['in_progress', 'submitted', 'partially_approved', 'revision_required'])
+                ->whereHas('thesis.assignments', fn($aq) => $aq->where('status', 'active'))
+                ->with('thesis')
+                ->get();
+
+            foreach ($readySupMilestones as $readySm) {
+                if ($readySm->thesis) {
+                    $workflow->tryAutoAdvanceSupervisorsAssigned($readySm->thesis);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Auto-advance sync on Supervisors Assigned panel load failed: ' . $e->getMessage());
+        }
+
         $query = MilestoneTemplate::with('program')
             ->with(['studentMilestones' => function ($q) use ($isCoordinator, $coordinatorProgramId) {
                 $q->whereIn('status', ['in_progress', 'submitted', 'revision_required', 'partially_approved'])

@@ -387,4 +387,60 @@ class SupervisorsAssignedMilestoneTest extends TestCase
         $this->assertEquals('approved', $supMilestone->status);
         $this->assertEquals('fulfilled', $supMilestone->approvals['supervisor_request']['status'] ?? null);
     }
+
+    #[Test]
+    public function coordinator_attaching_supervisors_without_proposal_upload_advances_student_to_proposal_defence(): void
+    {
+        Notification::fake();
+
+        [, , $thesis, $supMilestone] = $this->createStudentAtSupervisorsAssigned(
+            $this->mscLevel,
+            'Bola Adeyemi',
+            'NOU267778889'
+        );
+
+        $prof = $this->createSupervisor('Prof. Lead Chair', 'Professor', $this->program);
+        $co = $this->createSupervisor('Dr. Co Reader', 'Senior Lecturer', $this->program);
+
+        app(ThesisService::class)->replaceSupervisors($thesis, [$prof->id, $co->id]);
+
+        $supMilestone->refresh();
+        $this->assertEquals('approved', $supMilestone->status);
+
+        $proposalMilestone = StudentMilestone::where('thesis_project_id', $thesis->id)
+            ->whereHas('template', fn ($q) => $q->where('slug', 'proposal_defence'))
+            ->firstOrFail();
+        $this->assertEquals('in_progress', $proposalMilestone->status);
+    }
+
+    #[Test]
+    public function seminar_course_grade_does_not_mark_supervisors_assigned_milestone_as_graded(): void
+    {
+        [, , $thesis, $supMilestone] = $this->createStudentAtSupervisorsAssigned(
+            $this->mscLevel,
+            'Graded Seminar Candidate',
+            'NOU261112223'
+        );
+
+        $event = \App\Models\DefenceEvent::create([
+            'thesis_project_id' => $thesis->id,
+            'type' => 'seminar',
+            'schedule_start' => now()->subDay(),
+            'schedule_end' => now()->subDay()->addHour(),
+            'location' => 'https://zoom.us/j/sem',
+            'outcome' => 'pass',
+        ]);
+
+        $examiner = User::factory()->create(['name' => 'Dr. Sem Examiner', 'is_active' => true]);
+        \App\Models\Evaluation::create([
+            'defence_event_id' => $event->id,
+            'evaluator_id' => $examiner->id,
+            'score' => ['total' => 72],
+            'recommendation' => 'pass',
+            'submitted_at' => now()->subDay(),
+        ]);
+
+        $workflow = app(\App\Services\MilestoneWorkflowService::class);
+        $this->assertFalse($workflow->hasBeenGraded($supMilestone->fresh(['template', 'thesis.defenceEvents.evaluations'])));
+    }
 }

@@ -207,7 +207,12 @@ class MilestoneWorkflowService
      */
     public function hasBeenGraded(StudentMilestone $milestone): bool
     {
-        $type = $milestone->template?->defence_type ?? match($milestone->template?->slug) {
+        $slug = $milestone->template?->slug;
+        if ($slug === 'supervisors_assigned') {
+            return false;
+        }
+
+        $type = $milestone->template?->defence_type ?? match($slug) {
             'seminar_as_a_course' => 'seminar',
             'proposal_defence' => 'proposal',
             'progress_report_1' => 'progress_report_1',
@@ -216,8 +221,13 @@ class MilestoneWorkflowService
             'viva' => 'external',
             default => null,
         };
+
+        if (!$type) {
+            return false;
+        }
+
         $events = $milestone->thesis?->defenceEvents()
-            ->when($type, fn($q) => $q->where('type', $type))
+            ->where('type', $type)
             ->withCount('evaluations')
             ->get() ?? collect();
 
@@ -225,7 +235,7 @@ class MilestoneWorkflowService
             return true;
         }
 
-        if (\Illuminate\Support\Facades\Schema::hasTable('seminar_grades')) {
+        if ($slug === 'seminar_as_a_course' && \Illuminate\Support\Facades\Schema::hasTable('seminar_grades')) {
             if (\Illuminate\Support\Facades\DB::table('seminar_grades')->where('student_milestone_id', $milestone->id)->exists()) {
                 return true;
             }
@@ -783,8 +793,10 @@ class MilestoneWorkflowService
 
     /**
      * Supervisors Assigned -> Proposal Defence.
-     * Advances automatically once (a) the student has uploaded a tentative proposal on the
-     * Supervisors Assigned milestone and (b) supervisors have been assigned.
+     * Advances automatically once the candidate is at Supervisors Assigned (or has completed earlier milestones)
+     * AND either:
+     *  (a) the student supplied their supervisors (2 for MSc, 3 for PhD), OR
+     *  (b) a Program Coordinator / Admin attached supervisor(s) to the student.
      */
     public function tryAutoAdvanceSupervisorsAssigned(?ThesisProject $project): bool
     {
@@ -798,20 +810,38 @@ class MilestoneWorkflowService
 
         if (!$milestone) return false;
 
-        // All earlier milestones (e.g. Seminar course) must be completed first.
-        $pendingEarlier = $project->milestones()
-            ->whereHas('template', fn($q) => $q->where('order', '<', $milestone->template->order))
-            ->where('status', '!=', 'approved')
-            ->exists();
-        if ($pendingEarlier) return false;
+        $isAlreadyAtStage = in_array($milestone->status, ['in_progress', 'submitted', 'partially_approved', 'revision_required'], true);
 
-        $hasProposal = $milestone->submissions()->exists();
+        if (!$isAlreadyAtStage) {
+            $earlierMilestones = $project->milestones()
+                ->with('template')
+                ->whereHas('template', fn($q) => $q->where('order', '<', $milestone->template->order))
+                ->where('status', '!=', 'approved')
+                ->get();
+
+            $pendingEarlier = $earlierMilestones->contains(function ($m) use ($project) {
+                return method_exists($project, 'isExemptFromMilestone') ? !$project->isExemptFromMilestone($m->template) : true;
+            });
+
+            if ($pendingEarlier) {
+                return false;
+            }
+        }
+
+        $approvals = $milestone->approvals ?? [];
+        if (is_string($approvals)) {
+            $approvals = json_decode($approvals, true) ?: [];
+        }
+
+        $hasSelfInserted = !empty($approvals['student_inserted_supervisors']);
         $hasSupervisors = $project->assignments()->where('status', 'active')->exists();
 
-        if (!$hasProposal || !$hasSupervisors) return false;
+        if (!$hasSupervisors && !$hasSelfInserted) {
+            return false;
+        }
 
-        $this->approveAndAdvance($milestone, 'Auto-advanced: tentative proposal uploaded and supervisors assigned.');
-        $this->notifyUpdate($milestone, 'Supervisors assigned and tentative proposal received — advanced to Proposal Defence.');
+        $this->approveAndAdvance($milestone, 'Auto-advanced: supervisors assigned to candidate.');
+        $this->notifyUpdate($milestone, 'Supervisors assigned — advanced to Proposal Defence.');
 
         return true;
     }
