@@ -131,16 +131,11 @@ class MilestoneWorkflowService
         switch ($template->slug) {
             case 'seminar_as_a_course':
                 $this->activateCommunicationChannels($project);
-                $studentUser = $project->student->user ?? null;
-                if ($studentUser) {
-                    try {
-                        \Illuminate\Support\Facades\Mail::raw("Your 'Seminar as a course' milestone has been marked as done.", function($msg) use ($studentUser) {
-                            $msg->to($studentUser->email)->subject("Milestone Completed: Seminar as a course");
-                        });
-                    } catch (\Throwable $e) {
-                        \Illuminate\Support\Facades\Log::warning('Seminar completion mail failed: ' . $e->getMessage());
-                    }
-                }
+                $this->sendSeminarOutcomeInboxMessage(
+                    $milestone,
+                    true,
+                    $this->getSeminarAverageScoreDetails($milestone)
+                );
                 break;
             case 'supervisors_assigned':
                 $this->activateCommunicationChannels($project);
@@ -925,9 +920,6 @@ class MilestoneWorkflowService
         }
 
         if ($slug === 'seminar_as_a_course') {
-            if (!$this->hasUploadedPresentation($milestone)) {
-                return 'presentation slides (PPT/PDF) not uploaded';
-            }
             if (!$this->hasBeenGraded($milestone)) {
                 return 'not yet graded by any examiner';
             }
@@ -964,12 +956,154 @@ class MilestoneWorkflowService
     }
 
     /**
+     * Compute rounded seminar course score details from evaluations or seminar_grades.
+     *
+     * @return array{average: int, count: int, passed: bool, examiner_scores: array<int, array{name: string, score: int}>}|null
+     */
+    public function getSeminarAverageScoreDetails(StudentMilestone $milestone): ?array
+    {
+        $type = $milestone->template?->defence_type ?? 'seminar';
+
+        $events = \App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)
+            ->where('type', $type)
+            ->with(['evaluations.evaluator'])
+            ->get();
+
+        $total = 0.0;
+        $count = 0;
+        $examinerScores = [];
+
+        foreach ($events as $event) {
+            foreach ($event->evaluations as $eval) {
+                if (isset($eval->score['total']) && is_numeric($eval->score['total'])) {
+                    $val = (float) $eval->score['total'];
+                    $total += $val;
+                    $count++;
+                    $examinerScores[] = [
+                        'name' => $eval->evaluator?->name ?? 'Examiner',
+                        'score' => (int) round($val),
+                    ];
+                }
+            }
+        }
+
+        if ($count === 0 && \Illuminate\Support\Facades\Schema::hasTable('seminar_grades')) {
+            $grades = \Illuminate\Support\Facades\DB::table('seminar_grades')
+                ->where('student_milestone_id', $milestone->id)
+                ->get();
+
+            if ($grades->isNotEmpty()) {
+                $userNames = \App\Models\User::whereIn('id', $grades->pluck('examiner_id')->filter()->unique())
+                    ->pluck('name', 'id');
+
+                foreach ($grades as $g) {
+                    if (is_numeric($g->grade)) {
+                        $val = (float) $g->grade;
+                        $total += $val;
+                        $count++;
+                        $examinerScores[] = [
+                            'name' => $userNames[$g->examiner_id] ?? 'Examiner',
+                            'score' => (int) round($val),
+                        ];
+                    }
+                }
+            }
+        }
+
+        if ($count === 0) {
+            return null;
+        }
+
+        $rounded = (int) round($total / $count);
+
+        return [
+            'average' => $rounded,
+            'count' => $count,
+            'passed' => $rounded >= 50,
+            'examiner_scores' => $examinerScores,
+        ];
+    }
+
+    /**
+     * Deliver an in-app inbox message (never email) to the candidate with their seminar score breakdown.
+     */
+    public function sendSeminarOutcomeInboxMessage(StudentMilestone $milestone, bool $passed, ?array $scoreDetails = null): void
+    {
+        $studentUser = $milestone->thesis?->student?->user;
+        if (!$studentUser) {
+            return;
+        }
+
+        $score = $scoreDetails['average'] ?? null;
+        $scoreDisplay = $score !== null ? "{$score} / 100" : 'Graded';
+
+        $breakdownText = '';
+        if (!empty($scoreDetails['examiner_scores'])) {
+            $lines = array_map(
+                fn ($item) => "- {$item['name']}: {$item['score']} / 100",
+                $scoreDetails['examiner_scores']
+            );
+            $breakdownText = "Examiner Score Breakdown:\n" . implode("\n", $lines) . "\n\n";
+        }
+
+        if ($passed) {
+            $subject = $score !== null
+                ? "Seminar Result: PASSED ({$score}/100) — Moved to Supervisors Assigned"
+                : "Seminar Result: PASSED — Moved to Supervisors Assigned";
+            $body = "Dear {$studentUser->name},\n\n"
+                . "Your Seminar as a Course presentation session has ended.\n\n"
+                . "Final Score: {$scoreDisplay}\n"
+                . "Outcome: PASSED (Pass Mark: 50 and above)\n\n"
+                . $breakdownText
+                . "Congratulations! You have been moved to the next milestone: Supervisors Assigned.\n"
+                . "Please visit your Milestones page to record your existing supervisors or upload your tentative proposal to request supervisors.\n\n"
+                . "Academic Portal Administration";
+        } else {
+            $subject = $score !== null
+                ? "Seminar Result: {$score}/100 — Repeat Presentation Required"
+                : "Milestone Outcome: Seminar as a course - Repeat Required";
+            $body = "Dear {$studentUser->name},\n\n"
+                . "Your Seminar as a Course presentation session has ended.\n\n"
+                . "Final Score: {$scoreDisplay}\n"
+                . "Outcome: BELOW PASS MARK (Minimum Pass Mark: 50)\n\n"
+                . $breakdownText
+                . "Because your score is below 50, you did not advance to Supervisors Assigned and will be required to present again when the next seminar presentation is scheduled.\n\n"
+                . "Academic Portal Administration";
+        }
+
+        try {
+            $inboxMsg = \App\Models\InboxMessage::create([
+                'sender_id' => auth()->id() ?? $studentUser->id,
+                'subject' => $subject,
+                'body' => $body,
+                'delivery_method' => 'in_app',
+            ]);
+
+            $inboxMsg->recipients()->attach($studentUser->id, [
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'recipient_type' => 'to',
+            ]);
+
+            \App\Events\MessageReceived::dispatch($inboxMsg, $studentUser->id);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to deliver seminar outcome inbox message: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Compute average grading outcome from examiners for presentation defence milestones.
-     * Policy: Majority vote decides. Tie = Pass (benefit of doubt).
+     * Policy: For Seminar as a Course, rounded average >= 50 passes. For other stages, majority vote decides (tie = Pass).
      * Returns 'pass', 'fail', or null if not yet graded.
      */
     public function getAverageGradingOutcome(StudentMilestone $milestone): ?string
     {
+        if ($milestone->template?->slug === 'seminar_as_a_course') {
+            $scoreDetails = $this->getSeminarAverageScoreDetails($milestone);
+            if ($scoreDetails !== null) {
+                return $scoreDetails['passed'] ? 'pass' : 'fail';
+            }
+        }
+
         $type = $milestone->template?->defence_type ?? match($milestone->template?->slug) {
             'seminar_as_a_course' => 'seminar',
             'proposal_defence' => 'proposal',
@@ -1062,29 +1196,37 @@ class MilestoneWorkflowService
         if ($studentUserId) {
             \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUserId);
 
-            // Deliver official outcome notice directly to candidate's personal inbox (Requirements 3 & 5)
-            try {
-                $milestoneTitle = $milestone->template?->title ?? $milestone->template?->name ?? 'Milestone Defence';
-                $studentName = $milestone->thesis?->student?->user?->name ?? 'Candidate';
-                $inboxMsg = \App\Models\InboxMessage::create([
-                    'sender_id' => auth()->id() ?? $studentUserId,
-                    'subject' => "Milestone Outcome: {$milestoneTitle} - FAIL (Repeat Required)",
-                    'body' => "Dear {$studentName},\n\n"
-                            . "Following the examiner panel evaluation for your \"{$milestoneTitle}\", your average grading outcome was recorded as FAIL.\n\n"
-                            . "Feedback / Reason: {$reason}\n\n"
-                            . "In accordance with institutional guidelines, you are required to repeat this milestone stage. Please liaise with your supervisor to make necessary revisions and re-submit your materials for approval.\n\n"
-                            . "Academic Portal Administration",
-                    'delivery_method' => 'in_app',
-                ]);
+            if ($milestone->template?->slug === 'seminar_as_a_course') {
+                $this->sendSeminarOutcomeInboxMessage(
+                    $milestone,
+                    false,
+                    $this->getSeminarAverageScoreDetails($milestone)
+                );
+            } else {
+                // Deliver official outcome notice directly to candidate's personal inbox (Requirements 3 & 5)
+                try {
+                    $milestoneTitle = $milestone->template?->title ?? $milestone->template?->name ?? 'Milestone Defence';
+                    $studentName = $milestone->thesis?->student?->user?->name ?? 'Candidate';
+                    $inboxMsg = \App\Models\InboxMessage::create([
+                        'sender_id' => auth()->id() ?? $studentUserId,
+                        'subject' => "Milestone Outcome: {$milestoneTitle} - FAIL (Repeat Required)",
+                        'body' => "Dear {$studentName},\n\n"
+                                . "Following the examiner panel evaluation for your \"{$milestoneTitle}\", your average grading outcome was recorded as FAIL.\n\n"
+                                . "Feedback / Reason: {$reason}\n\n"
+                                . "In accordance with institutional guidelines, you are required to repeat this milestone stage. Please liaise with your supervisor to make necessary revisions and re-submit your materials for approval.\n\n"
+                                . "Academic Portal Administration",
+                        'delivery_method' => 'in_app',
+                    ]);
 
-                $inboxMsg->recipients()->attach($studentUserId, [
-                    'id' => (string) \Illuminate\Support\Str::uuid(),
-                    'recipient_type' => 'to',
-                ]);
+                    $inboxMsg->recipients()->attach($studentUserId, [
+                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'recipient_type' => 'to',
+                    ]);
 
-                \App\Events\MessageReceived::dispatch($inboxMsg, $studentUserId);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Failed to create inbox message on milestone failure: " . $e->getMessage());
+                    \App\Events\MessageReceived::dispatch($inboxMsg, $studentUserId);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Failed to create inbox message on milestone failure: " . $e->getMessage());
+                }
             }
         }
 

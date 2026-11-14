@@ -1349,13 +1349,25 @@ class MilestoneTemplateController extends Controller
                 $reason = $workflow->getEndSessionBlockReason($sm);
                 if ($reason) {
                     $skipped[] = ($sm->thesis?->student?->user?->name ?? 'Unknown student') . ' — ' . $reason;
+                    // End of presentation session: clear active schedule so presentation tab closes until rescheduled
+                    $sm->update([
+                        'defence_date' => null,
+                        'defence_time' => null,
+                        'meeting_link' => null,
+                    ]);
+                    if ($sm->thesis?->student?->user_id) {
+                        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $sm->thesis->student->user_id);
+                    }
                     continue;
                 }
 
                 $gradingOutcome = $workflow->getAverageGradingOutcome($sm);
                 if ($gradingOutcome === 'fail') {
-                    $workflow->failAndRepeatMilestone($sm, "Average examination grade was FAIL. Candidate must repeat milestone.");
-                    $skipped[] = ($sm->thesis?->student?->user?->name ?? 'Unknown student') . ' — Failed grading (marked for milestone repetition)';
+                    $failReason = $template->slug === 'seminar_as_a_course'
+                        ? 'Score was below the minimum pass mark of 50. Candidate must repeat this milestone.'
+                        : 'Average examination grade was FAIL. Candidate must repeat milestone.';
+                    $workflow->failAndRepeatMilestone($sm, $failReason);
+                    $skipped[] = ($sm->thesis?->student?->user?->name ?? 'Unknown student') . " — {$failReason}";
                     continue;
                 }
 
@@ -1372,6 +1384,14 @@ class MilestoneTemplateController extends Controller
             \Illuminate\Support\Facades\DB::commit();
             \App\Models\MilestoneTemplate::clearPresentationCache();
 
+            $remainingScheduled = \App\Models\StudentMilestone::where('milestone_template_id', $template->id)
+                ->whereNotNull('defence_date')
+                ->where('status', '!=', 'approved')
+                ->with('template')
+                ->get()
+                ->reject(fn($m) => $workflow->isPostDefencePhase($m))
+                ->count();
+
             $trackLabel = match($discGroup) {
                 'cybersecurity' => ' (Cybersecurity Track)',
                 'artificial_intelligence' => ' (AI Track)',
@@ -1381,8 +1401,26 @@ class MilestoneTemplateController extends Controller
             $sessionTitle = "{$template->name}{$trackLabel}";
 
             if ($advanced === 0) {
+                $noAdvanceMsg = "Presentation session for {$sessionTitle} has ended. No scheduled student met the pass criteria to advance.";
+                if ($remainingScheduled === 0) {
+                    $fallbackRoute = $template->slug === 'seminar_as_a_course'
+                        ? route('admin.past-presentations.index')
+                        : route('admin.milestone-templates.index');
+
+                    return $this->respondMilestoneAction(
+                        $request,
+                        $template,
+                        'warning',
+                        $noAdvanceMsg,
+                        ['skipped_students' => $skipped, 'redirect_url' => $fallbackRoute],
+                        redirect()->to($fallbackRoute)
+                            ->with('warning', $noAdvanceMsg)
+                            ->with('skipped_students', $skipped)
+                    );
+                }
+
                 return redirect()->back()
-                    ->with('error', "No student was advanced from {$sessionTitle}. None of the scheduled students met the requirements.")
+                    ->with('error', $noAdvanceMsg)
                     ->with('skipped_students', $skipped);
             }
 
@@ -1390,10 +1428,10 @@ class MilestoneTemplateController extends Controller
                 ? "Presentation session for {$sessionTitle} ended: {$advanced} student(s) passed presentation and entered the Post-Defence Correction stage (must submit corrected thesis for Internal Examiner approval before moving to Viva)."
                 : "Presentation session for {$sessionTitle} ended: {$advanced} student(s) advanced to the next milestone.";
             if (count($skipped) > 0) {
-                $msg .= ' ' . count($skipped) . ' student(s) remain scheduled or were marked to repeat because of requirements or grading.';
+                $msg .= ' ' . count($skipped) . ' student(s) did not advance and had their ended session slot cleared until rescheduled.';
             }
 
-            if ($discGroup) {
+            if ($discGroup && $remainingScheduled > 0) {
                 return $this->respondMilestoneAction(
                     $request,
                     $template,
@@ -1405,23 +1443,29 @@ class MilestoneTemplateController extends Controller
             }
 
             if ($template->slug === 'seminar_as_a_course') {
-                // Set a flag to trigger the auto-download in the past presentations view
+                // Redirect to Past Seminar Results since the active presentation tab is now closed
+                $redirectRes = redirect()->route('admin.past-presentations.index')
+                    ->with('success', $msg)
+                    ->with('skipped_students', $skipped);
+
+                if (!$discGroup) {
+                    $redirectRes
+                        ->with('auto_download_scores', route('admin.past-presentations.export-scores'))
+                        ->with('auto_download_attendance', route('admin.past-presentations.export-attendance'));
+                }
+
                 return $this->respondMilestoneAction(
                     $request,
                     $template,
                     'success',
                     $msg,
-                    [
+                    array_filter([
                         'skipped_students' => $skipped,
                         'redirect_url' => route('admin.past-presentations.index'),
-                        'auto_download_scores' => route('admin.past-presentations.export-scores'),
-                        'auto_download_attendance' => route('admin.past-presentations.export-attendance'),
-                    ],
-                    redirect()->route('admin.past-presentations.index')
-                        ->with('success', $msg)
-                        ->with('skipped_students', $skipped)
-                        ->with('auto_download_scores', route('admin.past-presentations.export-scores'))
-                        ->with('auto_download_attendance', route('admin.past-presentations.export-attendance'))
+                        'auto_download_scores' => !$discGroup ? route('admin.past-presentations.export-scores') : null,
+                        'auto_download_attendance' => !$discGroup ? route('admin.past-presentations.export-attendance') : null,
+                    ], fn ($v) => $v !== null),
+                    $redirectRes
                 );
             }
 
@@ -1430,7 +1474,7 @@ class MilestoneTemplateController extends Controller
                 $template,
                 'success',
                 $msg,
-                ['skipped_students' => $skipped],
+                ['skipped_students' => $skipped, 'redirect_url' => route('admin.milestone-templates.index')],
                 redirect()->route('admin.milestone-templates.index')->with('success', $msg)->with('skipped_students', $skipped)
             );
 
