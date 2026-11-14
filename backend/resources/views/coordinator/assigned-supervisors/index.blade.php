@@ -501,14 +501,20 @@
                                         </div>
                                     </td>
 
-                                    {{-- Tentative Proposal Status --}}
+                                    {{-- Tentative Proposal & Request Status --}}
                                     <td class="px-4 lg:px-6 py-4 lg:py-6">
+                                        @php $supReq = $ms?->approvals['supervisor_request'] ?? null; @endphp
                                         @if($hasUpload)
                                             <div class="flex flex-col items-start gap-1">
                                                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[9px] font-black uppercase tracking-wider border border-emerald-100">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                                     Uploaded (Ready)
                                                 </span>
+                                                @if(($supReq['status'] ?? null) === 'pending')
+                                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[9px] font-black uppercase tracking-wider border border-indigo-200">
+                                                        Supervisor Requested
+                                                    </span>
+                                                @endif
                                                 <span class="text-[9px] font-medium text-slate-400">
                                                     {{ $latestSub && $latestSub->created_at ? $latestSub->created_at->format('M d, Y') : '--' }}
                                                 </span>

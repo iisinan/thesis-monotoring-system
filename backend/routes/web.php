@@ -151,6 +151,8 @@ Route::get('/run-migrations', function () {
     Route::get('/milestones', [MilestoneController::class, 'index'])->name('milestones.index');
     Route::get('/milestones/{milestone}', [MilestoneController::class, 'show'])->name('milestones.show');
     Route::post('/milestones/{milestone}', [MilestoneController::class, 'store'])->name('milestones.store'); // Submission
+    Route::post('/milestones/{milestone}/supervisors', [MilestoneController::class, 'submitSelfSupervisors'])->name('milestones.supervisors.store');
+    Route::post('/milestones/{milestone}/request-supervisors', [MilestoneController::class, 'requestSupervisors'])->name('milestones.supervisors.request');
     Route::post('/milestones/{milestone}/approve', [MilestoneController::class, 'approve'])->name('milestones.approve');
     Route::post('/milestones/{milestone}/unlock', [MilestoneController::class, 'unlock'])->name('milestones.unlock');
     Route::post('/milestones/{milestone}/defence-date', [MilestoneController::class, 'setDefenceDate'])->name('milestones.set_defence_date');

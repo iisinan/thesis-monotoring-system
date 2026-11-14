@@ -136,28 +136,34 @@ class StudentMilestone extends Model
         if ($slug === 'supervisors_assigned') {
             $hasProposal = $this->relationLoaded('submissions') ? $this->submissions->isNotEmpty() : $this->submissions()->exists();
             $hasSupervisors = $this->thesis?->relationLoaded('assignments') ? $this->thesis->assignments->where('status', 'active')->isNotEmpty() : $this->thesis?->assignments()->where('status', 'active')->exists();
+            $hasSelfInserted = !empty($this->approvals['student_inserted_supervisors']);
+            $requestPending = ($this->approvals['supervisor_request']['status'] ?? null) === 'pending';
             $isApproved = $this->status === 'approved';
 
             $tasks = [
                 [
                     'id' => 'tentative_proposal',
-                    'name' => 'Upload Tentative Proposal',
-                    'completed' => $hasProposal || $isApproved,
-                    'details' => $hasProposal ? 'Tentative proposal received' : 'Awaiting tentative proposal upload (PDF)',
+                    'name' => $hasSelfInserted ? 'Supervisor Confirmation' : 'Tentative Proposal / Request',
+                    'completed' => $hasProposal || $hasSelfInserted || $isApproved,
+                    'details' => $hasSelfInserted
+                        ? 'Existing supervisors inserted by candidate'
+                        : ($hasProposal ? 'Tentative proposal received' . ($requestPending ? ' & request sent to coordinator' : '') : 'Insert existing supervisors or upload tentative proposal (PDF)'),
                     'action_type' => 'none',
                 ],
                 [
                     'id' => 'assign_supervisors',
                     'name' => 'Supervisors Assigned',
                     'completed' => $hasSupervisors || $isApproved,
-                    'details' => $hasSupervisors ? 'Supervisors allocated by coordinator' : 'Awaiting supervisor allocation',
+                    'details' => $hasSupervisors
+                        ? ($hasSelfInserted ? 'Supervisors recorded by candidate' : 'Supervisors allocated by coordinator')
+                        : ($requestPending ? 'Request sent — awaiting coordinator allocation' : 'Awaiting supervisor allocation'),
                     'action_type' => 'none',
                 ],
                 [
                     'id' => 'auto_advance',
                     'name' => 'Advancement to Proposal Defence',
                     'completed' => $isApproved,
-                    'details' => $isApproved ? 'Advanced to Proposal Defence' : 'Automatic upon upload & assignment',
+                    'details' => $isApproved ? 'Advanced to Proposal Defence' : 'Automatic once supervisors are recorded or assigned',
                     'action_type' => 'none',
                 ],
             ];

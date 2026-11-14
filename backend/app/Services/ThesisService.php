@@ -92,11 +92,15 @@ class ThesisService
         });
     }
     /**
-     * Replace all supervisors for a thesis project enforcing logic.
+     * Replace all supervisors for a thesis project enforcing institutional panel count and rules.
      */
-    public function replaceSupervisors(ThesisProject $project, array $supervisorIds)
-    {
-        return DB::transaction(function () use ($project, $supervisorIds) {
+    public function replaceSupervisors(
+        ThesisProject $project,
+        array $supervisorIds,
+        bool $enforceCapacity = true,
+        bool $enforcePrimaryProfessor = true
+    ) {
+        return DB::transaction(function () use ($project, $supervisorIds, $enforceCapacity, $enforcePrimaryProfessor) {
             $student = $project->student;
             $levelName = $student->level->name ?? '';
             $isPhD = $levelName && stripos($levelName, 'PhD') !== false;
@@ -108,13 +112,17 @@ class ThesisService
                 throw new Exception($msg);
             }
 
+            if (count($supervisorIds) !== count(array_unique($supervisorIds))) {
+                throw new Exception("A supervisor cannot be selected more than once.");
+            }
+
             // 2. End Existing Assignments
             $existingAssignments = SupervisionAssignment::where('thesis_project_id', $project->id)
                 ->where('status', 'active')
                 ->get();
 
             foreach ($existingAssignments as $assignment) {
-                if ($assignment->supervisor) {
+                if ($assignment->supervisor && $assignment->supervisor->current_load > 0) {
                     $assignment->supervisor->decrement('current_load');
                 }
             }
@@ -125,18 +133,18 @@ class ThesisService
 
             // 3. Create New Assignments
             foreach ($supervisorIds as $index => $supervisorId) {
-                $supervisor = SupervisorProfile::findOrFail($supervisorId);
+                $supervisor = SupervisorProfile::with('user')->findOrFail($supervisorId);
 
-                // Institutional Rule: First supervisor (index 0) must be a Professor
-                $isProf = (stripos($supervisor->rank ?? '', 'prof') !== false) || 
+                // Institutional Rule: First supervisor (index 0) must be a Professor when enforced
+                $isProf = (stripos($supervisor->rank ?? '', 'prof') !== false) ||
                           ($supervisor->user && stripos($supervisor->user->name, 'prof') !== false);
 
-                if ($index === 0 && !$isProf) {
+                if ($enforcePrimaryProfessor && $index === 0 && !$isProf) {
                     throw new Exception("Academic Hierarchy Violation: The Lead Supervisor ({$supervisor->user->name}) must hold the rank of Professor.");
                 }
 
                 // Check workload
-                if ($supervisor->current_load >= $supervisor->max_students) {
+                if ($enforceCapacity && $supervisor->current_load >= $supervisor->max_students) {
                     throw new Exception("Supervisor {$supervisor->user->name} has reached maximum capacity.");
                 }
 
@@ -151,7 +159,7 @@ class ThesisService
                 $supervisor->increment('current_load');
             }
 
-            // 4. Try auto-advancing Milestone 2 if both proposal uploaded and supervisors assigned
+            // 4. Try auto-advancing Milestone 2 when conditions are satisfied
             app(\App\Services\MilestoneWorkflowService::class)->tryAutoAdvanceSupervisorsAssigned($project->fresh());
 
             return true;

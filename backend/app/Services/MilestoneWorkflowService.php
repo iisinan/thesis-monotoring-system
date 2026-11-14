@@ -63,12 +63,13 @@ class MilestoneWorkflowService
             return "Submission Gated: Post-submission authorization is required before clearance.";
         }
 
-        // Supervisors Assigned validation: tentative proposal + supervisor allocation
+        // Supervisors Assigned validation: tentative proposal (or self-reported supervisors) + supervisor allocation
         if ($template->slug === 'supervisors_assigned') {
             $hasProposal = $milestone->submissions()->exists();
             $hasSupervisors = $milestone->thesis->assignments()->where('status', 'active')->exists();
-            if (!$hasProposal && !$user->hasRole('Admin')) {
-                return "Tentative Proposal Required: Candidate must upload their tentative proposal before clearance.";
+            $hasSelfInserted = !empty($milestone->approvals['student_inserted_supervisors']);
+            if (!$hasProposal && !$hasSelfInserted && !$user->hasRole('Admin')) {
+                return "Tentative Proposal Required: Candidate must upload their tentative proposal or record existing supervisors before clearance.";
             }
             if (!$hasSupervisors && !$user->hasRole('Admin')) {
                 return "Supervision Required: Programme coordinator must assign supervisors before clearance.";
@@ -1147,8 +1148,9 @@ class MilestoneWorkflowService
 
     /**
      * Supervisors Assigned -> Proposal Defence.
-     * Advances automatically once (a) the student has uploaded a tentative proposal on the
-     * Supervisors Assigned milestone and (b) supervisors have been assigned.
+     * Advances automatically once active supervisors exist AND either:
+     *  (a) the student uploaded a tentative proposal (Coordinator-assigned flow), OR
+     *  (b) the student recorded their existing supervisors on the milestone.
      */
     public function tryAutoAdvanceSupervisorsAssigned(?ThesisProject $project): bool
     {
@@ -1170,14 +1172,214 @@ class MilestoneWorkflowService
         if ($pendingEarlier) return false;
 
         $hasProposal = $milestone->submissions()->exists();
+        $hasSelfInserted = !empty($milestone->approvals['student_inserted_supervisors']);
         $hasSupervisors = $project->assignments()->where('status', 'active')->exists();
 
-        if (!$hasProposal || !$hasSupervisors) return false;
+        if ((!$hasProposal && !$hasSelfInserted) || !$hasSupervisors) return false;
 
-        $this->approveAndAdvance($milestone, 'Auto-advanced: tentative proposal uploaded and supervisors assigned.');
-        $this->notifyUpdate($milestone, 'Supervisors assigned and tentative proposal received — advanced to Proposal Defence.');
+        $approvals = $milestone->approvals ?? [];
+        if (($approvals['supervisor_request']['status'] ?? null) === 'pending') {
+            $approvals['supervisor_request']['status'] = 'fulfilled';
+            $approvals['supervisor_request']['fulfilled_at'] = now()->toDateTimeString();
+            $milestone->approvals = $approvals;
+            $milestone->save();
+        }
+
+        $reason = $hasSelfInserted
+            ? 'Auto-advanced: student recorded existing supervisory panel.'
+            : 'Auto-advanced: tentative proposal uploaded and supervisors assigned.';
+
+        $this->approveAndAdvance($milestone, $reason);
+        $this->notifyUpdate(
+            $milestone,
+            $hasSelfInserted
+                ? 'Supervisory panel recorded — advanced to Proposal Defence.'
+                : 'Supervisors assigned and tentative proposal received — advanced to Proposal Defence.'
+        );
 
         return true;
+    }
+
+    /**
+     * Resolve active Program Coordinators scoped to a student's program and level.
+     */
+    public function resolveScopedCoordinators(\App\Models\StudentProfile $student): \Illuminate\Support\Collection
+    {
+        $coordinators = collect();
+
+        if ($student->program_id) {
+            $profileUsers = \App\Models\CoordinatorProfile::with('user')
+                ->where('program_id', $student->program_id)
+                ->where('active', true)
+                ->where(function ($q) use ($student) {
+                    $q->whereNull('level_id');
+                    if ($student->level_id) {
+                        $q->orWhere('level_id', $student->level_id);
+                    }
+                })
+                ->get()
+                ->pluck('user')
+                ->filter();
+
+            $coordinators = $coordinators->merge($profileUsers);
+        }
+
+        $roleUsers = \App\Models\User::role('Program Coordinator')
+            ->get()
+            ->filter(fn ($u) => $u->hasCoordinatorAccess($student));
+
+        $coordinators = $coordinators->merge($roleUsers);
+
+        if ($coordinators->isEmpty() && $student->program_id) {
+            $coordinators = \App\Models\CoordinatorProfile::with('user')
+                ->where('program_id', $student->program_id)
+                ->where('active', true)
+                ->get()
+                ->pluck('user')
+                ->filter();
+        }
+
+        return $coordinators
+            ->filter(fn ($u) => $u && $u->id !== $student->user_id)
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * Immediately email & notify Program Coordinators when a student requests supervisors
+     * on the Supervisors Assigned milestone (with student name and matric number).
+     */
+    public function notifyCoordinatorsOfSupervisorRequest(
+        StudentMilestone $milestone,
+        \App\Models\User $studentUser,
+        ?\App\Models\Submission $submission = null,
+        ?string $note = null
+    ): array {
+        $milestone->loadMissing(['thesis.student.user', 'thesis.student.program', 'thesis.student.level']);
+        $student = $milestone->thesis?->student;
+        if (!$student) {
+            return [];
+        }
+
+        $coordinators = $this->resolveScopedCoordinators($student);
+        $matric = $student->student_id_number ?? 'N/A';
+        $programName = $student->program?->name ?? 'Program';
+        $levelName = $student->level?->name ?? 'Postgraduate';
+
+        $approvals = $milestone->approvals ?? [];
+        $approvals['student_path'] = 'request_supervisors';
+        $approvals['supervisor_request'] = [
+            'status' => 'pending',
+            'requested_at' => now()->toDateTimeString(),
+            'requested_by' => $studentUser->id,
+            'student_name' => $studentUser->name,
+            'matric_number' => $matric,
+            'note' => $note ? trim($note) : null,
+            'submission_id' => $submission?->id,
+            'notified_coordinator_ids' => $coordinators->pluck('id')->values()->all(),
+            'notified_coordinator_names' => $coordinators->pluck('name')->values()->all(),
+        ];
+        $milestone->approvals = $approvals;
+        $milestone->save();
+
+        if ($coordinators->isEmpty()) {
+            \Illuminate\Support\Facades\Log::warning('No active Program Coordinator found for supervisor request.', [
+                'student_profile_id' => $student->id,
+                'program_id' => $student->program_id,
+                'level_id' => $student->level_id,
+            ]);
+            return [];
+        }
+
+        $notification = new \App\Notifications\SupervisorRequestedNotification($milestone, $submission, $note);
+        foreach ($coordinators as $coordinator) {
+            try {
+                \Illuminate\Support\Facades\Notification::sendNow($coordinator, clone $notification);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Failed immediate email/notification to coordinator for supervisor request', [
+                    'coordinator_id' => $coordinator->id,
+                    'coordinator_email' => $coordinator->email,
+                    'student_name' => $studentUser->name,
+                    'matric_number' => $matric,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        try {
+            $inboxBody = "Dear Program Coordinator,\n\n"
+                . "{$studentUser->name} (Matric Number: {$matric}) in {$programName} ({$levelName}) has uploaded a tentative proposal and is requesting supervisor assignment.\n"
+                . ($note ? "\nCandidate Note: {$note}\n" : '')
+                . "\nPlease open Coordinator -> Assign Supervisors or the candidate's Milestones page to review the tentative proposal and assign supervisors.\n\n"
+                . "ACETEL Academic Portal";
+
+            $inboxMsg = \App\Models\InboxMessage::create([
+                'sender_id' => $studentUser->id,
+                'subject' => "Supervisor Request: {$studentUser->name} ({$matric})",
+                'body' => $inboxBody,
+                'delivery_method' => 'in_app',
+            ]);
+
+            foreach ($coordinators as $coordinator) {
+                $inboxMsg->recipients()->attach($coordinator->id, [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'recipient_type' => 'to',
+                ]);
+                \App\Events\MessageReceived::dispatch($inboxMsg, $coordinator->id);
+                \App\Events\MilestoneSubmitted::dispatch($milestone, $coordinator->id);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed inbox/broadcast dispatch for supervisor request: ' . $e->getMessage());
+        }
+
+        return $coordinators->pluck('name')->values()->all();
+    }
+
+    /**
+     * Inform scoped Program Coordinators when a student inserts their own existing supervisors.
+     */
+    public function notifyCoordinatorsOfSelfInsertedSupervisors(
+        StudentMilestone $milestone,
+        \App\Models\User $studentUser,
+        \Illuminate\Support\Collection $supervisors
+    ): void {
+        $milestone->loadMissing(['thesis.student.program', 'thesis.student.level']);
+        $student = $milestone->thesis?->student;
+        if (!$student) {
+            return;
+        }
+
+        $coordinators = $this->resolveScopedCoordinators($student);
+        if ($coordinators->isEmpty()) {
+            return;
+        }
+
+        try {
+            $matric = $student->student_id_number ?? 'N/A';
+            $list = $supervisors->values()->map(function ($sup, $idx) {
+                $label = $idx === 0 ? 'Lead Supervisor' : 'Co-Supervisor ' . $idx;
+                return "- {$label}: " . ($sup->user?->name ?? 'Supervisor') . ' (' . ($sup->user?->email ?? 'N/A') . ')';
+            })->implode("\n");
+
+            $inboxMsg = \App\Models\InboxMessage::create([
+                'sender_id' => $studentUser->id,
+                'subject' => "Supervisors Recorded by Candidate: {$studentUser->name} ({$matric})",
+                'body' => "Dear Program Coordinator,\n\n"
+                    . "{$studentUser->name} (Matric Number: {$matric}) has recorded their existing supervisory panel on the Supervisors Assigned milestone:\n\n"
+                    . "{$list}\n\nACETEL Academic Portal",
+                'delivery_method' => 'in_app',
+            ]);
+
+            foreach ($coordinators as $coordinator) {
+                $inboxMsg->recipients()->attach($coordinator->id, [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'recipient_type' => 'to',
+                ]);
+                \App\Events\MessageReceived::dispatch($inboxMsg, $coordinator->id);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to notify coordinators of self-inserted supervisors: ' . $e->getMessage());
+        }
     }
 
     /**

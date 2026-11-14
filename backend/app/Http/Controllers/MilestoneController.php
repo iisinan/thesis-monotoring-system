@@ -93,7 +93,7 @@ class MilestoneController extends Controller
                 // Internal Examiner
                 $internalExaminer = $thesis->internalExaminer;
 
-                // All supervisors and internal examiners for assignment (Coordinators/Admins only) - Restricted by Program Scope
+                // All supervisors and internal examiners for assignment (Coordinators/Admins scoped by program; Students see faculty supervisors to record existing panels)
                 $allSupervisors = collect();
                 $allInternalExaminers = collect();
                 if ($user->hasAnyRole(['Program Coordinator', 'Admin']) && $thesis->student) {
@@ -107,6 +107,16 @@ class MilestoneController extends Controller
                         ->where('program_id', $thesis->student->program_id)
                         ->where('active', true)
                         ->get();
+                } elseif ($user->hasRole('Student') && $thesis->student) {
+                    $allSupervisors = \App\Models\SupervisorProfile::with(['user', 'programs'])
+                        ->whereHas('user', fn($q) => $q->where('id', '!=', $user->id))
+                        ->get()
+                        ->sortBy(function ($sup) use ($thesis) {
+                            $inProgram = $sup->programs->contains('id', $thesis->student->program_id) ? 0 : 1;
+                            $isProf = stripos($sup->rank ?? '', 'prof') !== false ? 0 : 1;
+                            return "{$inProgram}-{$isProf}-" . strtolower($sup->user?->name ?? 'zzz');
+                        })
+                        ->values();
                 }
 
                 // Identify the "Ongoing" milestone (first one that's not 100% complete)
@@ -848,30 +858,39 @@ class MilestoneController extends Controller
         }
 
         // Check if Supervisors Assigned milestone is now eligible to auto-advance
-        (new \App\Services\MilestoneWorkflowService())->tryAutoAdvanceSupervisorsAssigned($milestone->thesis);
+        $autoAdvancedSup = $workflowService->tryAutoAdvanceSupervisorsAssigned($milestone->thesis);
 
-        // Dispatch Real-time events to supervisors and coordinators
-        $recipients = collect();
-        // Supervisors
-        foreach ($milestone->thesis->assignments as $assignment) {
-            if ($assignment->supervisor) $recipients->push($assignment->supervisor->user_id);
-        }
-        // Program Coordinators
-        $coords = \App\Models\CoordinatorProfile::where('program_id', $milestone->thesis->student->program_id)->where('active', true)->pluck('user_id');
-        $recipients = $recipients->merge($coords);
+        $isSupervisorRequest = $milestone->template?->slug === 'supervisors_assigned'
+            && !$autoAdvancedSup
+            && !$milestone->thesis->assignments()->where('status', 'active')->exists();
 
-        // Internal Examiner (for internal defence / milestones with assigned examiner)
-        if ($milestone->thesis->internalExaminer && $milestone->thesis->internalExaminer->user_id) {
-            $recipients->push($milestone->thesis->internalExaminer->user_id);
-        }
-        foreach ($milestone->examiners as $examinerUser) {
-            $recipients->push($examinerUser->id);
-        }
+        $notifiedCoordinators = [];
+        if ($isSupervisorRequest) {
+            $notifiedCoordinators = $workflowService->notifyCoordinatorsOfSupervisorRequest(
+                $milestone,
+                Auth::user(),
+                $createdManuscriptSub ?? null,
+                $request->input('description')
+            );
+        } else {
+            // Dispatch Real-time events to supervisors and coordinators
+            $recipients = collect();
+            foreach ($milestone->thesis->assignments as $assignment) {
+                if ($assignment->supervisor) $recipients->push($assignment->supervisor->user_id);
+            }
+            $coords = \App\Models\CoordinatorProfile::where('program_id', $milestone->thesis->student->program_id)->where('active', true)->pluck('user_id');
+            $recipients = $recipients->merge($coords);
 
-        $recipients = $recipients->unique();
+            if ($milestone->thesis->internalExaminer && $milestone->thesis->internalExaminer->user_id) {
+                $recipients->push($milestone->thesis->internalExaminer->user_id);
+            }
+            foreach ($milestone->examiners as $examinerUser) {
+                $recipients->push($examinerUser->id);
+            }
 
-        foreach ($recipients as $userId) {
-            \App\Events\MilestoneSubmitted::dispatch($milestone, $userId);
+            foreach ($recipients->unique() as $userId) {
+                \App\Events\MilestoneSubmitted::dispatch($milestone, $userId);
+            }
         }
 
         // Send Portal Inbox notification to assigned Supervisors (or Internal Examiner for post-defence)
@@ -918,10 +937,15 @@ class MilestoneController extends Controller
         // Invalidate student dashboard query cache
         \Illuminate\Support\Facades\Cache::forget('user_thesis_' . Auth::id());
 
+        $successMessage = $isSupervisorRequest
+            ? ('Tentative proposal uploaded and supervisor request emailed immediately to your Program Coordinator'
+                . (!empty($notifiedCoordinators) ? ' (' . implode(', ', $notifiedCoordinators) . ')' : '') . '.')
+            : 'Milestone submitted successfully.';
+
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Milestone submitted successfully.',
+                'message' => $successMessage,
                 'milestone_id' => $milestone->id,
             ]);
         }
@@ -929,7 +953,276 @@ class MilestoneController extends Controller
         return redirect()->route('milestones.index', [
             'expanded' => $milestone->id,
             'thesis_id' => $milestone->thesis_project_id,
-        ])->with('success', 'Milestone submitted successfully.');
+        ])->with('success', $successMessage);
+    }
+
+    /**
+     * Option A on Supervisors Assigned milestone:
+     * Allow a student who already has supervisors to insert/record their existing supervisory panel.
+     */
+    public function submitSelfSupervisors(Request $request, StudentMilestone $milestone)
+    {
+        $this->authorize('submit', $milestone);
+
+        if ($milestone->template?->slug !== 'supervisors_assigned') {
+            return back()->with('error', 'Supervisors can only be recorded on the Supervisors Assigned milestone.');
+        }
+
+        $ongoing = $milestone->thesis->milestones()->get()->sortBy(fn($m) => $m->template->order ?? 999)->first(fn($m) => $m->status !== 'approved');
+        if ($ongoing && $ongoing->id !== $milestone->id && !Auth::user()->hasAnyRole(['Admin', 'Director'])) {
+            return back()->with('error', 'Workflow Violation: This milestone is currently locked. Actions must be performed on the ongoing node: ' . $ongoing->template->name);
+        }
+
+        $student = $milestone->thesis->student;
+        $studentUser = Auth::user();
+        $levelName = $student?->level?->name ?? '';
+        $isPhd = $levelName !== ''
+            ? stripos($levelName, 'phd') !== false
+            : ($student ? $student->isPhd() : false);
+        $requiredCount = $isPhd ? 3 : 2;
+
+        $request->validate([
+            'supervisor_ids' => 'nullable|array',
+            'supervisor_ids.*' => 'nullable|string',
+            'new_supervisors' => 'nullable|array',
+            'new_supervisors.*.name' => 'nullable|string|max:255',
+            'new_supervisors.*.email' => 'nullable|email|max:255',
+            'new_supervisors.*.rank' => 'nullable|string|max:100',
+        ]);
+
+        $submittedIds = $request->input('supervisor_ids', []);
+        $submittedNew = $request->input('new_supervisors', []);
+
+        $resolvedIds = [];
+        $slotErrors = [];
+
+        for ($i = 0; $i < $requiredCount; $i++) {
+            $slotLabel = $i === 0 ? 'Lead Supervisor' : ($isPhd ? "Co-Supervisor {$i}" : 'Co-Supervisor');
+            $selectedId = trim((string) ($submittedIds[$i] ?? ''));
+            $manualName = trim((string) ($submittedNew[$i]['name'] ?? ''));
+            $manualEmail = trim((string) ($submittedNew[$i]['email'] ?? ''));
+            $manualRank = trim((string) ($submittedNew[$i]['rank'] ?? ($i === 0 ? 'Professor' : 'Senior Lecturer')));
+
+            if ($selectedId !== '' && $selectedId !== '__manual__') {
+                $profile = \App\Models\SupervisorProfile::with('user')->find($selectedId);
+                if (!$profile || !$profile->user) {
+                    $slotErrors["supervisor_ids.{$i}"] = "{$slotLabel}: Selected supervisor profile could not be found.";
+                    continue;
+                }
+                if ($profile->user_id === $studentUser->id) {
+                    $slotErrors["supervisor_ids.{$i}"] = "{$slotLabel}: You cannot assign yourself as your own supervisor.";
+                    continue;
+                }
+                $resolvedIds[] = $profile->id;
+            } elseif ($manualName !== '' || $manualEmail !== '') {
+                if ($manualName === '' || $manualEmail === '') {
+                    $slotErrors["new_supervisors.{$i}.email"] = "{$slotLabel}: Both full name and valid email address are required when entering an unlisted supervisor.";
+                    continue;
+                }
+                if (strcasecmp($manualEmail, $studentUser->email) === 0) {
+                    $slotErrors["new_supervisors.{$i}.email"] = "{$slotLabel}: Supervisor email cannot be your own student email.";
+                    continue;
+                }
+
+                $plainPassword = \Illuminate\Support\Str::random(12);
+                $supUser = \App\Models\User::firstOrCreate(
+                    ['email' => strtolower($manualEmail)],
+                    [
+                        'name' => $manualName,
+                        'password' => \Illuminate\Support\Facades\Hash::make($plainPassword),
+                    ]
+                );
+
+                if ($supUser->wasRecentlyCreated) {
+                    try {
+                        \Illuminate\Support\Facades\Mail::to($supUser->email)->send(new \App\Mail\WelcomeUser($supUser, $plainPassword));
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning("Failed to send welcome email to inserted supervisor {$supUser->email}: " . $e->getMessage());
+                    }
+                }
+
+                if (!$supUser->hasRole('Supervisor')) {
+                    $supUser->assignRole('Supervisor');
+                }
+
+                $supProfile = \App\Models\SupervisorProfile::firstOrCreate(
+                    ['user_id' => $supUser->id],
+                    [
+                        'rank' => $manualRank ?: ($i === 0 ? 'Professor' : 'Senior Lecturer'),
+                        'max_students' => 5,
+                        'current_load' => 0,
+                        'specialization' => $student?->program?->name,
+                    ]
+                );
+
+                if ($student?->program_id) {
+                    $supProfile->programs()->syncWithoutDetaching([$student->program_id]);
+                }
+
+                $resolvedIds[] = $supProfile->id;
+            } else {
+                $slotErrors["supervisor_ids.{$i}"] = "{$slotLabel}: Please select an existing supervisor or enter their name and email.";
+            }
+        }
+
+        if (!empty($slotErrors)) {
+            return back()->withErrors($slotErrors)->withInput();
+        }
+
+        if (count($resolvedIds) !== count(array_unique($resolvedIds))) {
+            return back()->withErrors([
+                'supervisor_ids' => 'Each slot must be a distinct supervisor (a supervisor cannot be selected twice).',
+            ])->withInput();
+        }
+
+        $profiles = \App\Models\SupervisorProfile::with('user')->whereIn('id', $resolvedIds)->get()->keyBy('id');
+        $orderedProfiles = collect($resolvedIds)->map(fn($id) => $profiles->get($id))->filter()->values();
+
+        $approvals = $milestone->approvals ?? [];
+        $approvals['student_path'] = 'insert_supervisors';
+        $approvals['student_inserted_supervisors'] = [
+            'submitted_at' => now()->toDateTimeString(),
+            'submitted_by' => $studentUser->id,
+            'supervisor_profile_ids' => $resolvedIds,
+            'supervisors' => $orderedProfiles->map(fn($s, $idx) => [
+                'profile_id' => $s->id,
+                'name' => $s->user?->name,
+                'email' => $s->user?->email,
+                'role' => $idx === 0 ? 'primary' : 'secondary',
+            ])->values()->all(),
+        ];
+        $milestone->approvals = $approvals;
+        $milestone->submitted_at = $milestone->submitted_at ?? now();
+        $milestone->save();
+
+        try {
+            app(\App\Services\ThesisService::class)->replaceSupervisors(
+                $milestone->thesis,
+                $resolvedIds,
+                false,
+                false
+            );
+        } catch (\Throwable $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        // Notify assigned supervisors & scoped coordinators
+        foreach ($orderedProfiles as $supProfile) {
+            if ($supProfile->user) {
+                try {
+                    $supProfile->user->notify(new \App\Notifications\SupervisorAssigned($milestone->thesis));
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Failed notifying self-inserted supervisor {$supProfile->user->email}: " . $e->getMessage());
+                }
+            }
+        }
+
+        app(\App\Services\MilestoneWorkflowService::class)->notifyCoordinatorsOfSelfInsertedSupervisors(
+            $milestone->fresh(),
+            $studentUser,
+            $orderedProfiles
+        );
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . Auth::id());
+
+        $msg = 'Supervisory panel recorded successfully. Your Supervisors Assigned milestone is complete and Proposal Defence is now unlocked.';
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'milestone_id' => $milestone->id,
+            ]);
+        }
+
+        return redirect()->route('milestones.index', [
+            'expanded' => $milestone->id,
+            'thesis_id' => $milestone->thesis_project_id,
+        ])->with('success', $msg);
+    }
+
+    /**
+     * Option B explicit/resend action on Supervisors Assigned milestone:
+     * Sends or re-sends an immediate coordinator email when a student requests supervisors
+     * (after uploading or along with their tentative proposal).
+     */
+    public function requestSupervisors(Request $request, StudentMilestone $milestone)
+    {
+        $this->authorize('submit', $milestone);
+
+        if ($milestone->template?->slug !== 'supervisors_assigned') {
+            return back()->with('error', 'Supervisor requests are only available on the Supervisors Assigned milestone.');
+        }
+
+        $ongoing = $milestone->thesis->milestones()->get()->sortBy(fn($m) => $m->template->order ?? 999)->first(fn($m) => $m->status !== 'approved');
+        if ($ongoing && $ongoing->id !== $milestone->id && !Auth::user()->hasAnyRole(['Admin', 'Director'])) {
+            return back()->with('error', 'Workflow Violation: This milestone is currently locked. Actions must be performed on the ongoing node: ' . $ongoing->template->name);
+        }
+
+        if ($milestone->thesis->assignments()->where('status', 'active')->exists()) {
+            return back()->with('info', 'Supervisors are already assigned to your thesis project.');
+        }
+
+        $request->validate([
+            'file' => 'nullable|file|mimes:pdf|max:51200',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        $submission = $milestone->submissions()->latest()->first();
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $path = $this->storeSubmissionFile($file, 'submissions/' . $milestone->thesis_project_id);
+
+            $submission = $milestone->submissions()->create([
+                'submitted_by' => Auth::id(),
+                'type' => 'manuscript',
+                'file_url' => $path,
+                'file_meta' => [
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ],
+                'checksum' => md5_file($file->getRealPath()),
+                'description' => $request->input('description') ?: 'Tentative Research Proposal',
+                'version' => $milestone->submissions()->where('type', 'manuscript')->count() + 1,
+            ]);
+        }
+
+        if (!$submission) {
+            return back()->withErrors([
+                'file' => 'Please upload your tentative proposal (PDF) before requesting supervisors.',
+            ])->withInput();
+        }
+
+        $milestone->update([
+            'status' => 'submitted',
+            'submitted_at' => $milestone->submitted_at ?? now(),
+        ]);
+
+        $notified = app(\App\Services\MilestoneWorkflowService::class)->notifyCoordinatorsOfSupervisorRequest(
+            $milestone,
+            Auth::user(),
+            $submission,
+            $request->input('description')
+        );
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . Auth::id());
+
+        $msg = 'Supervisor request emailed immediately to your Program Coordinator'
+            . (!empty($notified) ? ' (' . implode(', ', $notified) . ')' : '') . '.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'milestone_id' => $milestone->id,
+            ]);
+        }
+
+        return redirect()->route('milestones.index', [
+            'expanded' => $milestone->id,
+            'thesis_id' => $milestone->thesis_project_id,
+        ])->with('success', $msg);
     }
 
     /**

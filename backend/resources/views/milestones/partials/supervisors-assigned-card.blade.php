@@ -2,6 +2,7 @@
     $student = $milestone->thesis?->student;
     $studentUser = $student?->user;
     $studentName = $studentUser?->name ?? 'Candidate';
+    $matricNumber = $student?->student_id_number ?? 'N/A';
     $program = $student?->program;
     $programName = $program?->name ?? 'Academic Program';
     $levelName = strtoupper($student?->level?->name ?? '');
@@ -13,25 +14,40 @@
     $hasUploaded = !is_null($latestProposal);
     $proposalUrl = $latestProposal ? (str_starts_with($latestProposal->file_url, 'http') ? $latestProposal->file_url : \Illuminate\Support\Facades\Storage::url($latestProposal->file_url)) : '';
 
+    $supervisorRequest = $milestone->approvals['supervisor_request'] ?? null;
+    $hasSelfInserted = !empty($milestone->approvals['student_inserted_supervisors']);
+    $hasRequestedSupervisors = !empty($supervisorRequest);
+
     $assignments = $milestone->thesis?->assignments()->where('status', 'active')->with('supervisor.user')->get() ?? collect();
     $hasSupervisors = $assignments->count() > 0;
 
-    // Available supervisors in student's program
-    $availableSupervisors = \App\Models\SupervisorProfile::with('user')
-        ->when($student?->program_id, function($q) use ($student) {
-            $q->whereHas('programs', fn($p) => $p->where('programs.id', $student->program_id));
-        })
-        ->get();
+    // Available supervisors: for Coordinators/Admins scoped by student program; for Students include directory
+    if (auth()->user()->hasRole('Student')) {
+        $availableSupervisors = \App\Models\SupervisorProfile::with(['user', 'programs'])
+            ->whereHas('user', fn($q) => $q->where('id', '!=', auth()->id()))
+            ->get()
+            ->sortBy(function ($s) use ($student) {
+                $inProg = ($student?->program_id && $s->programs->contains('id', $student->program_id)) ? 0 : 1;
+                $isProf = stripos($s->rank ?? '', 'prof') !== false ? 0 : 1;
+                return "{$inProg}-{$isProf}-" . strtolower($s->user?->name ?? 'zzz');
+            })->values();
+    } else {
+        $availableSupervisors = \App\Models\SupervisorProfile::with('user')
+            ->when($student?->program_id, function($q) use ($student) {
+                $q->whereHas('programs', fn($p) => $p->where('programs.id', $student->program_id));
+            })
+            ->get();
 
-    // Fallback if none mapped specifically
-    if ($availableSupervisors->isEmpty()) {
-        $availableSupervisors = \App\Models\SupervisorProfile::with('user')->get();
+        if ($availableSupervisors->isEmpty()) {
+            $availableSupervisors = \App\Models\SupervisorProfile::with('user')->get();
+        }
     }
 
     $allSupervisorsJson = $availableSupervisors->map(function($s) {
         return [
             'id' => $s->id,
             'name' => $s->user?->name ?? 'Supervisor',
+            'email' => $s->user?->email ?? '',
             'rank' => $s->rank ?? 'Senior Lecturer',
             'is_professor' => strtoupper($s->rank ?? '') === 'PROFESSOR',
             'current_load' => (int) ($s->current_load ?? 0),
@@ -43,10 +59,14 @@
     $assignedIds = $assignments->pluck('supervisor_profile_id')->all();
     $primaryAssignment = $assignments->firstWhere('role', 'primary') ?? $assignments->first();
     $leadSupervisorId = $primaryAssignment?->supervisor_profile_id ?? ($assignedIds[0] ?? '');
-    
+
     $secondaryAssignments = $assignments->filter(fn($a) => $a->id !== $primaryAssignment?->id)->values();
     $secondSupervisorId = $secondaryAssignments->get(0)?->supervisor_profile_id ?? ($assignedIds[1] ?? '');
     $thirdSupervisorId = $secondaryAssignments->get(1)?->supervisor_profile_id ?? ($assignedIds[2] ?? '');
+
+    $defaultStudentPath = ($errors->has('supervisor_ids.*') || $errors->has('new_supervisors.*') || $errors->has('supervisor_ids') || old('supervisor_ids') || old('new_supervisors'))
+        ? 'insert'
+        : 'request';
 @endphp
 
 <div id="supervisors-assigned-card-{{ $milestone->id }}" 
@@ -55,13 +75,32 @@
         showStudentMessageModal: false,
         messageRecipient: '{{ addslashes($studentName) }}',
         uploading: false,
+        submittingSelfSups: false,
+        requestingSups: false,
         fileError: '',
+        studentPath: '{{ $defaultStudentPath }}',
+        manualMode: [
+            {{ (old('new_supervisors.0.name') || old('new_supervisors.0.email')) ? 'true' : 'false' }},
+            {{ (old('new_supervisors.1.name') || old('new_supervisors.1.email')) ? 'true' : 'false' }},
+            {{ (old('new_supervisors.2.name') || old('new_supervisors.2.email')) ? 'true' : 'false' }}
+        ],
+        slotSearch: ['', '', ''],
         selectedLead: '{{ $leadSupervisorId }}',
         selectedSecond: '{{ $secondSupervisorId }}',
         selectedThird: '{{ $thirdSupervisorId }}',
         supervisorsList: {{ \Illuminate\Support\Js::from($allSupervisorsJson) }},
         isPhD: {{ $isPhD ? 'true' : 'false' }},
         randomizeAlert: '',
+        filteredSupervisors(slotIdx) {
+            const q = (this.slotSearch[slotIdx] || '').toLowerCase().trim();
+            if (!q) return this.supervisorsList;
+            return this.supervisorsList.filter(s =>
+                (s.name || '').toLowerCase().includes(q) ||
+                (s.email || '').toLowerCase().includes(q) ||
+                (s.rank || '').toLowerCase().includes(q) ||
+                (s.department || '').toLowerCase().includes(q)
+            );
+        },
         randomize() {
             const profs = this.supervisorsList.filter(s => s.is_professor && s.current_load < s.max_students);
             const allEligible = this.supervisorsList.filter(s => s.current_load < s.max_students);
@@ -98,116 +137,10 @@
     {{-- 1. STUDENT SIDE VIEW                                                      --}}
     {{-- ========================================================================= --}}
     @if(auth()->user()->hasRole('Student'))
-        @if(!$hasUploaded)
-            {{-- State 1A: Student has NOT uploaded proposal yet --}}
-            <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-8 sm:p-10 relative overflow-hidden animate-in-up">
-                <div class="flex items-start gap-5 mb-8">
-                    <div class="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 shadow-sm">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-black uppercase tracking-wider mb-2 border border-indigo-100">
-                            <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
-                            <span>Upload Required</span>
-                        </div>
-                        <h2 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                            Upload Tentative Research Proposal
-                        </h2>
-                        <p class="text-sm sm:text-base font-semibold text-slate-600 mt-2 leading-relaxed max-w-3xl">
-                            Upload your tentative research proposal, it will be used to select your supervisors.
-                        </p>
-                    </div>
-                </div>
-
-                {{-- Upload Dropzone Form --}}
-                <form @submit.prevent="
-                    const fileInput = $event.target.querySelector('input[type=file]');
-                    if (!fileInput || !fileInput.files[0]) {
-                        (window.toast ? window.toast.error('Please select your proposal document (PDF)') : alert('Please select your proposal document (PDF)'));
-                        return;
-                    }
-                    if (fileInput.files[0].size > 30 * 1024 * 1024) {
-                        fileError = 'The selected file exceeds the 30MB limit.';
-                        (window.toast ? window.toast.error(fileError) : alert(fileError));
-                        return;
-                    }
-                    uploading = true;
-                    fetch('{{ route('milestones.store', $milestone) }}', {
-                        method: 'POST',
-                        body: new FormData($event.target),
-                        headers: { 'Accept': 'text/html' }
-                    }).then(res => {
-                        window.location.reload();
-                    }).catch(err => {
-                        console.error(err);
-                        window.location.reload();
-                    }).finally(() => {
-                        uploading = false;
-                    });
-                " class="space-y-6">
-                    @csrf
-                    
-                    <div class="relative w-full">
-                        <input type="file" 
-                               name="file" 
-                               accept=".pdf" 
-                               required 
-                               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                               @change="
-                                   const f = $event.target.files[0];
-                                   document.getElementById('proposal-file-name-{{ $milestone->id }}').textContent = f ? f.name : 'Click or drop to select your proposal PDF';
-                                   if (f && f.size > 30 * 1024 * 1024) {
-                                       fileError = 'The file exceeds 30MB.';
-                                       $event.target.value = '';
-                                   } else {
-                                       fileError = '';
-                                   }
-                               "/>
-                        <div class="w-full flex flex-col items-center justify-center gap-4 px-6 py-12 bg-slate-50 border-2 border-slate-200 border-dashed rounded-3xl hover:border-indigo-400 hover:bg-indigo-50/40 transition-all cursor-pointer group">
-                            <div class="w-14 h-14 rounded-2xl bg-white text-indigo-600 flex items-center justify-center shadow-lg shadow-slate-200/50 group-hover:scale-110 transition-transform">
-                                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                </svg>
-                            </div>
-                            <div class="text-center">
-                                <span id="proposal-file-name-{{ $milestone->id }}" class="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
-                                    Click or drop to select your tentative research proposal (PDF Only)
-                                </span>
-                                <p class="text-xs font-medium text-slate-400 mt-1">PDF document up to 30MB</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <span x-show="fileError" x-text="fileError" class="text-xs font-bold text-rose-600 block" style="display: none;"></span>
-
-                    <div class="flex items-center justify-between pt-2">
-                        <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                            <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                            <span>Used by Program Coordinator to assign best-fit supervisors</span>
-                        </div>
-                        <button type="submit" 
-                                :disabled="uploading" 
-                                class="inline-flex items-center gap-2.5 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/30 active:scale-95 disabled:opacity-50 cursor-pointer">
-                            <svg x-show="!uploading" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
-                            </svg>
-                            <svg x-show="uploading" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" style="display: none;">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span x-text="uploading ? 'Uploading Proposal...' : 'Submit Tentative Proposal'"></span>
-                        </button>
-                    </div>
-                </form>
-            </div>
-        @else
-            {{-- State 1B: Student HAS uploaded proposal --}}
+        @if($hasSupervisors)
+            {{-- State 1C: Supervisors are already assigned / recorded --}}
             <div class="space-y-6">
-                {{-- Reassuring Received Banner --}}
                 <div class="bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white rounded-[2.5rem] border border-emerald-200 shadow-xl shadow-slate-200/40 p-8 sm:p-10 relative overflow-hidden animate-in-up">
-                    <div class="absolute -right-12 -top-12 w-48 h-48 bg-emerald-100/60 rounded-full blur-2xl pointer-events-none"></div>
                     <div class="relative flex items-start gap-5">
                         <div class="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/25">
                             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
@@ -216,102 +149,453 @@
                         </div>
                         <div class="space-y-2 max-w-3xl">
                             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider border border-emerald-200">
-                                <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
-                                <span>Submission Received</span>
+                                <span>{{ $hasSelfInserted ? 'Supervisors Recorded' : 'Supervisors Assigned' }}</span>
                             </div>
                             <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                                Your submission is received and your program coordinator is currently reviewing it to get your supervisors more fitting to your research.
+                                Your supervisory panel is active ({{ $assignments->count() }} {{ \Illuminate\Support\Str::plural('supervisor', $assignments->count()) }}).
                             </h2>
-                            <p class="text-xs sm:text-sm font-medium text-slate-600 leading-relaxed pt-1">
-                                Your Program Coordinator will evaluate your proposed research area and appoint a qualified supervisory panel ({{ $isPhD ? '3 supervisors including a Lead Professor' : '2 supervisors including a Lead Professor' }}). You will be notified automatically once assigned.
+                            <p class="text-xs sm:text-sm font-medium text-slate-600 leading-relaxed">
+                                {{ $hasSelfInserted ? 'You recorded your existing supervisory panel on this milestone.' : 'Your Program Coordinator has assigned your supervisory committee.' }}
                             </p>
                         </div>
                     </div>
                 </div>
 
-                {{-- Uploaded Proposal Document Card --}}
-                <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-8">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                            <div class="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
-                            Uploaded Tentative Proposal
-                        </h3>
-                        <span class="text-xs font-bold text-slate-400">
-                            Version 0{{ $latestProposal->version }} • {{ $latestProposal->created_at->format('M d, Y') }}
-                        </span>
-                    </div>
-
-                    <div class="p-5 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-slate-200 transition-colors">
-                        <div class="flex items-center gap-4">
-                            <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0 shadow-sm font-black text-xs">
-                                PDF
+                @if($hasUploaded && $latestProposal)
+                    <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-8">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                <div class="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                                Uploaded Tentative Proposal
+                            </h3>
+                            <span class="text-xs font-bold text-slate-400">
+                                Version 0{{ $latestProposal->version }} • {{ $latestProposal->created_at->format('M d, Y') }}
+                            </span>
+                        </div>
+                        <div class="p-5 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0 font-black text-xs">PDF</div>
+                                <div>
+                                    <h4 class="text-sm font-bold text-slate-900">{{ $latestProposal->file_meta['original_name'] ?? 'Tentative_Research_Proposal.pdf' }}</h4>
+                                    <p class="text-xs text-slate-500 mt-0.5">Submitted {{ $latestProposal->created_at->diffForHumans() }}</p>
+                                </div>
                             </div>
-                            <div>
-                                <h4 class="text-sm font-bold text-slate-900">
-                                    {{ $latestProposal->file_meta['original_name'] ?? 'Tentative_Research_Proposal.pdf' }}
-                                </h4>
-                                <p class="text-xs text-slate-500 mt-0.5">
-                                    Submitted {{ $latestProposal->created_at->diffForHumans() }}
-                                </p>
+                            <div class="flex items-center gap-2">
+                                <button type="button"
+                                        @click.prevent="$dispatch('open-document-preview', { url: '{{ $proposalUrl }}', title: 'Tentative Proposal - {{ addslashes($studentName) }}', type: 'pdf' })"
+                                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider border border-indigo-200 cursor-pointer">
+                                    <span>Preview Document</span>
+                                </button>
+                                <a href="{{ $proposalUrl }}" download class="p-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl" title="Download">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                </a>
                             </div>
                         </div>
-
-                        <div class="flex items-center gap-2">
-                            <button type="button" 
-                                    @click.prevent="$dispatch('open-document-preview', { 
-                                        url: '{{ $proposalUrl }}', 
-                                        title: 'Tentative Proposal - {{ addslashes($studentName) }}', 
-                                        type: 'pdf' 
-                                    })"
-                                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-indigo-200 cursor-pointer">
-                                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                                <span>Preview Document</span>
-                            </button>
-                            <a href="{{ $proposalUrl }}" download class="p-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl transition-colors" title="Download">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            </a>
-                        </div>
                     </div>
-                </div>
+                @endif
 
-                {{-- Supervisors Allocation Status (Student Side) --}}
                 <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-8">
                     <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
                         <div class="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
                         Supervisory Committee Allocation
                     </h3>
-                    @if($hasSupervisors)
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            @foreach($assignments as $assignment)
-                                @php $sup = $assignment->supervisor; @endphp
-                                <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-4">
-                                    <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600 font-black text-sm shadow-sm">
-                                        {{ substr($sup->user?->name ?? 'S', 0, 1) }}
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center gap-2">
-                                            <span class="inline-flex px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider {{ $assignment->role === 'primary' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-700' }}">
-                                                {{ $assignment->role === 'primary' ? 'Lead Supervisor' : 'Co-Supervisor' }}
-                                            </span>
-                                            <span class="text-[10px] font-bold text-slate-400">{{ $sup->rank }}</span>
-                                        </div>
-                                        <h4 class="text-sm font-bold text-slate-900 truncate mt-0.5">{{ $sup->user?->name }}</h4>
-                                        <p class="text-xs text-slate-500 truncate">{{ $sup->department ?? $programName }}</p>
-                                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        @foreach($assignments as $assignment)
+                            @php $sup = $assignment->supervisor; @endphp
+                            <div class="p-5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-4">
+                                <div class="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600 font-black text-sm shadow-sm">
+                                    {{ substr($sup->user?->name ?? 'S', 0, 1) }}
                                 </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="inline-flex px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider {{ $assignment->role === 'primary' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-700' }}">
+                                            {{ $assignment->role === 'primary' ? 'Lead Supervisor' : 'Co-Supervisor' }}
+                                        </span>
+                                        <span class="text-[10px] font-bold text-slate-400">{{ $sup->rank }}</span>
+                                    </div>
+                                    <h4 class="text-sm font-bold text-slate-900 truncate mt-0.5">{{ $sup->user?->name }}</h4>
+                                    <p class="text-xs text-slate-500 truncate">{{ $sup->user?->email ?? ($sup->department ?? $programName) }}</p>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        @else
+            {{-- State 1A / 1B: Student does NOT yet have supervisors on portal -> Choose Insert Supervisors OR Upload Tentative Proposal & Request --}}
+            <div class="space-y-6 animate-in-up">
+                {{-- Two-Path Selector Header --}}
+                <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-8">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                        <div>
+                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-black uppercase tracking-wider mb-2 border border-indigo-100">
+                                <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
+                                <span>Supervisory Panel Setup</span>
+                            </div>
+                            <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                                Do you already have supervisors, or do you need supervisors assigned?
+                            </h2>
+                            <p class="text-xs sm:text-sm font-medium text-slate-600 mt-1">
+                                Candidate: <strong class="text-slate-900">{{ $studentName }}</strong> &bull; Matric No: <strong class="text-slate-900">{{ $matricNumber }}</strong> &bull; Required Panel: <strong>{{ $requiredSupervisorCount }} Supervisors</strong> ({{ $isPhD ? 'PhD' : 'MSc' }})
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button type="button"
+                                @click="studentPath = 'insert'"
+                                :class="studentPath === 'insert'
+                                    ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20 shadow-md'
+                                    : 'border-slate-200 bg-slate-50/60 hover:border-indigo-300 hover:bg-white'"
+                                class="text-left p-5 rounded-3xl border-2 transition-all cursor-pointer flex items-start gap-4">
+                            <div :class="studentPath === 'insert' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-slate-200'"
+                                 class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-colors">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <span class="text-[10px] font-black uppercase tracking-widest text-indigo-600">Option 1</span>
+                                <h3 class="text-sm sm:text-base font-black text-slate-900 mt-0.5">I Already Have Supervisors</h3>
+                                <p class="text-xs font-medium text-slate-600 mt-1">
+                                    Insert your {{ $requiredSupervisorCount }} existing supervisors directly to complete this step and unlock Proposal Defence.
+                                </p>
+                            </div>
+                        </button>
+
+                        <button type="button"
+                                @click="studentPath = 'request'"
+                                :class="studentPath === 'request'
+                                    ? 'border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-md'
+                                    : 'border-slate-200 bg-slate-50/60 hover:border-emerald-300 hover:bg-white'"
+                                class="text-left p-5 rounded-3xl border-2 transition-all cursor-pointer flex items-start gap-4">
+                            <div :class="studentPath === 'request' ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-600 border border-slate-200'"
+                                 class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-colors">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <span class="text-[10px] font-black uppercase tracking-widest text-emerald-600">Option 2</span>
+                                <h3 class="text-sm sm:text-base font-black text-slate-900 mt-0.5">Upload Tentative Proposal &amp; Request Supervisors</h3>
+                                <p class="text-xs font-medium text-slate-600 mt-1">
+                                    Upload your tentative proposal PDF and immediately notify your Program Coordinator by email with your name &amp; matric number.
+                                </p>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- OPTION 1 PANEL: Student Inserts Existing Supervisors --}}
+                <div x-show="studentPath === 'insert'" x-cloak class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-10 space-y-6">
+                    <div class="flex items-start gap-4 border-b border-slate-100 pb-5">
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-lg sm:text-xl font-black text-slate-900">Insert Your Supervisory Panel</h3>
+                            <p class="text-xs sm:text-sm text-slate-600 font-medium mt-1">
+                                Select each of your {{ $requiredSupervisorCount }} supervisors from the faculty directory, or switch a slot to manual entry if a supervisor is not listed yet.
+                            </p>
+                        </div>
+                    </div>
+
+                    @if($errors->has('supervisor_ids') || $errors->has('supervisor_ids.*') || $errors->has('new_supervisors.*'))
+                        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 space-y-1">
+                            @foreach($errors->all() as $err)
+                                <p>&bull; {{ $err }}</p>
                             @endforeach
                         </div>
+                    @endif
+
+                    <form action="{{ route('milestones.supervisors.store', $milestone) }}" method="POST" @submit="submittingSelfSups = true" class="space-y-5">
+                        @csrf
+                        @for($i = 0; $i < $requiredSupervisorCount; $i++)
+                            @php
+                                $slotTitle = $i === 0 ? 'Lead Supervisor (Main Supervisor — Professor Recommended)' : ($isPhD ? "Co-Supervisor {$i}" : 'Co-Supervisor');
+                            @endphp
+                            <div class="p-5 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                        <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider {{ $i === 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700' }}">
+                                            Slot {{ $i + 1 }}
+                                        </span>
+                                        <h4 class="text-sm font-black text-slate-900">{{ $slotTitle }}</h4>
+                                    </div>
+                                    <button type="button"
+                                            @click="manualMode[{{ $i }}] = !manualMode[{{ $i }}]"
+                                            class="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer">
+                                        <span x-text="manualMode[{{ $i }}] ? '← Select from Faculty Directory' : '+ Supervisor not listed? Enter Name & Email'"></span>
+                                    </button>
+                                </div>
+
+                                {{-- Existing Faculty Directory Picker --}}
+                                <div x-show="!manualMode[{{ $i }}]" class="space-y-2.5">
+                                    <input type="text"
+                                           x-model="slotSearch[{{ $i }}]"
+                                           placeholder="Filter faculty by name, email, or rank..."
+                                           class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+                                    <select name="supervisor_ids[{{ $i }}]"
+                                            :disabled="manualMode[{{ $i }}]"
+                                            class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                        <option value="">-- Choose {{ $i === 0 ? 'Lead Supervisor' : 'Co-Supervisor' }} --</option>
+                                        <template x-for="sup in filteredSupervisors({{ $i }})" :key="sup.id">
+                                            <option :value="sup.id"
+                                                    :selected="'{{ old("supervisor_ids.{$i}") }}' === sup.id"
+                                                    x-text="`${sup.name} (${sup.rank || 'Faculty'})${sup.email ? ' — ' + sup.email : ''}`"></option>
+                                        </template>
+                                    </select>
+                                </div>
+
+                                {{-- Manual Unlisted Supervisor Entry --}}
+                                <div x-show="manualMode[{{ $i }}]" x-cloak class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div>
+                                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Full Name *</label>
+                                        <input type="text"
+                                               name="new_supervisors[{{ $i }}][name]"
+                                               value="{{ old("new_supervisors.{$i}.name") }}"
+                                               :disabled="!manualMode[{{ $i }}]"
+                                               placeholder="e.g. Prof. Ada Obi"
+                                               class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Email Address *</label>
+                                        <input type="email"
+                                               name="new_supervisors[{{ $i }}][email]"
+                                               value="{{ old("new_supervisors.{$i}.email") }}"
+                                               :disabled="!manualMode[{{ $i }}]"
+                                               placeholder="supervisor@noun.edu.ng"
+                                               class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Academic Rank</label>
+                                        <select name="new_supervisors[{{ $i }}][rank]"
+                                                :disabled="!manualMode[{{ $i }}]"
+                                                class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800">
+                                            <option value="Professor" {{ old("new_supervisors.{$i}.rank", $i === 0 ? 'Professor' : '') === 'Professor' ? 'selected' : '' }}>Professor</option>
+                                            <option value="Associate Professor" {{ old("new_supervisors.{$i}.rank") === 'Associate Professor' ? 'selected' : '' }}>Associate Professor</option>
+                                            <option value="Senior Lecturer" {{ old("new_supervisors.{$i}.rank", $i > 0 ? 'Senior Lecturer' : '') === 'Senior Lecturer' ? 'selected' : '' }}>Senior Lecturer</option>
+                                            <option value="Lecturer I" {{ old("new_supervisors.{$i}.rank") === 'Lecturer I' ? 'selected' : '' }}>Lecturer I</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        @endfor
+
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+                            <p class="text-xs font-semibold text-slate-500">
+                                Recording your existing supervisors notifies your Program Coordinator and advances your thesis to Proposal Defence.
+                            </p>
+                            <button type="submit"
+                                    :disabled="submittingSelfSups"
+                                    class="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/30 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0">
+                                <span x-text="submittingSelfSups ? 'Saving Supervisors...' : 'Save Supervisors & Continue'"></span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {{-- OPTION 2 PANEL: Upload Tentative Proposal & Request Supervisors --}}
+                <div x-show="studentPath === 'request'" class="space-y-6">
+                    @if(!$hasUploaded)
+                        <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-10 relative overflow-hidden">
+                            <div class="flex items-start gap-5 mb-6">
+                                <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 shadow-sm">
+                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider mb-2 border border-emerald-100">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                                        <span>Proposal &amp; Supervisor Request</span>
+                                    </div>
+                                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                                        Upload Tentative Proposal &amp; Request Supervisors
+                                    </h3>
+                                    <p class="text-sm font-medium text-slate-600 mt-1.5 leading-relaxed max-w-3xl">
+                                        Upload your tentative research proposal (PDF). Once submitted, your Program Coordinator will receive an <strong>immediate email</strong> showing your name (<strong class="text-slate-900">{{ $studentName }}</strong>) and matric number (<strong class="text-slate-900">{{ $matricNumber }}</strong>) to assign fitting supervisors.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <form action="{{ route('milestones.store', $milestone) }}"
+                                  method="POST"
+                                  enctype="multipart/form-data"
+                                  @submit="
+                                    const fileInput = $event.target.querySelector('input[type=file]');
+                                    if (!fileInput || !fileInput.files[0]) {
+                                        $event.preventDefault();
+                                        fileError = 'Please select your tentative proposal PDF.';
+                                        return;
+                                    }
+                                    if (fileInput.files[0].size > 30 * 1024 * 1024) {
+                                        $event.preventDefault();
+                                        fileError = 'The selected file exceeds the 30MB limit.';
+                                        return;
+                                    }
+                                    uploading = true;
+                                  "
+                                  class="space-y-5">
+                                @csrf
+
+                                <div class="relative w-full">
+                                    <input type="file"
+                                           name="file"
+                                           accept=".pdf"
+                                           required
+                                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                           @change="
+                                               const f = $event.target.files[0];
+                                               document.getElementById('proposal-file-name-{{ $milestone->id }}').textContent = f ? f.name : 'Click or drop to select your tentative proposal (PDF Only)';
+                                               if (f && f.size > 30 * 1024 * 1024) {
+                                                   fileError = 'The file exceeds 30MB.';
+                                                   $event.target.value = '';
+                                               } else {
+                                                   fileError = '';
+                                               }
+                                           "/>
+                                    <div class="w-full flex flex-col items-center justify-center gap-4 px-6 py-10 bg-slate-50 border-2 border-slate-200 border-dashed rounded-3xl hover:border-emerald-400 hover:bg-emerald-50/40 transition-all cursor-pointer group">
+                                        <div class="w-14 h-14 rounded-2xl bg-white text-emerald-600 flex items-center justify-center shadow-lg shadow-slate-200/50 group-hover:scale-110 transition-transform">
+                                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                            </svg>
+                                        </div>
+                                        <div class="text-center">
+                                            <span id="proposal-file-name-{{ $milestone->id }}" class="text-sm font-bold text-slate-800 group-hover:text-emerald-700 transition-colors">
+                                                Click or drop to select your tentative research proposal (PDF Only)
+                                            </span>
+                                            <p class="text-xs font-medium text-slate-400 mt-1">PDF document up to 30MB</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <span x-show="fileError" x-text="fileError" class="text-xs font-bold text-rose-600 block" style="display: none;"></span>
+
+                                <div>
+                                    <label class="block text-xs font-black text-slate-700 uppercase tracking-wider mb-1.5">Research Interest / Note for Coordinator (Optional)</label>
+                                    <textarea name="description"
+                                              rows="2"
+                                              placeholder="Briefly describe your tentative research focus or any note for your Program Coordinator..."
+                                              class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-medium text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">{{ old('description') }}</textarea>
+                                </div>
+
+                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+                                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                                        <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                        <span>Sends immediate email &amp; portal alert to your Program Coordinator</span>
+                                    </div>
+                                    <button type="submit"
+                                            :disabled="uploading"
+                                            class="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/30 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0">
+                                        <span x-text="uploading ? 'Uploading & Emailing Coordinator...' : 'Upload Proposal & Request Supervisors'"></span>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     @else
-                        <div class="p-6 bg-slate-50 border border-slate-200 border-dashed rounded-2xl flex items-center gap-4 text-slate-600">
-                            <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-slate-400">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        {{-- State 1B: Student HAS uploaded tentative proposal; show request confirmation & resend option --}}
+                        <div class="bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white rounded-[2.5rem] border border-emerald-200 shadow-xl shadow-slate-200/40 p-8 sm:p-10 relative overflow-hidden">
+                            <div class="relative flex items-start gap-5">
+                                <div class="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/25">
+                                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <div class="space-y-2 max-w-3xl">
+                                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider border border-emerald-200">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                                        <span>{{ $hasRequestedSupervisors ? 'Supervisor Request Emailed to Coordinator' : 'Tentative Proposal Uploaded' }}</span>
+                                    </div>
+                                    <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
+                                        @if($hasRequestedSupervisors)
+                                            Your Program Coordinator has been notified of your supervisor request ({{ $studentName }} — {{ $matricNumber }}).
+                                        @else
+                                            Your tentative proposal is uploaded. Click below to send your formal supervisor request email to your Program Coordinator.
+                                        @endif
+                                    </h3>
+                                    @if(!empty($supervisorRequest['notified_coordinator_names']))
+                                        <p class="text-xs sm:text-sm font-medium text-slate-600">
+                                            Notified Coordinator(s): <strong class="text-slate-800">{{ implode(', ', $supervisorRequest['notified_coordinator_names']) }}</strong>
+                                            @if(!empty($supervisorRequest['requested_at']))
+                                                &bull; Sent {{ \Carbon\Carbon::parse($supervisorRequest['requested_at'])->diffForHumans() }}
+                                            @endif
+                                        </p>
+                                    @endif
+                                </div>
                             </div>
-                            <div class="text-xs font-semibold">
-                                <span class="font-bold text-slate-800">Supervisors Not Yet Assigned:</span> Your Program Coordinator is currently matching your research proposal with prospective faculty members.
+                        </div>
+
+                        {{-- Uploaded Proposal Document Card --}}
+                        <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-8">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                    <div class="w-1.5 h-4 bg-emerald-500 rounded-full"></div>
+                                    Uploaded Tentative Proposal
+                                </h3>
+                                <span class="text-xs font-bold text-slate-400">
+                                    Version 0{{ $latestProposal->version }} • {{ $latestProposal->created_at->format('M d, Y') }}
+                                </span>
                             </div>
+
+                            <div class="p-5 bg-slate-50 border border-slate-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-slate-200 transition-colors">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 border border-rose-100 flex items-center justify-center shrink-0 shadow-sm font-black text-xs">
+                                        PDF
+                                    </div>
+                                    <div>
+                                        <h4 class="text-sm font-bold text-slate-900">
+                                            {{ $latestProposal->file_meta['original_name'] ?? 'Tentative_Research_Proposal.pdf' }}
+                                        </h4>
+                                        <p class="text-xs text-slate-500 mt-0.5">
+                                            Submitted {{ $latestProposal->created_at->diffForHumans() }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <button type="button"
+                                            @click.prevent="$dispatch('open-document-preview', { url: '{{ $proposalUrl }}', title: 'Tentative Proposal - {{ addslashes($studentName) }}', type: 'pdf' })"
+                                            class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold uppercase tracking-wider transition-colors border border-indigo-200 cursor-pointer">
+                                        <span>Preview Document</span>
+                                    </button>
+                                    <a href="{{ $proposalUrl }}" download class="p-2 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-xl transition-colors" title="Download">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Explicit Request / Re-send Request Form --}}
+                        <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-8 space-y-4">
+                            <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                <div class="w-1.5 h-4 bg-indigo-500 rounded-full"></div>
+                                {{ $hasRequestedSupervisors ? 'Update Proposal or Follow Up with Coordinator' : 'Send Supervisor Request Email Now' }}
+                            </h3>
+                            <form action="{{ route('milestones.supervisors.request', $milestone) }}"
+                                  method="POST"
+                                  enctype="multipart/form-data"
+                                  @submit="requestingSups = true"
+                                  class="space-y-4">
+                                @csrf
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Replace Tentative Proposal PDF (Optional)</label>
+                                        <input type="file" name="file" accept=".pdf" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700" />
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Message / Research Area Note (Optional)</label>
+                                        <input type="text" name="description" value="{{ old('description') }}" placeholder="Note for Program Coordinator..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700" />
+                                    </div>
+                                </div>
+                                <button type="submit"
+                                        :disabled="requestingSups"
+                                        class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md cursor-pointer disabled:opacity-50">
+                                    <span x-text="requestingSups ? 'Sending Email...' : '{{ $hasRequestedSupervisors ? 'Re-send Request Email to Coordinator' : 'Request Supervisors (Email Coordinator Immediately)' }}'"></span>
+                                </button>
+                            </form>
                         </div>
                     @endif
                 </div>
@@ -322,8 +606,8 @@
     {{-- 2. PROGRAM COORDINATOR SIDE VIEW                                          --}}
     {{-- ========================================================================= --}}
     @elseif(auth()->user()->hasRole('Program Coordinator'))
-        @if(!$hasUploaded)
-            {{-- State 2A: Student has NOT uploaded proposal yet --}}
+        @if(!$hasUploaded && !$hasSupervisors)
+            {{-- State 2A: Student has NOT uploaded proposal or inserted supervisors yet --}}
             <div class="bg-amber-50/70 border border-amber-200 rounded-[2.5rem] p-8 sm:p-10 shadow-xl shadow-slate-200/40 relative overflow-hidden animate-in-up">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div class="flex items-start gap-5">
@@ -375,13 +659,18 @@
                         <div>
                             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider mb-2 border border-emerald-200">
                                 <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
-                                <span>Proposal Available for Review</span>
+                                <span>{{ $hasUploaded ? 'Proposal Available for Review' : ($hasSelfInserted ? 'Supervisors Recorded by Candidate' : 'Supervisors Assigned') }}</span>
                             </div>
+                            @if(($supervisorRequest['status'] ?? null) === 'pending')
+                                <span class="ml-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs font-black uppercase tracking-wider border border-indigo-200">
+                                    Supervisor Requested ({{ $studentName }} &bull; {{ $matricNumber }})
+                                </span>
+                            @endif
                             <h2 class="text-2xl font-black text-slate-900 tracking-tight">
-                                Candidate Tentative Research Proposal
+                                {{ $hasUploaded ? 'Candidate Tentative Research Proposal' : 'Candidate Supervisory Panel' }}
                             </h2>
                             <p class="text-sm font-medium text-slate-500 mt-1">
-                                Click on the document below to preview the upload and match supervisors to this candidate's research focus.
+                                {{ $hasUploaded ? 'Click on the document below to preview the upload and match supervisors to this candidate\'s research focus.' : 'Candidate recorded their existing supervisors on the portal. You may review or modify assignments below.' }}
                             </p>
                         </div>
 
@@ -398,6 +687,7 @@
                         </div>
                     </div>
 
+                    @if($hasUploaded && $latestProposal)
                     {{-- Clickable Document Card --}}
                     <div class="mt-6">
                         <div @click.prevent="$dispatch('open-document-preview', { 
@@ -436,6 +726,7 @@
                             </div>
                         </div>
                     </div>
+                    @endif
 
                     {{-- Current Supervisory Committee Allocation --}}
                     <div class="mt-8 pt-6 border-t border-slate-100">
