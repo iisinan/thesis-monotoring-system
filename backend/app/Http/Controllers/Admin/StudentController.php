@@ -44,9 +44,20 @@ class StudentController extends Controller
             'thesis.milestones.template',
             'thesis.milestones.submissions' => fn($q) => $q->latest(),
             'thesis.defenceEvents',
+            'thesis.assignments' => fn($q) => $q->where('status', 'active')->with('supervisor.user'),
             'thesis.supervisors.supervisor.user',
             'thesis.internalExaminer.user'
         ]);
+
+        $availableSupervisors = \App\Models\SupervisorProfile::with(['user', 'programs'])
+            ->whereHas('user', fn($q) => $q->where('id', '!=', $student->user_id))
+            ->get()
+            ->sortBy(function ($sup) use ($student) {
+                $inProg = ($student->program_id && $sup->programs->contains('id', $student->program_id)) ? 0 : 1;
+                $isProf = stripos($sup->rank ?? '', 'prof') !== false ? 0 : 1;
+                return "{$inProg}-{$isProf}-" . strtolower($sup->user?->name ?? 'zzz');
+            })
+            ->values();
 
         $internalExaminers = InternalExaminerProfile::with(['user', 'program'])
             ->where('active', true)
@@ -67,7 +78,195 @@ class StudentController extends Controller
             ->take(8)
             ->get();
 
-        return view('admin.students.show', compact('student', 'internalExaminers', 'recent_logs'));
+        return view('admin.students.show', compact('student', 'internalExaminers', 'availableSupervisors', 'recent_logs'));
+    }
+
+    /**
+     * Administratively add a supervisor to the student's thesis.
+     */
+    public function addSupervisor(Request $request, StudentProfile $student)
+    {
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Only Administrators can perform direct supervisory edits.');
+        }
+
+        $validated = $request->validate([
+            'supervisor_profile_id' => 'required|exists:supervisor_profiles,id',
+            'role' => 'nullable|in:primary,secondary,main,co-supervisor',
+        ]);
+
+        $thesis = $student->thesis;
+        if (!$thesis) {
+            $thesis = \App\Models\ThesisProject::create([
+                'student_profile_id' => $student->id,
+                'title' => 'Thesis Project - ' . ($student->user?->name ?? $student->student_id_number),
+                'status' => 'active',
+                'start_date' => now(),
+            ]);
+            $thesis->syncMilestones();
+        }
+
+        $supervisor = \App\Models\SupervisorProfile::with('user')->findOrFail($validated['supervisor_profile_id']);
+        $role = $validated['role'] ?? ($thesis->assignments()->where('status', 'active')->exists() ? 'secondary' : 'primary');
+
+        try {
+            app(\App\Services\ThesisService::class)->addOrUpdateAssignment($thesis, $supervisor, $role);
+        } catch (\Throwable $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $studentName = $student->user?->name ?? 'Candidate';
+        $supName = $supervisor->user?->name ?? 'Supervisor';
+
+        \App\Models\AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'admin_supervisor_added',
+            'entity_type' => \App\Models\ThesisProject::class,
+            'entity_id' => $thesis->id,
+            'metadata' => [
+                'student_id' => $student->id,
+                'student_name' => $studentName,
+                'supervisor_profile_id' => $supervisor->id,
+                'supervisor_name' => $supName,
+                'role' => $role,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $student->user_id);
+
+        return back()->with('success', "Supervisor {$supName} added to {$studentName}'s committee.");
+    }
+
+    /**
+     * Administratively change or update an existing supervisor assignment (replace supervisor and/or change role).
+     */
+    public function updateSupervisorAssignment(Request $request, StudentProfile $student, \App\Models\SupervisionAssignment $assignment)
+    {
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Only Administrators can perform direct supervisory edits.');
+        }
+
+        if (!$student->thesis || (string) $assignment->thesis_project_id !== (string) $student->thesis->id) {
+            return back()->with('error', 'Supervisor assignment does not belong to this student.');
+        }
+
+        $validated = $request->validate([
+            'supervisor_profile_id' => 'required|exists:supervisor_profiles,id',
+            'role' => 'required|in:primary,secondary,main,co-supervisor',
+        ]);
+
+        $newSupervisor = \App\Models\SupervisorProfile::with('user')->findOrFail($validated['supervisor_profile_id']);
+
+        try {
+            app(\App\Services\ThesisService::class)->addOrUpdateAssignment(
+                $student->thesis,
+                $newSupervisor,
+                $validated['role'],
+                $assignment
+            );
+        } catch (\Throwable $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        $studentName = $student->user?->name ?? 'Candidate';
+        $supName = $newSupervisor->user?->name ?? 'Supervisor';
+
+        \App\Models\AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'admin_supervisor_updated',
+            'entity_type' => \App\Models\ThesisProject::class,
+            'entity_id' => $student->thesis->id,
+            'metadata' => [
+                'student_id' => $student->id,
+                'student_name' => $studentName,
+                'old_assignment_id' => $assignment->id,
+                'new_supervisor_profile_id' => $newSupervisor->id,
+                'new_supervisor_name' => $supName,
+                'role' => $validated['role'],
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $student->user_id);
+
+        return back()->with('success', "Supervisory assignment updated for {$studentName} ({$supName}).");
+    }
+
+    /**
+     * Administratively remove a single supervisor assignment from the student's committee.
+     */
+    public function removeSupervisorAssignment(Request $request, StudentProfile $student, \App\Models\SupervisionAssignment $assignment)
+    {
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Only Administrators can remove supervisors.');
+        }
+
+        if (!$student->thesis || (string) $assignment->thesis_project_id !== (string) $student->thesis->id) {
+            return back()->with('error', 'Supervisor assignment does not belong to this student.');
+        }
+
+        $assignment->loadMissing('supervisor.user');
+        $supName = $assignment->supervisor?->user?->name ?? 'Supervisor';
+        $studentName = $student->user?->name ?? 'Candidate';
+
+        app(\App\Services\ThesisService::class)->removeAssignment($assignment);
+
+        \App\Models\AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'admin_supervisor_removed',
+            'entity_type' => \App\Models\ThesisProject::class,
+            'entity_id' => $student->thesis->id,
+            'metadata' => [
+                'student_id' => $student->id,
+                'student_name' => $studentName,
+                'removed_supervisor_profile_id' => $assignment->supervisor_profile_id,
+                'removed_supervisor_name' => $supName,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $student->user_id);
+
+        return back()->with('success', "Removed {$supName} from {$studentName}'s supervisory committee.");
+    }
+
+    /**
+     * Administratively remove all active supervisors from a student's thesis.
+     */
+    public function clearSupervisors(Request $request, StudentProfile $student)
+    {
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Only Administrators can clear all supervisors.');
+        }
+
+        if (!$student->thesis) {
+            return back()->with('info', 'Student does not have an active thesis project.');
+        }
+
+        $count = app(\App\Services\ThesisService::class)->clearSupervisors($student->thesis);
+        $studentName = $student->user?->name ?? 'Candidate';
+
+        \App\Models\AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'admin_supervisors_cleared',
+            'entity_type' => \App\Models\ThesisProject::class,
+            'entity_id' => $student->thesis->id,
+            'metadata' => [
+                'student_id' => $student->id,
+                'student_name' => $studentName,
+                'cleared_count' => $count,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $student->user_id);
+
+        return back()->with('success', "Removed {$count} active supervisor(s) from {$studentName}.");
     }
 
     /**

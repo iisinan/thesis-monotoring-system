@@ -21,10 +21,10 @@
     $assignments = $milestone->thesis?->assignments()->where('status', 'active')->with('supervisor.user')->get() ?? collect();
     $hasSupervisors = $assignments->count() > 0;
 
-    // Available supervisors: for Coordinators/Admins scoped by student program; for Students include directory
-    if (auth()->user()->hasRole('Student')) {
+    // Available supervisors: Students & Admins see all directory faculty (program-matching & Professors first); Coordinators see scoped program faculty
+    if (auth()->user()->hasAnyRole(['Student', 'Admin'])) {
         $availableSupervisors = \App\Models\SupervisorProfile::with(['user', 'programs'])
-            ->whereHas('user', fn($q) => $q->where('id', '!=', auth()->id()))
+            ->whereHas('user', fn($q) => $q->where('id', '!=', $student?->user_id ?? auth()->id()))
             ->get()
             ->sortBy(function ($s) use ($student) {
                 $inProg = ($student?->program_id && $s->programs->contains('id', $student->program_id)) ? 0 : 1;
@@ -845,7 +845,7 @@
                 </div>
 
                 {{-- Panel 2: Supervisors Allocated by Programme Coordinator --}}
-                <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-8 flex flex-col justify-between">
+                <div @if(auth()->user()->hasRole('Admin')) x-data="{ editingAdminAssignId: null }" @endif class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-8 flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
@@ -860,25 +860,71 @@
                         @if($hasSupervisors)
                             <div class="space-y-3 mb-4">
                                 @foreach($assignments as $assignment)
-                                    @php $sup = $assignment->supervisor; @endphp
-                                    <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between gap-3">
-                                        <div class="flex items-center gap-3 min-w-0">
-                                            <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600 font-bold text-xs shadow-sm shrink-0">
-                                                {{ substr($sup->user?->name ?? 'S', 0, 1) }}
-                                            </div>
-                                            <div class="min-w-0">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-xs font-bold text-slate-900 truncate">{{ $sup->user?->name }}</span>
-                                                    <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded {{ $assignment->role === 'primary' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-700' }}">
-                                                        {{ $assignment->role === 'primary' ? 'Lead' : 'Co-Sup' }}
-                                                    </span>
+                                    @php
+                                        $sup = $assignment->supervisor;
+                                        $isPrimaryRole = in_array($assignment->role, ['primary', 'main'], true);
+                                    @endphp
+                                    <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div class="flex items-center gap-3 min-w-0">
+                                                <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-indigo-600 font-bold text-xs shadow-sm shrink-0">
+                                                    {{ substr($sup->user?->name ?? 'S', 0, 1) }}
                                                 </div>
-                                                <p class="text-[11px] text-slate-500 truncate">{{ $sup->rank }} • {{ $sup->department ?? $programName }}</p>
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-2">
+                                                        <span class="text-xs font-bold text-slate-900 truncate">{{ $sup->user?->name }}</span>
+                                                        <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded {{ $isPrimaryRole ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-700' }}">
+                                                            {{ $isPrimaryRole ? 'Lead' : 'Co-Sup' }}
+                                                        </span>
+                                                    </div>
+                                                    <p class="text-[11px] text-slate-500 truncate">{{ $sup->rank }} • {{ $sup->department ?? $programName }}</p>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-1.5 shrink-0">
+                                                <span class="text-[10px] font-bold text-slate-400 mr-1">
+                                                    Load: {{ $sup->current_load }}/{{ $sup->max_students }}
+                                                </span>
+                                                @if(auth()->user()->hasRole('Admin') && $student)
+                                                    <button type="button"
+                                                            @click="editingAdminAssignId = editingAdminAssignId === '{{ $assignment->id }}' ? null : '{{ $assignment->id }}'"
+                                                            class="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-700 text-[10px] font-bold text-slate-700 cursor-pointer">
+                                                        Change
+                                                    </button>
+                                                    <form method="POST" action="{{ route('admin.students.supervisors.destroy', [$student, $assignment]) }}" onsubmit="return confirm('Remove {{ addslashes($sup->user?->name ?? 'this supervisor') }} from this student?')">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="px-2 py-1 rounded-lg bg-white border border-rose-200 hover:bg-rose-50 text-[10px] font-bold text-rose-600 cursor-pointer">
+                                                            Remove
+                                                        </button>
+                                                    </form>
+                                                @endif
                                             </div>
                                         </div>
-                                        <span class="text-[10px] font-bold text-slate-400 shrink-0">
-                                            Load: {{ $sup->current_load }}/{{ $sup->max_students }}
-                                        </span>
+
+                                        @if(auth()->user()->hasRole('Admin') && $student)
+                                            <form x-show="editingAdminAssignId === '{{ $assignment->id }}'"
+                                                  x-cloak
+                                                  method="POST"
+                                                  action="{{ route('admin.students.supervisors.update', [$student, $assignment]) }}"
+                                                  class="pt-2.5 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                                                @csrf
+                                                @method('PATCH')
+                                                <select name="supervisor_profile_id" required class="sm:col-span-6 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-800">
+                                                    @foreach($availableSupervisors as $availSup)
+                                                        <option value="{{ $availSup->id }}" @selected($availSup->id === $assignment->supervisor_profile_id)>
+                                                            {{ $availSup->rank }} {{ $availSup->user?->name }} ({{ $availSup->current_load }}/{{ $availSup->max_students }})
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                <select name="role" required class="sm:col-span-4 w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-800">
+                                                    <option value="primary" @selected($isPrimaryRole)>Lead Supervisor</option>
+                                                    <option value="secondary" @selected(!$isPrimaryRole)>Co-Supervisor</option>
+                                                </select>
+                                                <button type="submit" class="sm:col-span-2 w-full px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer">
+                                                    Save
+                                                </button>
+                                            </form>
+                                        @endif
                                     </div>
                                 @endforeach
                             </div>
@@ -891,13 +937,22 @@
                         @endif
                     </div>
 
-                    <div class="flex items-center gap-3 pt-4 border-t border-slate-100">
+                    <div class="flex flex-wrap items-center gap-2.5 pt-4 border-t border-slate-100">
                         <button type="button" 
                                 @click="showAssignModal = true"
-                                class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer">
+                                class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer">
                             <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                             <span>{{ $hasSupervisors ? 'Manage / Override Supervisors' : 'Assign Supervisors' }}</span>
                         </button>
+                        @if(auth()->user()->hasRole('Admin') && $hasSupervisors && $student)
+                            <form method="POST" action="{{ route('admin.students.supervisors.clear', $student) }}" onsubmit="return confirm('Remove ALL assigned supervisors from this student?')">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="inline-flex items-center justify-center gap-1.5 px-4 py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer">
+                                    Remove All
+                                </button>
+                            </form>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -1068,16 +1123,16 @@
                                     {{-- Slot 1: Lead Supervisor (Professor) --}}
                                     <div>
                                         <label class="block text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                                            <span>1. Lead Supervisor (Rank: Professor Required)</span>
+                                            <span>1. Lead Supervisor ({{ auth()->user()->hasRole('Admin') ? 'Admin Override Allowed' : 'Rank: Professor Required' }})</span>
                                             <span class="text-[10px] text-indigo-600 font-bold">Primary Chair</span>
                                         </label>
                                         <select x-model="selectedLead" 
                                                 required 
                                                 class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all">
-                                            <option value="">-- Select Professor for Lead Supervisor --</option>
+                                            <option value="">-- Select {{ auth()->user()->hasRole('Admin') ? 'Lead Supervisor' : 'Professor for Lead Supervisor' }} --</option>
                                             <template x-for="sup in supervisorsList" :key="sup.id">
                                                 <option :value="sup.id" 
-                                                        :disabled="!sup.is_professor && sup.id !== selectedLead"
+                                                        @if(!auth()->user()->hasRole('Admin')) :disabled="!sup.is_professor && sup.id !== selectedLead" @endif
                                                         x-text="(sup.is_professor ? '⭐ Professor ' : sup.rank + ' ') + sup.name + ' • Load: ' + sup.current_load + '/' + sup.max_students + (!sup.is_professor ? ' (Not a Professor)' : '')">
                                                 </option>
                                             </template>

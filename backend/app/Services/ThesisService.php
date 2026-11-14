@@ -220,6 +220,207 @@ class ThesisService
     }
 
     /**
+     * Administratively add or replace a single supervisor assignment on a thesis project.
+     */
+    public function addOrUpdateAssignment(
+        ThesisProject $project,
+        SupervisorProfile $supervisor,
+        string $role = 'secondary',
+        ?SupervisionAssignment $replaceAssignment = null
+    ): SupervisionAssignment {
+        $role = in_array($role, ['primary', 'main'], true) ? 'primary' : 'secondary';
+
+        if ($supervisor->user_id && $project->student && (string) $supervisor->user_id === (string) $project->student->user_id) {
+            throw new Exception("A student cannot be assigned as their own supervisor.");
+        }
+
+        return DB::transaction(function () use ($project, $supervisor, $role, $replaceAssignment) {
+            $removedUserId = null;
+
+            if ($replaceAssignment) {
+                if ((string) $replaceAssignment->thesis_project_id !== (string) $project->id) {
+                    throw new Exception("The selected supervision assignment does not belong to this student's thesis.");
+                }
+
+                // Changing only role when keeping the same supervisor
+                if ((string) $replaceAssignment->supervisor_profile_id === (string) $supervisor->id && $replaceAssignment->status === 'active') {
+                    if ($role === 'primary') {
+                        SupervisionAssignment::where('thesis_project_id', $project->id)
+                            ->where('status', 'active')
+                            ->where('id', '!=', $replaceAssignment->id)
+                            ->whereIn('role', ['primary', 'main'])
+                            ->update(['role' => 'secondary']);
+                    }
+                    $replaceAssignment->update(['role' => $role]);
+                    $this->syncAfterSupervisorMutation($project->fresh());
+
+                    return $replaceAssignment->fresh(['supervisor.user']);
+                }
+
+                // Replacing with a different supervisor: verify new supervisor isn't already active on another slot
+                $alreadyActive = SupervisionAssignment::where('thesis_project_id', $project->id)
+                    ->where('supervisor_profile_id', $supervisor->id)
+                    ->where('status', 'active')
+                    ->where('id', '!=', $replaceAssignment->id)
+                    ->exists();
+                if ($alreadyActive) {
+                    throw new Exception("Supervisor {$supervisor->user?->name} is already assigned to another slot on this thesis.");
+                }
+
+                $replaceAssignment->loadMissing('supervisor');
+                if ($replaceAssignment->status === 'active' && $replaceAssignment->supervisor && $replaceAssignment->supervisor->current_load > 0) {
+                    $replaceAssignment->supervisor->decrement('current_load');
+                }
+                $removedUserId = $replaceAssignment->supervisor?->user_id;
+                $replaceAssignment->update([
+                    'status' => 'ended',
+                    'ended_at' => now(),
+                ]);
+            } else {
+                $alreadyActive = SupervisionAssignment::where('thesis_project_id', $project->id)
+                    ->where('supervisor_profile_id', $supervisor->id)
+                    ->where('status', 'active')
+                    ->exists();
+                if ($alreadyActive) {
+                    throw new Exception("Supervisor {$supervisor->user?->name} is already actively assigned to this student.");
+                }
+            }
+
+            if ($role === 'primary') {
+                SupervisionAssignment::where('thesis_project_id', $project->id)
+                    ->where('status', 'active')
+                    ->whereIn('role', ['primary', 'main'])
+                    ->update(['role' => 'secondary']);
+            }
+
+            // Re-activate an ended assignment row if one exists for this thesis+supervisor, else create new
+            $assignment = SupervisionAssignment::where('thesis_project_id', $project->id)
+                ->where('supervisor_profile_id', $supervisor->id)
+                ->first();
+
+            if ($assignment) {
+                $wasActive = $assignment->status === 'active';
+                $assignment->update([
+                    'role' => $role,
+                    'status' => 'active',
+                    'assigned_at' => now(),
+                    'ended_at' => null,
+                ]);
+                if (!$wasActive) {
+                    $supervisor->increment('current_load');
+                }
+            } else {
+                $assignment = SupervisionAssignment::create([
+                    'thesis_project_id' => $project->id,
+                    'supervisor_profile_id' => $supervisor->id,
+                    'role' => $role,
+                    'status' => 'active',
+                    'assigned_at' => now(),
+                ]);
+                $supervisor->increment('current_load');
+            }
+
+            $this->syncAfterSupervisorMutation($project->fresh(), $removedUserId);
+
+            return $assignment->fresh(['supervisor.user']);
+        });
+    }
+
+    /**
+     * Administratively remove a single active supervisor assignment from a thesis project.
+     */
+    public function removeAssignment(SupervisionAssignment $assignment): void
+    {
+        DB::transaction(function () use ($assignment) {
+            $assignment->loadMissing(['supervisor', 'thesis']);
+            $project = $assignment->thesis;
+            $removedUserId = $assignment->supervisor?->user_id;
+
+            if ($assignment->status === 'active') {
+                if ($assignment->supervisor && $assignment->supervisor->current_load > 0) {
+                    $assignment->supervisor->decrement('current_load');
+                }
+                $assignment->update([
+                    'status' => 'ended',
+                    'ended_at' => now(),
+                ]);
+            }
+
+            if ($project) {
+                $this->syncAfterSupervisorMutation($project->fresh(), $removedUserId);
+            }
+        });
+    }
+
+    /**
+     * Administratively remove all active supervisor assignments from a thesis project.
+     */
+    public function clearSupervisors(ThesisProject $project): int
+    {
+        return DB::transaction(function () use ($project) {
+            $active = SupervisionAssignment::with('supervisor')
+                ->where('thesis_project_id', $project->id)
+                ->where('status', 'active')
+                ->get();
+
+            $removedUserIds = [];
+            foreach ($active as $assignment) {
+                if ($assignment->supervisor && $assignment->supervisor->current_load > 0) {
+                    $assignment->supervisor->decrement('current_load');
+                }
+                if ($assignment->supervisor?->user_id) {
+                    $removedUserIds[] = $assignment->supervisor->user_id;
+                }
+            }
+
+            SupervisionAssignment::where('thesis_project_id', $project->id)
+                ->where('status', 'active')
+                ->update([
+                    'status' => 'ended',
+                    'ended_at' => now(),
+                ]);
+
+            foreach (array_unique($removedUserIds) as $removedId) {
+                $this->syncAfterSupervisorMutation($project->fresh(), $removedId);
+            }
+
+            return $active->count();
+        });
+    }
+
+    /**
+     * Sync auto-advancement and Internal Defence panel membership after supervisor mutations.
+     */
+    public function syncAfterSupervisorMutation(ThesisProject $project, ?string $removedSupervisorUserId = null): void
+    {
+        $workflow = app(MilestoneWorkflowService::class);
+        $workflow->tryAutoAdvanceSupervisorsAssigned($project);
+
+        $internalEvents = \App\Models\DefenceEvent::where('thesis_project_id', $project->id)
+            ->where('type', 'internal')
+            ->get();
+
+        foreach ($internalEvents as $event) {
+            $workflow->syncInternalDefencePanel($event);
+
+            if ($removedSupervisorUserId) {
+                $desiredIds = $workflow->getInternalDefencePanelUserIds($project->fresh());
+                if (!in_array((string) $removedSupervisorUserId, array_map('strval', $desiredIds), true)) {
+                    $hasEvaluated = \App\Models\Evaluation::where('defence_event_id', $event->id)
+                        ->where('evaluator_id', $removedSupervisorUserId)
+                        ->exists();
+                    if (!$hasEvaluated) {
+                        \App\Models\PanelMember::where('defence_event_id', $event->id)
+                            ->where('user_id', $removedSupervisorUserId)
+                            ->where('role', 'examiner')
+                            ->delete();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Verify if a supervisor is authorized for any of the student's institutional programs.
      */
     protected function isSupervisorInStudentPrograms(SupervisorProfile $supervisor, StudentProfile $student): bool

@@ -137,8 +137,9 @@ class ThesisController extends Controller
                     throw new \Exception("A supervisor cannot be attached to one student multiple times.");
                 }
 
-                // Bulk Assignment (Replace)
-                $this->thesisService->replaceSupervisors($thesis, $ids);
+                // Bulk Assignment (Replace); Admins may override capacity/rank when managing existing committees
+                $isAdminOverride = auth()->user()?->hasRole('Admin') ?? false;
+                $this->thesisService->replaceSupervisors($thesis, $ids, !$isAdminOverride, !$isAdminOverride);
                 $message = 'Institutional supervision panel authorized successfully.';
                 $data = ['success' => true, 'message' => $message];
             } else {

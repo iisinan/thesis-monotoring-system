@@ -336,10 +336,11 @@ class SupervisorController extends Controller
 
         $assignment = \App\Models\SupervisionAssignment::where('supervisor_profile_id', $supervisor->id)
             ->where('thesis_project_id', $thesis->id)
+            ->where('status', 'active')
             ->first();
 
         if ($assignment) {
-            $assignment->delete(); // Or update status to 'inactive' if history is needed
+            app(\App\Services\ThesisService::class)->removeAssignment($assignment);
             return back()->with('success', 'Student unassigned successfully.');
         }
 

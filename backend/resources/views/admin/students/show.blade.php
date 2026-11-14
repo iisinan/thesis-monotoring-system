@@ -184,21 +184,163 @@
             </div>
 
             {{-- Supervision Cluster --}}
-            <div class="bg-white border border-slate-100 rounded-[2rem] p-8 shadow-sm">
-                <h4 class="text-lg font-black text-slate-900 tracking-tight mb-6">Supervision Cluster</h4>
-                <div class="space-y-4">
-                    @forelse($student->thesis->supervisors ?? [] as $assoc)
-                        <div class="group p-4 bg-white border border-slate-100 rounded-2xl hover:border-brand-200 transition-all duration-300 shadow-sm flex items-center justify-between">
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-lg font-black text-slate-400 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
-                                    {{ substr($assoc->supervisor->user->name ?? '?', 0, 1) }}
-                                </div>
-                                <div>
-                                    <p class="text-sm font-black text-slate-900">{{ $assoc->supervisor->user->name ?? 'Unknown' }}</p>
-                                    <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">{{ $assoc->role }} Supervisor</p>
-                                </div>
+            @php
+                $activeAssignments = $student->thesis?->assignments
+                    ? $student->thesis->assignments->where('status', 'active')->values()
+                    : collect();
+                $canManageSupervisors = auth()->user()->hasRole('Admin');
+            @endphp
+            <div class="bg-white border border-slate-100 rounded-[2rem] p-8 shadow-sm"
+                 x-data="{ editingAssignmentId: null, showAddSupervisor: false, supFilter: '' }">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
+                    <div>
+                        <h4 class="text-lg font-black text-slate-900 tracking-tight">Supervision Cluster</h4>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            {{ $activeAssignments->count() }} Active Supervisor(s)
+                        </p>
+                    </div>
+                    @if($canManageSupervisors)
+                        <div class="flex items-center gap-2">
+                            <button type="button"
+                                    @click="showAddSupervisor = !showAddSupervisor"
+                                    class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition shadow-sm cursor-pointer">
+                                <span x-text="showAddSupervisor ? 'Close' : '+ Add Supervisor'"></span>
+                            </button>
+                            @if($activeAssignments->isNotEmpty() && $student->thesis)
+                                <form action="{{ route('admin.students.supervisors.clear', $student) }}" method="POST"
+                                      data-confirm="Remove ALL {{ $activeAssignments->count() }} active supervisor(s) from {{ addslashes($student->user->name ?? 'this student') }}?"
+                                      data-confirm-title="Remove All Supervisors"
+                                      data-confirm-type="danger"
+                                      data-confirm-btn="Remove All">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition cursor-pointer">
+                                        Remove All
+                                    </button>
+                                </form>
+                            @endif
+                        </div>
+                    @endif
+                </div>
+
+                @if($canManageSupervisors)
+                    {{-- Add Supervisor Form --}}
+                    <div x-show="showAddSupervisor" x-cloak class="mb-5 p-4 bg-indigo-50/60 border border-indigo-200 rounded-2xl space-y-3">
+                        <p class="text-[10px] font-black text-indigo-900 uppercase tracking-wider">Add Supervisor to Committee</p>
+                        <input type="text"
+                               x-model="supFilter"
+                               placeholder="Search faculty by name or rank..."
+                               class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700" />
+                        <form action="{{ route('admin.students.supervisors.store', $student) }}" method="POST" class="space-y-3">
+                            @csrf
+                            <div>
+                                <label class="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1">Supervisor</label>
+                                <select name="supervisor_profile_id" required class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2.5 px-3">
+                                    <option value="">-- Choose Supervisor --</option>
+                                    @foreach($availableSupervisors ?? [] as $sup)
+                                        @php
+                                            $supDisplay = ($sup->user?->name ?? 'Supervisor') . ' [' . ($sup->rank ?? 'Faculty') . '] (Load: ' . ($sup->current_load ?? 0) . '/' . ($sup->max_students ?? 5) . ')';
+                                        @endphp
+                                        <option value="{{ $sup->id }}"
+                                                x-show="!supFilter || '{{ strtolower(addslashes(($sup->user?->name ?? '') . ' ' . ($sup->rank ?? '') . ' ' . ($sup->user?->email ?? ''))) }}'.includes(supFilter.toLowerCase())">
+                                            {{ $supDisplay }}
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
-                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <div>
+                                <label class="block text-[10px] font-black uppercase tracking-wider text-slate-600 mb-1">Role</label>
+                                <select name="role" class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2.5 px-3">
+                                    <option value="primary" {{ $activeAssignments->isEmpty() ? 'selected' : '' }}>Lead Supervisor (Primary)</option>
+                                    <option value="secondary" {{ $activeAssignments->isNotEmpty() ? 'selected' : '' }}>Co-Supervisor (Secondary)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm cursor-pointer">
+                                Save Supervisor
+                            </button>
+                        </form>
+                    </div>
+                @endif
+
+                <div class="space-y-4">
+                    @forelse($activeAssignments as $assoc)
+                        @php
+                            $isLead = in_array($assoc->role, ['primary', 'main'], true);
+                        @endphp
+                        <div class="group p-4 bg-white border border-slate-100 rounded-2xl hover:border-brand-200 transition-all duration-300 shadow-sm space-y-3">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-3 min-w-0">
+                                    <div class="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-base font-black text-slate-500 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors shrink-0">
+                                        {{ substr($assoc->supervisor?->user?->name ?? '?', 0, 1) }}
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-black text-slate-900 truncate">{{ $assoc->supervisor?->user?->name ?? 'Unknown' }}</p>
+                                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">
+                                            {{ $isLead ? 'Lead Supervisor' : 'Co-Supervisor' }} &bull; {{ $assoc->supervisor?->rank ?? 'Faculty' }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                @if($canManageSupervisors)
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button type="button"
+                                                @click="editingAssignmentId = editingAssignmentId === '{{ $assoc->id }}' ? null : '{{ $assoc->id }}'"
+                                                class="px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer"
+                                                title="Change Supervisor or Role">
+                                            Change
+                                        </button>
+                                        <form action="{{ route('admin.students.supervisors.destroy', [$student, $assoc]) }}" method="POST"
+                                              data-confirm="Remove {{ addslashes($assoc->supervisor?->user?->name ?? 'this supervisor') }} from {{ addslashes($student->user->name ?? 'this student') }}?"
+                                              data-confirm-title="Remove Supervisor"
+                                              data-confirm-type="danger"
+                                              data-confirm-btn="Remove">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit"
+                                                    class="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-[10px] font-black uppercase tracking-wider transition cursor-pointer"
+                                                    title="Remove Supervisor">
+                                                Remove
+                                            </button>
+                                        </form>
+                                    </div>
+                                @else
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                @endif
+                            </div>
+
+                            @if($canManageSupervisors)
+                                <div x-show="editingAssignmentId === '{{ $assoc->id }}'" x-cloak class="pt-3 border-t border-slate-100">
+                                    <form action="{{ route('admin.students.supervisors.update', [$student, $assoc]) }}" method="POST" class="space-y-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                        @csrf
+                                        @method('PATCH')
+                                        <div>
+                                            <label class="block text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1">Replace With Supervisor</label>
+                                            <select name="supervisor_profile_id" required class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2 px-2.5">
+                                                @foreach($availableSupervisors ?? [] as $sup)
+                                                    <option value="{{ $sup->id }}" {{ (string) $sup->id === (string) $assoc->supervisor_profile_id ? 'selected' : '' }}>
+                                                        {{ $sup->user?->name ?? 'Supervisor' }} [{{ $sup->rank ?? 'Faculty' }}] ({{ $sup->current_load ?? 0 }}/{{ $sup->max_students ?? 5 }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1">Role</label>
+                                            <select name="role" required class="w-full text-xs font-semibold bg-white rounded-xl border border-slate-300 py-2 px-2.5">
+                                                <option value="primary" {{ $isLead ? 'selected' : '' }}>Lead Supervisor (Primary)</option>
+                                                <option value="secondary" {{ !$isLead ? 'selected' : '' }}>Co-Supervisor (Secondary)</option>
+                                            </select>
+                                        </div>
+                                        <div class="flex items-center justify-end gap-2">
+                                            <button type="button" @click="editingAssignmentId = null" class="px-3 py-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-700 cursor-pointer">
+                                                Cancel
+                                            </button>
+                                            <button type="submit" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider cursor-pointer">
+                                                Save Changes
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            @endif
                         </div>
                     @empty
                         <div class="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">

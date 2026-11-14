@@ -32,6 +32,10 @@ Route::get('/users/{user}/impersonate', function () {
 Route::delete('/students/bulk-destroy', [StudentController::class, 'bulkDestroy'])->name('students.bulk-destroy');
 Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
 Route::get('/students/{student}', [StudentController::class, 'show'])->name('students.show');
+Route::post('/students/{student}/supervisors', [StudentController::class, 'addSupervisor'])->name('students.supervisors.store');
+Route::patch('/students/{student}/supervisors/{assignment}', [StudentController::class, 'updateSupervisorAssignment'])->name('students.supervisors.update');
+Route::delete('/students/{student}/supervisors/{assignment}', [StudentController::class, 'removeSupervisorAssignment'])->name('students.supervisors.destroy');
+Route::delete('/students/{student}/supervisors', [StudentController::class, 'clearSupervisors'])->name('students.supervisors.clear');
 Route::post('/students/{student}/assign-examiner', [StudentController::class, 'assignInternalExaminer'])->name('students.assign-examiner');
 Route::post('/students/{student}/promote-milestone', [StudentController::class, 'promoteMilestone'])->name('students.promote-milestone');
 Route::post('/students/{student}/set-milestone', [StudentController::class, 'setMilestone'])->name('students.set-milestone');
