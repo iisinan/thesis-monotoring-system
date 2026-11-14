@@ -24,7 +24,7 @@ class ThesisController extends Controller
                     $query->orWhereIn('external_examiner_profile_id', $externalProfileIds);
                 }
                 $query->orWhereHas('examinerAssignments', fn($eq) => $eq->where('examiner_id', $user->id))
-                      ->orWhereHas('defenceEvents', fn($dq) => $dq->whereIn('type', ['internal', 'external'])->whereHas('panelMembers', fn($pq) => $pq->where('user_id', $user->id)));
+                      ->orWhereHas('defenceEvents', fn($dq) => $dq->whereIn('type', ['external', 'viva'])->whereHas('panelMembers', fn($pq) => $pq->where('user_id', $user->id)));
             })
             ->latest()
             ->paginate(15);
@@ -54,7 +54,7 @@ class ThesisController extends Controller
                     $query->orWhereIn('external_examiner_profile_id', $externalProfileIds);
                 }
                 $query->orWhereHas('examinerAssignments', fn($eq) => $eq->where('examiner_id', $user->id))
-                      ->orWhereHas('defenceEvents', fn($dq) => $dq->whereIn('type', ['internal', 'external'])->whereHas('panelMembers', fn($pq) => $pq->where('user_id', $user->id)));
+                      ->orWhereHas('defenceEvents', fn($dq) => $dq->whereIn('type', ['external', 'viva'])->whereHas('panelMembers', fn($pq) => $pq->where('user_id', $user->id)));
             })
             ->firstOrFail();
 

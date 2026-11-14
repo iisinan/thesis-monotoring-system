@@ -131,15 +131,18 @@ class DefenceEvent extends Model
                 ]);
                 return true;
             }
-            if ($this->type === 'internal' && \App\Models\ExaminerAssignment::where('thesis_project_id', $thesis->id)->where('type', 'internal_examiner')->where('examiner_id', $userId)->exists()) {
-                \App\Models\PanelMember::firstOrCreate([
-                    'defence_event_id' => $this->id,
-                    'user_id' => $userId,
-                ], [
-                    'role' => 'examiner',
-                    'invitation_status' => 'accepted'
-                ]);
-                return true;
+            if ($this->type === 'internal') {
+                $panelIds = app(\App\Services\MilestoneWorkflowService::class)->getInternalDefencePanelUserIds($thesis);
+                if (in_array((string) $userId, array_map('strval', $panelIds), true)) {
+                    \App\Models\PanelMember::firstOrCreate([
+                        'defence_event_id' => $this->id,
+                        'user_id' => $userId,
+                        'role' => 'examiner',
+                    ], [
+                        'invitation_status' => 'accepted',
+                    ]);
+                    return true;
+                }
             }
             if (in_array($this->type, ['external', 'viva']) && \App\Models\ExaminerAssignment::where('thesis_project_id', $thesis->id)->where('type', 'external_examiner')->where('examiner_id', $userId)->exists()) {
                 \App\Models\PanelMember::firstOrCreate([

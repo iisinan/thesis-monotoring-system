@@ -217,6 +217,35 @@
         </div>
     </div>
 
+    {{-- Pending Panel Defence Evaluations for Director --}}
+    @if(isset($pending_evaluations) && $pending_evaluations->count() > 0)
+    <div class="bg-white rounded-3xl border border-amber-200/80 shadow-sm p-6 sm:p-7 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div>
+                <h3 class="text-base font-black text-slate-900 tracking-tight uppercase">Pending Oral / Internal Defence Evaluations</h3>
+                <p class="text-xs text-slate-500 mt-0.5">Scheduled defence panels awaiting your examiner evaluation.</p>
+            </div>
+            <span class="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black rounded-lg uppercase tracking-wider">
+                {{ $pending_evaluations->count() }} Pending
+            </span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            @foreach($pending_evaluations as $event)
+            <div class="p-5 bg-amber-50/40 border border-amber-100 rounded-2xl space-y-3 flex flex-col justify-between">
+                <div>
+                    <span class="text-[9px] font-black uppercase tracking-widest text-amber-700 bg-amber-100 px-2 py-0.5 rounded">{{ ucfirst(str_replace('_', ' ', $event->type ?? 'Internal')) }} Defence</span>
+                    <h4 class="text-sm font-black text-slate-800 mt-2">{{ $event->thesis?->student?->user?->name ?? 'Candidate' }}</h4>
+                    <p class="text-xs text-slate-500 truncate">{{ $event->thesis?->title ?? 'Untitled Thesis' }}</p>
+                </div>
+                <a href="{{ route('evaluations.create', ['defenceEvent' => $event->id]) }}" class="block text-center py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs">
+                    Evaluate Candidate
+                </a>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
     {{-- Stalled Students / Grace Period Alert Banner --}}
     @if(isset($stalled_students) && $stalled_students->count() > 0)
     <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-600 to-amber-500 p-px shadow-xl shadow-amber-600/20">

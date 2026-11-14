@@ -214,6 +214,11 @@ document.addEventListener('click', async function(e) {
     if (ok) {
         el._confirmed = true;
         if (el.tagName === 'FORM') {
+            if (el.hasAttribute('data-milestone-ajax') || el.closest('[data-milestone-block]')) {
+                el._confirmed = true;
+                typeof el.requestSubmit === 'function' ? el.requestSubmit() : el.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                return;
+            }
             HTMLFormElement.prototype.submit.call(el);
             return;
         }
@@ -224,6 +229,10 @@ document.addEventListener('click', async function(e) {
         const form = el.closest('form');
         if (form && (el.type === 'submit' || !el.type)) {
             form._confirmed = true;
+            if (form.hasAttribute('data-milestone-ajax') || form.closest('[data-milestone-block]')) {
+                typeof form.requestSubmit === 'function' ? form.requestSubmit(el.type === 'submit' ? el : undefined) : form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                return;
+            }
             HTMLFormElement.prototype.submit.call(form);
             return;
         }
@@ -264,6 +273,10 @@ document.addEventListener('submit', async function(e) {
     
     if (ok) {
         form._confirmed = true;
+        if (form.hasAttribute('data-milestone-ajax') || form.closest('[data-milestone-block]')) {
+            typeof form.requestSubmit === 'function' ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            return;
+        }
         HTMLFormElement.prototype.submit.call(form);
     }
 }, true);

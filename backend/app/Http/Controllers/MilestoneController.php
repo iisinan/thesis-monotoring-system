@@ -1105,6 +1105,10 @@ class MilestoneController extends Controller
                     ]);
                 }
             }
+
+            if ($type === 'internal') {
+                app(\App\Services\MilestoneWorkflowService::class)->syncInternalDefencePanel($event);
+            }
         }
 
         \Illuminate\Support\Facades\Log::info("Defence date set successfully for milestone: {$milestone->id}");

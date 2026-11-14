@@ -151,8 +151,7 @@ class DashboardController extends Controller
         $isCoordinator = $user->hasRole('Program Coordinator');
         $isInternalExaminer = $user->hasRole('Internal Examiner')
             || $user->internalExaminerProfiles()->exists()
-            || \App\Models\ExaminerAssignment::where('examiner_id', $user->id)->where('type', 'internal_examiner')->exists()
-            || \App\Models\DefenceEvent::where('type', 'internal')->whereHas('panelMembers', fn($q) => $q->where('user_id', $user->id))->exists();
+            || \App\Models\ExaminerAssignment::where('examiner_id', $user->id)->where('type', 'internal_examiner')->exists();
         $isExternalExaminer = $user->hasRole('External Examiner');
 
         $activeFacultyRoles = [
@@ -449,8 +448,7 @@ class DashboardController extends Controller
                             $q->whereIn('internal_examiner_profile_id', $internalProfileIds);
                             $method = 'orWhereHas';
                         }
-                        $q->{$method}('examinerAssignments', fn($eq) => $eq->where('examiner_id', $user->id)->where('type', 'internal_examiner'))
-                          ->orWhereHas('defenceEvents', fn($dq) => $dq->where('type', 'internal')->whereHas('panelMembers', fn($pq) => $pq->where('user_id', $user->id)));
+                        $q->{$method}('examinerAssignments', fn($eq) => $eq->where('examiner_id', $user->id)->where('type', 'internal_examiner'));
                     })
                     ->with(['student.user', 'student.program', 'student.level', 'currentMilestone.template', 'milestones.template'])
                     ->latest()
@@ -522,35 +520,7 @@ class DashboardController extends Controller
 
         // 5. VIVA / ORAL DEFENCE EVALUATIONS (Applicable to Examiners & Panelists)
         $workflowService = app(\App\Services\MilestoneWorkflowService::class);
-        $data['pending_evaluations'] = collect();
-        try {
-            $data['pending_evaluations'] = \App\Models\DefenceEvent::whereNotIn('type', ['seminar', 'proposal', 'progress_report_1', 'progress_report_2'])
-                ->where(function($q) {
-                    $q->whereNull('outcome')->orWhere('outcome', 'pending');
-                })
-                ->whereHas('panelMembers', function($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                })->whereDoesntHave('evaluations', function($q) use ($user) {
-                    $q->where('evaluator_id', $user->id);
-                })->with(['thesis.student.user', 'thesis.milestones.template'])
-                ->get()
-                ->filter(function ($event) use ($workflowService) {
-                    $milestones = $event->thesis?->milestones ?? collect();
-                    if (in_array($event->type, ['internal', 'internal_defence'])) {
-                        $m = $milestones->first(fn($sm) => $workflowService->isInternalDefence($sm));
-                        return $m && !empty($m->defence_date) && $m->status !== 'approved' && !$workflowService->isPostDefencePhase($m);
-                    }
-                    if (in_array($event->type, ['external', 'external_defence', 'viva'])) {
-                        $m = $milestones->first(fn($sm) => $sm->template?->slug === 'viva' || (int) ($sm->template?->order ?? 0) === 7);
-                        return $m && !empty($m->defence_date) && $m->status !== 'approved';
-                    }
-                    return !empty($event->schedule_start);
-                })
-                ->values();
-        } catch (\Throwable $e) {
-            \Log::warning('Pending evaluations query failed: ' . $e->getMessage());
-            error_log('[PENDING_EVALUATIONS_WARN] ' . $e->getMessage());
-        }
+        $data['pending_evaluations'] = $this->getPendingPanelEvaluations($user, $workflowService);
 
         // 6. UPCOMING ACADEMIC DEFENCES (Unified timeline across active portfolios)
         $upcomingDefences = collect();
@@ -795,8 +765,49 @@ class DashboardController extends Controller
         // Specific requirements for Section 10: Reports data visibility
         $data['available_programs'] = \App\Models\Program::all();
         $data['available_cohorts'] = \App\Models\Cohort::orderBy('intake_year', 'desc')->get();
+        $data['pending_evaluations'] = $this->getPendingPanelEvaluations($user);
 
         return view('dashboard.director', $data);
+    }
+
+    /**
+     * Load ungraded Viva / Internal Defence panel evaluations for the given user.
+     */
+    private function getPendingPanelEvaluations($user, ?\App\Services\MilestoneWorkflowService $workflowService = null): \Illuminate\Support\Collection
+    {
+        $workflowService = $workflowService ?? app(\App\Services\MilestoneWorkflowService::class);
+
+        try {
+            return \App\Models\DefenceEvent::whereNotIn('type', ['seminar', 'proposal', 'progress_report_1', 'progress_report_2'])
+                ->where(function ($q) {
+                    $q->whereNull('outcome')->orWhere('outcome', 'pending');
+                })
+                ->whereHas('panelMembers', function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                })
+                ->whereDoesntHave('evaluations', function ($q) use ($user) {
+                    $q->where('evaluator_id', $user->id);
+                })
+                ->with(['thesis.student.user', 'thesis.milestones.template'])
+                ->get()
+                ->filter(function ($event) use ($workflowService) {
+                    $milestones = $event->thesis?->milestones ?? collect();
+                    if (in_array($event->type, ['internal', 'internal_defence'])) {
+                        $m = $milestones->first(fn($sm) => $workflowService->isInternalDefence($sm));
+                        return $m && !empty($m->defence_date) && $m->status !== 'approved' && !$workflowService->isPostDefencePhase($m);
+                    }
+                    if (in_array($event->type, ['external', 'external_defence', 'viva'])) {
+                        $m = $milestones->first(fn($sm) => $sm->template?->slug === 'viva' || (int) ($sm->template?->order ?? 0) === 7);
+                        return $m && !empty($m->defence_date) && $m->status !== 'approved';
+                    }
+                    return !empty($event->schedule_start);
+                })
+                ->values();
+        } catch (\Throwable $e) {
+            \Log::warning('Pending evaluations query failed: ' . $e->getMessage());
+            error_log('[PENDING_EVALUATIONS_WARN] ' . $e->getMessage());
+            return collect();
+        }
     }
 
     private function adminDashboard($user, $data = [], $view = 'admin.dashboard')

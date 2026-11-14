@@ -81,6 +81,11 @@ class PresentationController extends Controller
                         'invitation_status' => 'accepted'
                     ]);
                 }
+
+                if ($targetEventType === 'internal') {
+                    app(\App\Services\MilestoneWorkflowService::class)->syncInternalDefencePanel($ev);
+                }
+
                 $missingEventFound = true;
             }
         }

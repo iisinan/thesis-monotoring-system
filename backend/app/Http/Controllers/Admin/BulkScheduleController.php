@@ -79,6 +79,35 @@ class BulkScheduleController extends Controller
                 $milestone->meeting_link = $request->meeting_link;
                 $milestone->save();
                 $updatedCount++;
+
+                if ($request->defence_type === 'internal' && $milestone->thesis) {
+                    $start = \Carbon\Carbon::parse($request->defence_date);
+                    if (!empty($request->defence_time)) {
+                        try {
+                            $timeParts = \Carbon\Carbon::parse($request->defence_time);
+                            $start->setTime($timeParts->hour, $timeParts->minute);
+                        } catch (\Throwable $e) {
+                            $start->setTime(9, 0);
+                        }
+                    } else {
+                        $start->setTime(9, 0);
+                    }
+
+                    $event = \App\Models\DefenceEvent::updateOrCreate(
+                        [
+                            'thesis_project_id' => $milestone->thesis->id,
+                            'type' => 'internal',
+                        ],
+                        [
+                            'schedule_start' => $start,
+                            'schedule_end' => $start->copy()->addHour(),
+                            'location' => $request->meeting_link ?: null,
+                            'outcome' => 'pending',
+                        ]
+                    );
+
+                    app(\App\Services\MilestoneWorkflowService::class)->syncInternalDefencePanel($event);
+                }
             }
 
             // Queue one email per unique student (even if multiple milestones matched)

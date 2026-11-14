@@ -396,13 +396,6 @@ class MilestoneWorkflowService
             return true;
         }
 
-        if (\App\Models\DefenceEvent::where('thesis_project_id', $thesis->id)
-            ->where('type', 'internal')
-            ->whereHas('panelMembers', fn($q) => $q->where('user_id', $user->id)->where('role', 'examiner'))
-            ->exists()) {
-            return true;
-        }
-
         return false;
     }
 
@@ -1519,5 +1512,83 @@ class MilestoneWorkflowService
 
             return true;
         });
+    }
+
+    /**
+     * Collect all user IDs who should automatically sit on an Internal Defence panel:
+     * all active thesis supervisors, all Program Coordinators, all Directors,
+     * plus any designated Internal Examiner on the thesis.
+     */
+    public function getInternalDefencePanelUserIds(ThesisProject $thesis): array
+    {
+        $studentUserId = $thesis->student?->user_id;
+
+        $supervisorUserIds = $thesis->assignments()
+            ->where('status', 'active')
+            ->with('supervisor')
+            ->get()
+            ->pluck('supervisor.user_id')
+            ->filter()
+            ->all();
+
+        $leadershipUserIds = \App\Models\User::whereHas('roles', function ($q) {
+                $q->whereIn('name', ['Program Coordinator', 'Director']);
+            })
+            ->where('is_active', true)
+            ->pluck('id')
+            ->all();
+
+        $coordinatorProfileUserIds = \App\Models\CoordinatorProfile::where('active', true)
+            ->pluck('user_id')
+            ->all();
+
+        $designatedIds = [];
+        if ($thesis->internalExaminer && $thesis->internalExaminer->user_id) {
+            $designatedIds[] = $thesis->internalExaminer->user_id;
+        }
+        $assignmentIds = \App\Models\ExaminerAssignment::where('thesis_project_id', $thesis->id)
+            ->where('type', 'internal_examiner')
+            ->pluck('examiner_id')
+            ->all();
+
+        return collect(array_merge(
+                $supervisorUserIds,
+                $leadershipUserIds,
+                $coordinatorProfileUserIds,
+                $designatedIds,
+                $assignmentIds
+            ))
+            ->filter(fn($id) => !empty($id) && (string) $id !== (string) $studentUserId)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Synchronize all required Internal Defence panel examiners onto the given DefenceEvent.
+     */
+    public function syncInternalDefencePanel(\App\Models\DefenceEvent $event): void
+    {
+        if ($event->type !== 'internal') {
+            return;
+        }
+
+        $thesis = $event->relationLoaded('thesis')
+            ? $event->thesis
+            : $event->thesis()->with(['student', 'internalExaminer'])->first();
+
+        if (!$thesis) {
+            return;
+        }
+
+        foreach ($this->getInternalDefencePanelUserIds($thesis) as $userId) {
+            \App\Models\PanelMember::firstOrCreate([
+                'defence_event_id' => $event->id,
+                'user_id' => $userId,
+                'role' => 'examiner',
+            ], [
+                'invitation_status' => 'accepted',
+            ]);
+        }
     }
 }

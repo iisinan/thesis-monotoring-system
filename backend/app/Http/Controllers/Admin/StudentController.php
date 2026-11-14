@@ -423,6 +423,9 @@ class StudentController extends Controller
         $studentIds = $request->input('student_ids', []);
 
         if (empty($milestoneIds) && empty($studentIds)) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => 'No students were selected for deletion.'], 422);
+            }
             return back()->with('error', 'No students were selected for deletion.');
         }
 
@@ -450,6 +453,9 @@ class StudentController extends Controller
         $count = $studentsToDelete->count();
 
         if ($count === 0) {
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => 'No valid student profiles were found to delete.'], 422);
+            }
             return back()->with('error', 'No valid student profiles were found to delete.');
         }
 
@@ -457,6 +463,11 @@ class StudentController extends Controller
             $this->deleteStudentRecord($student);
         }
 
-        return back()->with('success', "Successfully deleted {$count} student record(s) from the system.");
+        $msg = "Successfully deleted {$count} student record(s) from the system.";
+        if ($request->expectsJson()) {
+            return response()->json(['ok' => true, 'status' => 'success', 'message' => $msg]);
+        }
+
+        return back()->with('success', $msg);
     }
 }
