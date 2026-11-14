@@ -2134,7 +2134,7 @@
                                                                     }
                                                                 }
                                                                 if ($count > 0) {
-                                                                    $avgScore = round($total / $count, 1);
+                                                                    $avgScore = (int) round($total / $count);
                                                                 }
                                                                 if (($passCount + $failCount) > 0) {
                                                                     $gradingOutcome = ($passCount >= $failCount) ? 'pass' : 'fail';

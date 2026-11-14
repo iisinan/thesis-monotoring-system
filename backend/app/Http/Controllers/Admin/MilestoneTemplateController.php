@@ -2162,7 +2162,7 @@ class MilestoneTemplateController extends Controller
                             }
                         }
                         if ($count > 0) {
-                            $avgScore = round($total / $count, 1);
+                            $avgScore = (int) round($total / $count);
                         }
                     }
                 } elseif (in_array($template->slug, ['proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence'])) {
@@ -2297,7 +2297,7 @@ class MilestoneTemplateController extends Controller
                             }
                         }
                         if ($count > 0) {
-                            $avgScore = round($total / $count, 1);
+                            $avgScore = (int) round($total / $count);
                         }
                     }
                 }
