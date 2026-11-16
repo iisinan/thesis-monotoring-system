@@ -102,14 +102,17 @@ class ThesisService
     ) {
         return DB::transaction(function () use ($project, $supervisorIds, $enforceCapacity, $enforcePrimaryProfessor) {
             $student = $project->student;
-            $levelName = $student->level->name ?? '';
-            $isPhD = $levelName && stripos($levelName, 'PhD') !== false;
-            $requiredCount = $isPhD ? 3 : 2;
+            $isPhD = $student ? $student->isPhd() : false;
 
-            // 1. Enforce Count Rules (MSc=2, PhD=3)
-            if (count($supervisorIds) !== $requiredCount) {
-                $msg = $isPhD ? "PhD panels must consist of exactly 3 authorized members." : "MSc panels must consist of exactly 2 authorized members.";
-                throw new Exception($msg);
+            // 1. Enforce Count Rules (MSc=2, PhD=2 to 3)
+            if ($isPhD) {
+                if (count($supervisorIds) < 2 || count($supervisorIds) > 3) {
+                    throw new Exception("PhD panels must consist of 2 to 3 authorized members (up to 3 supervisors).");
+                }
+            } else {
+                if (count($supervisorIds) !== 2) {
+                    throw new Exception("MSc panels must consist of exactly 2 authorized members.");
+                }
             }
 
             if (count($supervisorIds) !== count(array_unique($supervisorIds))) {
@@ -172,9 +175,8 @@ class ThesisService
     public function proposeRandomSupervisors(ThesisProject $project)
     {
         $student = $project->student;
-        $levelName = $student->level->name ?? '';
-        $isPhD = $levelName && stripos($levelName, 'PhD') !== false;
-        $count = $isPhD ? 3 : 2; // Institutional Requirement Update: PhD=3, MSc=2
+        $isPhD = $student ? $student->isPhd() : false;
+        $count = $isPhD ? 3 : 2; // Institutional Requirement Update: PhD=up to 3, MSc=2
 
         $proposedSupervisors = [];
 

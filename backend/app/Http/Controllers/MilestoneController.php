@@ -976,11 +976,8 @@ class MilestoneController extends Controller
 
         $student = $milestone->thesis->student;
         $studentUser = Auth::user();
-        $levelName = $student?->level?->name ?? '';
-        $isPhd = $levelName !== ''
-            ? stripos($levelName, 'phd') !== false
-            : ($student ? $student->isPhd() : false);
-        $requiredCount = $isPhd ? 3 : 2;
+        $isPhd = $student ? $student->isPhd() : false;
+        $maxCount = $isPhd ? 3 : 2;
 
         $request->validate([
             'supervisor_ids' => 'nullable|array',
@@ -997,12 +994,17 @@ class MilestoneController extends Controller
         $resolvedIds = [];
         $slotErrors = [];
 
-        for ($i = 0; $i < $requiredCount; $i++) {
+        for ($i = 0; $i < $maxCount; $i++) {
             $slotLabel = $i === 0 ? 'Lead Supervisor' : ($isPhd ? "Co-Supervisor {$i}" : 'Co-Supervisor');
             $selectedId = trim((string) ($submittedIds[$i] ?? ''));
             $manualName = trim((string) ($submittedNew[$i]['name'] ?? ''));
             $manualEmail = trim((string) ($submittedNew[$i]['email'] ?? ''));
             $manualRank = trim((string) ($submittedNew[$i]['rank'] ?? ($i === 0 ? 'Professor' : 'Senior Lecturer')));
+
+            // For PhD students, the 3rd slot (index 2) is optional (up to 3 supervisors)
+            if ($isPhd && $i === 2 && ($selectedId === '' || $selectedId === '__manual__') && $manualName === '' && $manualEmail === '') {
+                continue;
+            }
 
             if ($selectedId !== '' && $selectedId !== '__manual__') {
                 $profile = \App\Models\SupervisorProfile::with('user')->find($selectedId);

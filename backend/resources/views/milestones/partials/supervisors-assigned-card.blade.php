@@ -6,7 +6,7 @@
     $program = $student?->program;
     $programName = $program?->name ?? 'Academic Program';
     $levelName = strtoupper($student?->level?->name ?? '');
-    $isPhD = str_contains($levelName, 'PHD');
+    $isPhD = $student ? $student->isPhd() : str_contains($levelName, 'PHD');
     $requiredSupervisorCount = $isPhD ? 3 : 2;
 
     $submissions = $milestone->submissions->sortByDesc('created_at');
@@ -236,7 +236,7 @@
                                 Do you already have supervisors, or do you need supervisors assigned?
                             </h2>
                             <p class="text-xs sm:text-sm font-medium text-slate-600 mt-1">
-                                Candidate: <strong class="text-slate-900">{{ $studentName }}</strong> &bull; Matric No: <strong class="text-slate-900">{{ $matricNumber }}</strong> &bull; Required Panel: <strong>{{ $requiredSupervisorCount }} Supervisors</strong> ({{ $isPhD ? 'PhD' : 'MSc' }})
+                                Candidate: <strong class="text-slate-900">{{ $studentName }}</strong> &bull; Matric No: <strong class="text-slate-900">{{ $matricNumber }}</strong> &bull; Supervisory Panel: <strong>{{ $isPhD ? 'Up to 3 Supervisors (2–3)' : '2 Supervisors' }}</strong> ({{ $isPhD ? 'PhD' : 'MSc' }})
                             </p>
                         </div>
                     </div>
@@ -258,7 +258,7 @@
                                 <span class="text-[10px] font-black uppercase tracking-widest text-indigo-600">Option 1</span>
                                 <h3 class="text-sm sm:text-base font-black text-slate-900 mt-0.5">I Already Have Supervisors</h3>
                                 <p class="text-xs font-medium text-slate-600 mt-1">
-                                    Insert your {{ $requiredSupervisorCount }} existing supervisors directly to complete this step and unlock Proposal Defence.
+                                    Insert your existing supervisors ({{ $isPhD ? 'up to 3' : '2' }}) directly to complete this step and unlock Proposal Defence.
                                 </p>
                             </div>
                         </button>
@@ -297,7 +297,7 @@
                         <div>
                             <h3 class="text-lg sm:text-xl font-black text-slate-900">Insert Your Supervisory Panel</h3>
                             <p class="text-xs sm:text-sm text-slate-600 font-medium mt-1">
-                                Select each of your {{ $requiredSupervisorCount }} supervisors from the faculty directory, or switch a slot to manual entry if a supervisor is not listed yet.
+                                {{ $isPhD ? 'A PhD candidate can have up to 3 supervisors. Select your Lead Supervisor and Co-Supervisor(s) from the faculty directory, or switch a slot to manual entry if not listed yet.' : 'Select each of your 2 supervisors from the faculty directory, or switch a slot to manual entry if a supervisor is not listed yet.' }}
                             </p>
                         </div>
                     </div>
@@ -314,7 +314,11 @@
                         @csrf
                         @for($i = 0; $i < $requiredSupervisorCount; $i++)
                             @php
-                                $slotTitle = $i === 0 ? 'Lead Supervisor (Main Supervisor — Professor Recommended)' : ($isPhD ? "Co-Supervisor {$i}" : 'Co-Supervisor');
+                                $slotTitle = $i === 0
+                                    ? 'Lead Supervisor (Main Supervisor — Professor Recommended)'
+                                    : ($isPhD
+                                        ? ($i === 2 ? 'Co-Supervisor 2 (Optional — up to 3 supervisors)' : "Co-Supervisor {$i}")
+                                        : 'Co-Supervisor');
                             @endphp
                             <div class="p-5 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
                                 <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1041,13 +1045,13 @@
                         <form action="{{ route('theses.assign_supervisor', $milestone->thesis_project_id) }}" 
                               method="POST"
                               @submit="
-                                  if (!selectedLead || !selectedSecond || (isPhD && !selectedThird)) {
+                                  if (!selectedLead || !selectedSecond) {
                                       $event.preventDefault();
-                                      alert('Please select all required supervisors.');
+                                      alert('Please select at least the Lead Supervisor and Co-Supervisor.');
                                       return;
                                   }
                                   const ids = [selectedLead, selectedSecond];
-                                  if (isPhD) ids.push(selectedThird);
+                                  if (isPhD && selectedThird) ids.push(selectedThird);
                                   const unique = new Set(ids);
                                   if (unique.size !== ids.length) {
                                       $event.preventDefault();
@@ -1060,7 +1064,7 @@
                             {{-- Hidden inputs with selected supervisor IDs --}}
                             <input type="hidden" name="supervisors[]" :value="selectedLead">
                             <input type="hidden" name="supervisors[]" :value="selectedSecond">
-                            <template x-if="isPhD">
+                            <template x-if="isPhD && selectedThird">
                                 <input type="hidden" name="supervisors[]" :value="selectedThird">
                             </template>
 

@@ -31,8 +31,7 @@
         $leadAssignment = $activeAssignments->firstWhere('role', 'primary') ?? $activeAssignments->first();
         $secondaryAssignments = $activeAssignments->filter(fn($a) => $a->id !== $leadAssignment?->id)->values();
 
-        $levelName = strtoupper($student->level->name ?? '');
-        $isPhD = str_contains($levelName, 'PHD');
+        $isPhD = $student->isPhd();
         $requiredCount = $isPhD ? 3 : 2;
 
         return [

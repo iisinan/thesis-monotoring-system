@@ -194,11 +194,12 @@ class AssignedSupervisorController extends Controller
             return back()->with('error', 'Students at the seminar course level do not require supervisors.');
         }
 
-        $isPhD = str_contains(strtolower($student->level->name ?? ''), 'phd');
-        $requiredCount = $isPhD ? 3 : 2;
+        $isPhD = $student->isPhd();
+        $minCount = 2;
+        $maxCount = $isPhD ? 3 : 2;
 
         $request->validate([
-            'supervisors' => 'required|array|min:' . $requiredCount . '|max:' . $requiredCount,
+            'supervisors' => 'required|array|min:' . $minCount . '|max:' . $maxCount,
             'supervisors.*' => 'required|exists:supervisor_profiles,id',
         ]);
 

@@ -1594,11 +1594,10 @@ class MilestoneWorkflowService
     {
         $count = count($supervisorIds);
         $student = $project->student;
-        $levelName = strtoupper(optional($student->level)->name ?? '');
 
-        if (str_contains($levelName, 'PHD')) {
-             if ($count !== 3) {
-                throw new Exception("Institutional PhD Protocol: The supervision panel must consist of exactly 3 authorized members.");
+        if ($student && $student->isPhd()) {
+             if ($count < 2 || $count > 3) {
+                throw new Exception("Institutional PhD Protocol: The supervision panel must consist of 2 to 3 authorized members (up to 3 supervisors).");
              }
         } else {
              if ($count !== 2) {
