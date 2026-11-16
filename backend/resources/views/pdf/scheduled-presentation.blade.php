@@ -277,23 +277,39 @@
         </div>
 
         {{-- Candidates Table for This Group --}}
+        @php
+            $isInternalDefence = ($template->slug === 'internal_defence');
+        @endphp
         <table class="schedule-table">
             <thead>
-                <tr>
-                    <th style="width: 4%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};" class="text-center">#</th>
-                    <th style="width: 13%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Matric Number</th>
-                    <th style="width: 19%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Candidate Name</th>
-                    <th style="width: 22%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Program</th>
-                    <th style="width: 10%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Cohort</th>
-                    <th style="width: 13%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Presentation Date</th>
-                    <th style="width: 9%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Slot Time</th>
-                    <th style="width: 10%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Meeting Link</th>
-                </tr>
+                @if($isInternalDefence)
+                    <tr>
+                        <th style="width: 3%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};" class="text-center">#</th>
+                        <th style="width: 19%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Candidate &amp; Program</th>
+                        <th style="width: 24%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Thesis Title</th>
+                        <th style="width: 19%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Supervisors</th>
+                        <th style="width: 15%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Internal Examiner</th>
+                        <th style="width: 12%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Date &amp; Time</th>
+                        <th style="width: 8%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Room</th>
+                    </tr>
+                @else
+                    <tr>
+                        <th style="width: 4%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};" class="text-center">#</th>
+                        <th style="width: 13%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Matric Number</th>
+                        <th style="width: 19%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Candidate Name</th>
+                        <th style="width: 22%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Program</th>
+                        <th style="width: 10%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Cohort</th>
+                        <th style="width: 13%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Presentation Date</th>
+                        <th style="width: 9%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Slot Time</th>
+                        <th style="width: 10%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Meeting Link</th>
+                    </tr>
+                @endif
             </thead>
             <tbody>
                 @forelse($grp['items'] as $cIndex => $sm)
                     @php
-                        $student = $sm->thesis?->student;
+                        $thesis = $sm->thesis;
+                        $student = $thesis?->student;
                         $user = $student?->user;
                         $program = $student?->program;
                         $cohort = $student?->cohort;
@@ -301,27 +317,110 @@
                         $timeFormatted = $sm->defence_time ? \Carbon\Carbon::parse($sm->defence_time)->format('h:i A') : 'TBD';
                         $roomLink = !empty($sm->meeting_link) ? $sm->meeting_link : $grp['zoom_link'];
                     @endphp
-                    <tr>
-                        <td class="text-center">{{ $cIndex + 1 }}</td>
-                        <td class="matric-no">{{ $student->student_id_number ?? 'N/A' }}</td>
-                        <td class="student-name">{{ $user->name ?? 'Candidate' }}</td>
-                        <td>{{ $program->name ?? ($program->code ?? 'N/A') }}</td>
-                        <td>{{ $cohort->name ?? ($cohort->code ?? 'N/A') }}</td>
-                        <td class="date-badge">{{ $dateFormatted }}</td>
-                        <td class="time-badge">{{ $timeFormatted }}</td>
-                        <td>
-                            @if(!empty($roomLink))
-                                <a href="{{ $roomLink }}" target="_blank" class="link-text">Join Zoom</a>
-                            @elseif(!empty($sm->defence_location))
-                                {{ $sm->defence_location }}
-                            @else
-                                <span style="color: #94a3b8;">—</span>
-                            @endif
-                        </td>
-                    </tr>
+                    @if($isInternalDefence)
+                        @php
+                            $activeSups = $thesis?->assignments?->where('status', 'active')
+                                ->sortBy(fn($a) => $a->role === 'primary' ? 0 : 1)
+                                ->map(fn($a) => [
+                                    'name' => $a->supervisor?->user?->name ?? 'Supervisor',
+                                    'is_primary' => $a->role === 'primary',
+                                ])
+                                ->filter(fn($s) => !empty($s['name']))
+                                ->values() ?? collect();
+
+                            $supUserIds = $thesis?->assignments?->where('status', 'active')
+                                ->map(fn($a) => $a->supervisor?->user_id)
+                                ->filter()
+                                ->all() ?? [];
+
+                            $ieNames = collect();
+                            if ($thesis?->internalExaminer?->user?->name) {
+                                $ieNames->push($thesis->internalExaminer->user->name);
+                            }
+                            if ($thesis?->examinerAssignments) {
+                                foreach ($thesis->examinerAssignments->where('type', 'internal_examiner') as $ea) {
+                                    if ($ea->examiner?->name) {
+                                        $ieNames->push($ea->examiner->name);
+                                    }
+                                }
+                            }
+                            $internalEvent = $thesis?->defenceEvents?->where('type', 'internal')->first();
+                            if ($internalEvent && $internalEvent->panelMembers) {
+                                foreach ($internalEvent->panelMembers->where('role', 'examiner') as $pm) {
+                                    if ($pm->user?->name && !in_array($pm->user_id, $supUserIds)) {
+                                        $ieNames->push($pm->user->name);
+                                    }
+                                }
+                            }
+                            $ieNames = $ieNames->unique()->values();
+                        @endphp
+                        <tr>
+                            <td class="text-center">{{ $cIndex + 1 }}</td>
+                            <td>
+                                <div class="student-name">{{ $user->name ?? 'Candidate' }}</div>
+                                <div class="matric-no" style="font-size: 9px;">{{ $student->student_id_number ?? 'N/A' }}</div>
+                                <div style="font-size: 8.5px; color: #475569; margin-top: 2px;">
+                                    {{ $program->name ?? ($program->code ?? 'N/A') }}
+                                    @if($cohort?->name) &bull; {{ $cohort->name }} @endif
+                                </div>
+                            </td>
+                            <td style="font-size: 9px; color: #0f172a; line-height: 1.3;">
+                                {{ $thesis?->title ?: 'Untitled Thesis' }}
+                            </td>
+                            <td style="font-size: 9px; line-height: 1.35;">
+                                @forelse($activeSups as $sup)
+                                    <div>
+                                        <strong>{{ $sup['name'] }}</strong>
+                                        <span style="font-size: 8px; color: #64748b;">({{ $sup['is_primary'] ? 'Lead' : 'Co-Sup' }})</span>
+                                    </div>
+                                @empty
+                                    <span style="color: #94a3b8; font-style: italic;">Unassigned</span>
+                                @endforelse
+                            </td>
+                            <td style="font-size: 9px; line-height: 1.35;">
+                                @forelse($ieNames as $ieName)
+                                    <div><strong>{{ $ieName }}</strong></div>
+                                @empty
+                                    <span style="color: #94a3b8; font-style: italic;">Not Assigned</span>
+                                @endforelse
+                            </td>
+                            <td>
+                                <div class="date-badge">{{ $dateFormatted }}</div>
+                                <div class="time-badge" style="font-size: 9px;">{{ $timeFormatted }}</div>
+                            </td>
+                            <td>
+                                @if(!empty($roomLink))
+                                    <a href="{{ $roomLink }}" target="_blank" class="link-text">Join Zoom</a>
+                                @elseif(!empty($sm->defence_location))
+                                    {{ $sm->defence_location }}
+                                @else
+                                    <span style="color: #94a3b8;">—</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @else
+                        <tr>
+                            <td class="text-center">{{ $cIndex + 1 }}</td>
+                            <td class="matric-no">{{ $student->student_id_number ?? 'N/A' }}</td>
+                            <td class="student-name">{{ $user->name ?? 'Candidate' }}</td>
+                            <td>{{ $program->name ?? ($program->code ?? 'N/A') }}</td>
+                            <td>{{ $cohort->name ?? ($cohort->code ?? 'N/A') }}</td>
+                            <td class="date-badge">{{ $dateFormatted }}</td>
+                            <td class="time-badge">{{ $timeFormatted }}</td>
+                            <td>
+                                @if(!empty($roomLink))
+                                    <a href="{{ $roomLink }}" target="_blank" class="link-text">Join Zoom</a>
+                                @elseif(!empty($sm->defence_location))
+                                    {{ $sm->defence_location }}
+                                @else
+                                    <span style="color: #94a3b8;">—</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endif
                 @empty
                     <tr>
-                        <td colspan="8" class="text-center" style="padding: 16px; color: #64748b; font-weight: 600;">
+                        <td colspan="{{ $isInternalDefence ? 7 : 8 }}" class="text-center" style="padding: 16px; color: #64748b; font-weight: 600;">
                             No candidates currently scheduled under this group.
                         </td>
                     </tr>

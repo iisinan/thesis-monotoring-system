@@ -2783,7 +2783,11 @@ class MilestoneTemplateController extends Controller
                 'thesis.student.user',
                 'thesis.student.program',
                 'thesis.student.level',
-                'thesis.student.cohort'
+                'thesis.student.cohort',
+                'thesis.assignments.supervisor.user',
+                'thesis.internalExaminer.user',
+                'thesis.examinerAssignments.examiner',
+                'thesis.defenceEvents.panelMembers.user',
             ]);
 
         if ($isCoordinator) {
