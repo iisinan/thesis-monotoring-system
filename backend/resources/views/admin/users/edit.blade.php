@@ -404,6 +404,14 @@
                                 </select>
                                 @error('level_id') <p class="text-red-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
                             </div>
+
+                            <div class="col-span-6">
+                                <label for="thesis_title" class="block text-sm font-semibold text-black mb-1">Thesis Title</label>
+                                <input type="text" name="thesis_title" id="thesis_title" maxlength="255"
+                                    class="focus:ring-acetel-500 focus:border-acetel-500 block w-full shadow-sm sm:text-sm border-slate-300 rounded-xl px-4 py-2.5 transition-colors"
+                                    value="{{ old('thesis_title', $user->studentProfile?->thesis?->title) }}" placeholder="Enter student's thesis title...">
+                                @error('thesis_title') <p class="text-red-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
+                            </div>
                         </div>
 
                         <!-- Milestone Management -->

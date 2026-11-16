@@ -32,6 +32,7 @@ Route::get('/users/{user}/impersonate', function () {
 Route::delete('/students/bulk-destroy', [StudentController::class, 'bulkDestroy'])->name('students.bulk-destroy');
 Route::delete('/students/{student}', [StudentController::class, 'destroy'])->name('students.destroy');
 Route::get('/students/{student}', [StudentController::class, 'show'])->name('students.show');
+Route::patch('/students/{student}/thesis-title', [StudentController::class, 'updateThesisTitle'])->name('students.update-thesis-title');
 Route::post('/students/{student}/supervisors', [StudentController::class, 'addSupervisor'])->name('students.supervisors.store');
 Route::patch('/students/{student}/supervisors/{assignment}', [StudentController::class, 'updateSupervisorAssignment'])->name('students.supervisors.update');
 Route::delete('/students/{student}/supervisors/{assignment}', [StudentController::class, 'removeSupervisorAssignment'])->name('students.supervisors.destroy');

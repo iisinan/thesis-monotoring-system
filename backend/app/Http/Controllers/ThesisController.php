@@ -57,6 +57,10 @@ class ThesisController extends Controller
         }
 
         $thesis->update($validated);
+        $thesis->loadMissing('student');
+        if ($thesis->student?->user_id) {
+            \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $thesis->student->user_id);
+        }
 
         return redirect()->back()->with('success', 'Thesis updated successfully.');
     }

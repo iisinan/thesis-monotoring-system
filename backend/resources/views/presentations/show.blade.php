@@ -594,6 +594,24 @@
                                             <input type="text" name="title" value="{{ $pres->thesis->title }}" class="flex-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-slate-800" required placeholder="Enter thesis title...">
                                             <button type="submit" class="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-slate-800 transition-colors whitespace-nowrap shadow-2xs">Save</button>
                                         </form>
+                                    @elseif(Auth::user()->hasAnyRole(['Admin', 'Director']))
+                                        <div x-data="{ editing: false }" class="mt-2">
+                                            <div x-show="!editing" class="flex items-start justify-between gap-2 p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70">
+                                                <span class="text-xs text-slate-800 font-bold leading-snug line-clamp-2" title="{{ $pres->thesis->title }}">
+                                                    {{ $pres->thesis->title ?: 'Untitled Thesis' }}
+                                                </span>
+                                                <button type="button" @click="editing = true" class="shrink-0 p-1 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors cursor-pointer" title="Edit Title">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                </button>
+                                            </div>
+                                            <form x-show="editing" x-cloak action="{{ route('theses.update', $pres->thesis) }}" method="POST" class="flex items-center gap-1.5 w-full">
+                                                @csrf
+                                                @method('PATCH')
+                                                <input type="text" name="title" value="{{ $pres->thesis->title }}" maxlength="255" class="flex-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-slate-800" required placeholder="Enter thesis title...">
+                                                <button type="submit" class="px-2.5 py-1.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-slate-800 transition-colors cursor-pointer">Save</button>
+                                                <button type="button" @click="editing = false" class="px-2 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-bold hover:bg-slate-200 transition-colors cursor-pointer">&times;</button>
+                                            </form>
+                                        </div>
                                     @elseif($pres->thesis->title)
                                         <div class="p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 text-xs text-slate-800 font-bold leading-snug line-clamp-2" title="{{ $pres->thesis->title }}">
                                             {{ $pres->thesis->title }}
@@ -1166,6 +1184,26 @@
                                                 <input type="text" name="title" value="{{ $sm->thesis->title }}" class="w-full px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-50 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-slate-800" required placeholder="Enter thesis title...">
                                                 <button type="submit" class="self-start px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors shadow-2xs">Update Title</button>
                                             </form>
+                                        @elseif(Auth::user()->hasAnyRole(['Admin', 'Director']) && $sm->thesis)
+                                            <div x-data="{ editing: false }">
+                                                <div x-show="!editing" class="p-3 rounded-2xl bg-slate-50/70 border border-slate-100/90 group-hover:border-slate-200 group-hover:bg-white transition-all flex items-start justify-between gap-2">
+                                                    <p class="font-bold text-slate-800 text-xs leading-relaxed line-clamp-2" title="{{ $topic }}">
+                                                        {{ $topic }}
+                                                    </p>
+                                                    <button type="button" @click="editing = true" class="shrink-0 p-1 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer" title="Edit Title">
+                                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                    </button>
+                                                </div>
+                                                <form x-show="editing" x-cloak action="{{ route('theses.update', $sm->thesis) }}" method="POST" class="flex flex-col gap-1.5 w-full">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <input type="text" name="title" value="{{ $sm->thesis->title }}" maxlength="255" class="w-full px-3 py-1.5 text-xs font-semibold rounded-xl bg-white border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-slate-800" required placeholder="Enter thesis title...">
+                                                    <div class="flex items-center gap-1.5">
+                                                        <button type="submit" class="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors shadow-2xs cursor-pointer">Save</button>
+                                                        <button type="button" @click="editing = false" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[9px] font-bold transition-colors cursor-pointer">Cancel</button>
+                                                    </div>
+                                                </form>
+                                            </div>
                                         @else
                                             <div class="p-3 rounded-2xl bg-slate-50/70 border border-slate-100/90 group-hover:border-slate-200 group-hover:bg-white transition-all">
                                                 <p class="font-bold text-slate-800 text-xs leading-relaxed line-clamp-2" title="{{ $topic }}">

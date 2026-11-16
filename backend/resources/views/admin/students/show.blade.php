@@ -679,28 +679,75 @@
         {{-- Milestone Execution Log Column --}}
         <div class="lg:col-span-2 space-y-8">
             {{-- Thesis Context --}}
-            <div class="bg-slate-900 rounded-[2rem] p-10 text-white shadow-2xl shadow-slate-200 overflow-hidden relative">
+            <div class="bg-slate-900 rounded-[2rem] p-10 text-white shadow-2xl shadow-slate-200 overflow-hidden relative"
+                 x-data="{ editingTitle: {{ $errors->has('title') ? 'true' : 'false' }} }">
                 <div class="absolute top-0 right-0 w-64 h-64 bg-brand-600/10 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl"></div>
                 <div class="relative z-10">
-                    <p class="text-[10px] font-black text-brand-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-brand-500"></span>
-                        Approved Project Context
-                    </p>
-                    <h2 class="text-3xl font-black leading-tight tracking-tight mb-6">
-                        {{ $student->thesis->title ?? 'Untitled Thesis Project' }}
-                    </h2>
+                    <div class="flex items-center justify-between gap-4 mb-4">
+                        <p class="text-[10px] font-black text-brand-400 uppercase tracking-widest flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-brand-500"></span>
+                            Approved Project Context
+                        </p>
+                        @if(auth()->user()->hasAnyRole(['Admin', 'Director']))
+                            <button type="button"
+                                    @click="editingTitle = !editingTitle"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                <span x-text="editingTitle ? 'Cancel' : 'Edit Title'"></span>
+                            </button>
+                        @endif
+                    </div>
+
+                    <div x-show="!editingTitle">
+                        <h2 class="text-3xl font-black leading-tight tracking-tight mb-6">
+                            {{ $student->thesis->title ?? 'Untitled Thesis Project' }}
+                        </h2>
+                    </div>
+
+                    @if(auth()->user()->hasAnyRole(['Admin', 'Director']))
+                        <form x-show="editingTitle" x-cloak
+                              action="{{ route('admin.students.update-thesis-title', $student) }}"
+                              method="POST"
+                              class="mb-6 space-y-3">
+                            @csrf
+                            @method('PATCH')
+                            <div>
+                                <label for="admin-thesis-title" class="sr-only">Thesis Title</label>
+                                <input type="text"
+                                       id="admin-thesis-title"
+                                       name="title"
+                                       value="{{ old('title', $student->thesis?->title) }}"
+                                       maxlength="255"
+                                       required
+                                       placeholder="Enter student's thesis title..."
+                                       class="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-slate-400 text-base font-bold focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-brand-400 transition-all">
+                                @error('title')
+                                    <p class="text-rose-400 text-xs font-semibold mt-1.5">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <div class="flex items-center gap-2.5">
+                                <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg cursor-pointer">
+                                    Save Title
+                                </button>
+                                <button type="button" @click="editingTitle = false" class="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer">
+                                    Cancel
+                                </button>
+                            </div>
+                        </form>
+                    @endif
+
                     <p class="text-slate-400 text-sm leading-relaxed max-w-3xl line-clamp-4">
-                        {{ $student->thesis->abstract ?? 'Institutional description of research scope and objectives pending submission.' }}
+                        {{ $student->thesis?->abstract ?? 'Institutional description of research scope and objectives pending submission.' }}
                     </p>
                     <div class="flex items-center gap-6 mt-10 pt-10 border-t border-white/5">
                         <div>
                             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Submission Phase</p>
-                            <p class="text-sm font-black text-white mt-1">{{ str_replace('_', ' ', $student->thesis->status) }}</p>
+                            <p class="text-sm font-black text-white mt-1">{{ str_replace('_', ' ', $student->thesis?->status ?? 'proposed') }}</p>
                         </div>
                         <div class="w-px h-8 bg-white/5"></div>
                         <div>
                             <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Internal Clearance</p>
-                            @if($student->thesis->cleared_for_internal_at)
+                            @if($student->thesis?->cleared_for_internal_at)
                                 <p class="text-sm font-black text-emerald-400 mt-1 flex items-center gap-1.5">
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                                     Cleared on {{ $student->thesis->cleared_for_internal_at->format('M d, Y') }}
