@@ -325,4 +325,62 @@ class InternalDefenceRedesignTest extends TestCase
             'subject' => 'Internal Defence Briefing',
         ]);
     }
+
+    #[Test]
+    public function supervisor_sees_simplified_single_approval_card_on_internal_defence_page(): void
+    {
+        [$studentUser, , $thesis, $milestone] = $this->createCandidateAtInternalDefence($this->progA, 'CleanUI');
+        $milestone->update(['approvals' => []]);
+
+        $supUser = User::factory()->create(['name' => 'Prof. Bukola Onashoga', 'is_active' => true]);
+        $supUser->assignRole('Supervisor');
+        $supProf = SupervisorProfile::create(['user_id' => $supUser->id, 'active' => true]);
+
+        SupervisionAssignment::create([
+            'thesis_project_id' => $thesis->id,
+            'supervisor_profile_id' => $supProf->id,
+            'role' => 'primary',
+            'status' => 'active',
+        ]);
+
+        // Two versions uploaded by student (v1 old, v2 latest)
+        \App\Models\Submission::create([
+            'student_milestone_id' => $milestone->id,
+            'submitted_by' => $studentUser->id,
+            'type' => 'manuscript',
+            'file_url' => 'submissions/old_v1.pdf',
+            'file_meta' => ['original_name' => '100_data_BCOS_first2.pdf'],
+            'version' => 1,
+        ]);
+
+        \App\Models\Submission::create([
+            'student_milestone_id' => $milestone->id,
+            'submitted_by' => $studentUser->id,
+            'type' => 'manuscript',
+            'file_url' => 'submissions/latest_v2.pdf',
+            'file_meta' => ['original_name' => 'DDSACA_Current_ACETEL.pdf'],
+            'version' => 2,
+        ]);
+
+        $res = $this->actingAs($supUser)->followingRedirects()->get(route('milestones.show', $milestone));
+        $res->assertOk();
+
+        // Shows candidate name, latest manuscript only, and single clear action card
+        $res->assertSee('Action Needed: Review & Approve Thesis');
+        $res->assertSee('DDSACA_Current_ACETEL.pdf');
+        $res->assertSee('Open Thesis PDF');
+        $res->assertDontSee('100_data_BCOS_first2.pdf');
+
+        // Does NOT clutter supervisor view with 6-step progression grid, submission history, or student banners
+        $res->assertDontSee('Milestone Progression Requirements');
+        $res->assertDontSee('Submission History');
+        $res->assertDontSee('Documentation Under Audit');
+
+        // Also check Thesis Overview page for supervisor
+        $thesisRes = $this->actingAs($supUser)->get(route('theses.show', $thesis));
+        $thesisRes->assertOk();
+        $thesisRes->assertSee('Action Needed: Review & Approve Thesis');
+        $thesisRes->assertSee('DDSACA_Current_ACETEL.pdf');
+        $thesisRes->assertDontSee('100_data_BCOS_first2.pdf');
+    }
 }

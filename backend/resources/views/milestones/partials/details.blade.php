@@ -67,10 +67,6 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Main Column: Submission Area -->
         <div class="lg:col-span-2 space-y-6">
-            {{-- Milestone Progression Checklist & End Presentation Banner --}}
-            @include('milestones.partials.progression-checklist', ['milestone' => $milestone])
-
-            <!-- Scheduled Date Section -->
             @php
                 $hasDefenceDateAllowed = $milestone->template->allow_defence_date;
                 $defenceDateStr = $milestone->defence_date;
@@ -98,77 +94,176 @@
                 $mySupReviewDetails = collect($supSummaryDetails['supervisors'] ?? [])->first(fn($s) => (string)($s['user_id'] ?? '') === (string)auth()->id());
                 $supIdsDetails = auth()->user()?->supervisorProfiles()->pluck('id') ?? collect();
                 $isAssignedSupervisorDetails = auth()->user()?->hasRole('Supervisor') && $supIdsDetails->isNotEmpty() && $milestone->thesis->assignments->whereIn('supervisor_profile_id', $supIdsDetails)->where('status', 'active')->isNotEmpty();
-                $showTopSupReviewCard = !$isPostDefenceStage && $milestone->submissions->isNotEmpty() && ($isAssignedSupervisorDetails || auth()->user()?->hasRole('Admin'));
-                $canActTopSupReview = $showTopSupReviewCard && $milestone->status !== 'approved' && (
+
+                $isStudentViewer = auth()->id() === $milestone->thesis?->student?->user_id;
+                $isAdminViewer = auth()->user()?->hasRole('Admin') ?? false;
+                $isSupervisorViewer = !$isStudentViewer && !$isAdminViewer && (auth()->user()?->hasRole('Supervisor') || $isAssignedSupervisorDetails);
+
+                $showTopSupReviewCard = !$isPostDefenceStage && ($isSupervisorViewer || ($milestone->submissions->isNotEmpty() && ($isAssignedSupervisorDetails || $isAdminViewer)));
+                $canActTopSupReview = $showTopSupReviewCard && $milestone->status !== 'approved' && $milestone->submissions->isNotEmpty() && (
                     $mySupReviewDetails ? in_array($mySupReviewDetails['status'], ['pending', 'pending_re_review']) : !$isUploadAccepted
                 );
                 $primaryReviewSub = $isPostDefenceStage
                     ? $latestManuscript
                     : ($milestone->submissions->whereIn('type', ['manuscript', 'file', 'ppt'])->sortByDesc('id')->first() ?? $milestone->submissions->sortByDesc('id')->first());
+                $attachedPubSubs = $milestone->submissions->where('type', 'publication')->sortByDesc('id')->values();
             @endphp
 
-            {{-- Prominent Supervisor Upload Review Banner (Above the Fold) --}}
+            {{-- Clean, Focused Supervisor Review & Approval Card --}}
             @if($showTopSupReviewCard)
-                @php
-                    $topReviewSubs = $milestone->submissions->sortByDesc('id');
-                @endphp
-                <div class="overflow-hidden rounded-[2rem] {{ $canActTopSupReview ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200' }} border shadow-xl shadow-slate-200/40 relative mb-6">
-                    <div class="absolute left-0 top-0 bottom-0 w-1.5 {{ $canActTopSupReview ? 'bg-amber-500' : 'bg-emerald-500' }}"></div>
-                    <div class="p-6 sm:p-7 space-y-4">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="overflow-hidden rounded-[2rem] bg-white border {{ $canActTopSupReview ? 'border-amber-300 shadow-amber-100/60' : 'border-slate-200' }} shadow-xl relative mb-6"
+                     x-data="{ editingSupDecision: {{ $canActTopSupReview ? 'true' : 'false' }}, remarks: {{ \Illuminate\Support\Js::from($mySupReviewDetails['remarks'] ?? '') }} }">
+                    <div class="p-6 sm:p-8 space-y-6">
+                        {{-- 1. Candidate & Status Header --}}
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
                             <div>
-                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full {{ $canActTopSupReview ? 'bg-amber-200/80 text-amber-900' : 'bg-emerald-100 text-emerald-800' }} text-[10px] font-black uppercase tracking-wider mb-1">
-                                    {{ $canActTopSupReview ? 'Supervisor Review & Decision Needed' : 'Candidate Submissions On Record' }}
-                                </span>
-                                <h3 class="text-base sm:text-lg font-black text-slate-900">
-                                    Uploaded Submission(s) ({{ $topReviewSubs->count() }})
+                                <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full {{ $canActTopSupReview ? 'bg-amber-100 text-amber-800 border border-amber-200' : ($isUploadAccepted ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-700') }} text-[10px] font-black uppercase tracking-wider">
+                                        <span class="w-1.5 h-1.5 rounded-full {{ $canActTopSupReview ? 'bg-amber-500 animate-pulse' : ($isUploadAccepted ? 'bg-emerald-600' : 'bg-slate-400') }}"></span>
+                                        {{ $canActTopSupReview ? 'Action Needed: Review & Approve Thesis' : ($isUploadAccepted ? 'Thesis Approved for Defence' : 'Thesis Review') }}
+                                    </span>
+                                </div>
+                                <h3 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                                    {{ $milestone->thesis?->student?->user?->name ?? 'Candidate' }}
                                 </h3>
+                                <p class="text-xs font-medium text-slate-500 mt-0.5">
+                                    {{ $milestone->thesis?->student?->student_id_number ?? 'N/A' }}
+                                    @if($milestone->thesis?->student?->program?->name)
+                                        • {{ $milestone->thesis->student->program->name }}
+                                    @endif
+                                </p>
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            @foreach($topReviewSubs->take(4) as $topSub)
-                                <div class="bg-white rounded-2xl border border-slate-200/80 p-3.5 flex items-center justify-between gap-3 shadow-xs">
-                                    <div class="min-w-0">
-                                        <div class="flex items-center gap-2">
-                                            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[9px] font-black uppercase tracking-wider">v.0{{ $topSub->version }}</span>
-                                            <span class="text-[10px] font-bold text-slate-400 uppercase">{{ $topSub->type === 'ppt' ? 'Slides' : ($topSub->type === 'publication' ? 'Publication' : 'Manuscript') }}</span>
-                                        </div>
-                                        <p class="text-xs font-bold text-slate-800 truncate mt-1">{{ $topSub->file_meta['original_name'] ?? ('Submission v.0' . $topSub->version) }}</p>
-                                        <p class="text-[10px] text-slate-400">{{ $topSub->created_at?->format('M d, Y · H:i') }}</p>
+                        {{-- 2. Latest Thesis Document (Only the current active manuscript, no duplicate old versions) --}}
+                        @if($primaryReviewSub)
+                            <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div class="flex items-start gap-3.5 min-w-0">
+                                    <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                     </div>
-                                    <div class="flex items-center gap-1.5 shrink-0">
-                                        <button type="button"
-                                            @click.prevent="$dispatch('open-document-preview', {
-                                                url: '{{ route('submissions.view', $topSub) }}',
-                                                title: '{{ addslashes($topSub->file_meta['original_name'] ?? ('Submission v.0' . $topSub->version)) }}',
-                                                type: '{{ str_ends_with(strtolower($topSub->file_url), '.pdf') ? 'pdf' : 'document' }}'
-                                            })"
-                                            class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors">
-                                            Preview
-                                        </button>
-                                        <a href="{{ route('submissions.view', $topSub) }}" target="_blank" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-wider transition-colors">
-                                            Open
-                                        </a>
+                                    <div class="min-w-0">
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                                Latest Thesis Manuscript
+                                            </span>
+                                            @if(!empty($primaryReviewSub->plagiarism_data['similarity_score']))
+                                                @php $simScore = $primaryReviewSub->plagiarism_data['similarity_score']; @endphp
+                                                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase {{ $simScore > 20 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700' }}">
+                                                    {{ $simScore }}% Similarity
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <p class="text-sm font-bold text-slate-900 truncate mt-1" title="{{ $primaryReviewSub->file_meta['original_name'] ?? 'Thesis Manuscript.pdf' }}">
+                                            {{ $primaryReviewSub->file_meta['original_name'] ?? ('Thesis Manuscript v.0' . $primaryReviewSub->version . '.pdf') }}
+                                        </p>
+                                        <p class="text-xs text-slate-500 mt-0.5">
+                                            Uploaded {{ $primaryReviewSub->created_at?->format('M d, Y \a\t g:i A') }}
+                                        </p>
                                     </div>
                                 </div>
-                            @endforeach
-                        </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <a href="{{ route('submissions.view', $primaryReviewSub) }}" target="_blank"
+                                        class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        <span>Open Thesis PDF</span>
+                                    </a>
+                                </div>
+                            </div>
 
-                        @if($canActTopSupReview)
-                            <form method="POST" x-data="{ remarks: '' }" class="bg-white/90 rounded-2xl border border-amber-200/80 p-4 space-y-3">
+                            @if($attachedPubsCount = $attachedPubSubs->count())
+                                <div class="space-y-2">
+                                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Attached Research Publication(s) ({{ $attachedPubsCount }})</p>
+                                    @foreach($attachedPubSubs as $pubSub)
+                                        <div class="p-3 bg-purple-50/50 rounded-xl border border-purple-100 flex items-center justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-xs font-bold text-slate-800 truncate">{{ $pubSub->publication_title ?: ($pubSub->file_meta['original_name'] ?? 'Publication.pdf') }}</p>
+                                                @if($pubSub->doi)
+                                                    <p class="text-[10px] text-slate-500 font-mono">DOI: {{ $pubSub->doi }}</p>
+                                                @endif
+                                            </div>
+                                            <a href="{{ route('submissions.view', $pubSub) }}" target="_blank" class="px-3 py-1.5 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[11px] font-bold shrink-0">
+                                                View Paper
+                                            </a>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @else
+                            <div class="p-6 bg-slate-50 rounded-2xl border border-slate-200/80 text-center">
+                                <p class="text-sm font-bold text-slate-700">No Thesis Uploaded Yet</p>
+                                <p class="text-xs text-slate-500 mt-1">The candidate has not uploaded their thesis manuscript for this stage yet.</p>
+                            </div>
+                        @endif
+
+                        {{-- 3. Supervisor Approval Status --}}
+                        @if($supSummaryDetails['has_supervisors'])
+                            <div class="space-y-2">
+                                <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Supervisor Approval Status</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    @foreach($supSummaryDetails['supervisors'] as $sItem)
+                                        <div class="flex items-center justify-between px-3.5 py-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs">
+                                            <span class="font-bold text-slate-800 truncate mr-2">
+                                                {{ $sItem['name'] }}
+                                                @if((string)$sItem['user_id'] === (string)auth()->id())
+                                                    <span class="text-[10px] font-black text-indigo-600 uppercase ml-1">(You)</span>
+                                                @endif
+                                            </span>
+                                            @if($sItem['status'] === 'approved')
+                                                <span class="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">✓ Approved</span>
+                                            @elseif($sItem['status'] === 'rejected')
+                                                <span class="text-[10px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-200 shrink-0">✕ Revision Requested</span>
+                                            @else
+                                                <span class="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 shrink-0">Pending</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- 4. Single Decision Box --}}
+                        @if($primaryReviewSub && $milestone->status !== 'approved')
+                            @if(!$canActTopSupReview)
+                                <div x-show="!editingSupDecision" class="p-4 rounded-2xl {{ ($mySupReviewDetails['status'] ?? '') === 'rejected' ? 'bg-rose-50 border border-rose-200 text-rose-900' : 'bg-emerald-50 border border-emerald-200 text-emerald-900' }} flex items-center justify-between gap-4">
+                                    <div class="text-xs font-bold">
+                                        @if(($mySupReviewDetails['status'] ?? '') === 'approved')
+                                            ✓ You have approved this thesis submission.
+                                        @elseif(($mySupReviewDetails['status'] ?? '') === 'rejected')
+                                            ✕ You requested revisions on this thesis submission.
+                                        @else
+                                            ✓ Thesis approval recorded.
+                                        @endif
+                                    </div>
+                                    <button type="button" @click="editingSupDecision = true" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-bold shrink-0 cursor-pointer">
+                                        Change Decision
+                                    </button>
+                                </div>
+                            @endif
+
+                            <form x-show="editingSupDecision" method="POST" class="bg-slate-50 rounded-2xl border border-slate-200 p-5 space-y-4">
                                 @csrf
-                                <textarea name="remarks" x-model="remarks" rows="2" class="w-full text-xs rounded-xl border-slate-300 focus:ring-amber-500 focus:border-amber-500 p-2.5 bg-white placeholder:text-slate-400" placeholder="Optional approval note, or required explanation when rejecting / requesting revision..."></textarea>
-                                <div class="flex flex-wrap justify-end gap-2">
+                                <div>
+                                    <div class="flex items-center justify-between mb-1.5">
+                                        <label class="block text-xs font-bold text-slate-800">
+                                            Your Review Comment <span class="text-slate-400 font-normal">(Optional for approval, required to request revision)</span>
+                                        </label>
+                                        @if(!$canActTopSupReview)
+                                            <button type="button" @click="editingSupDecision = false" class="text-xs font-bold text-slate-400 hover:text-slate-600 cursor-pointer">Cancel</button>
+                                        @endif
+                                    </div>
+                                    <textarea name="remarks" x-model="remarks" rows="3" class="w-full text-xs rounded-xl border-slate-300 focus:ring-emerald-500 focus:border-emerald-500 p-3 bg-white placeholder:text-slate-400" placeholder="Write any comments or feedback for the student here..."></textarea>
+                                </div>
+                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
                                     <button type="submit"
                                         formaction="{{ route('milestones.reject_upload', $milestone) }}"
                                         @click="if (!remarks.trim()) { alert('Please enter remarks explaining the revision required before rejecting.'); $event.preventDefault(); }"
-                                        class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer">
-                                        ✕ Reject / Request Revision
+                                        class="px-5 py-2.5 bg-white hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-300 rounded-xl text-xs font-bold transition-colors cursor-pointer">
+                                        ✕ Request Revision
                                     </button>
                                     <button type="submit"
                                         formaction="{{ route('milestones.accept_upload', $milestone) }}"
-                                        class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-sm">
+                                        class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-md shadow-emerald-600/20">
                                         ✓ Approve Thesis
                                     </button>
                                 </div>
@@ -176,6 +271,11 @@
                         @endif
                     </div>
                 </div>
+            @endif
+
+            {{-- Milestone Progression Checklist (Shown to Students and Admins, hidden for Supervisors to keep their page simple) --}}
+            @if(!$isSupervisorViewer)
+                @include('milestones.partials.progression-checklist', ['milestone' => $milestone])
             @endif
 
             {{-- Post-Defence Corrections Banner for Internal Defence --}}
@@ -1077,7 +1177,7 @@
                         @endif
                     </div>
                 @endif
-            @elseif($milestone->status === 'submitted')
+            @elseif($milestone->status === 'submitted' && !$isSupervisorViewer)
                 <div class="rounded-[2.5rem] bg-emerald-50 border border-emerald-100 shadow-xl shadow-slate-200/40 p-10 flex flex-col items-center justify-center text-center">
                     <div class="w-14 h-14 bg-white border border-emerald-200 text-emerald-600 rounded-2xl flex items-center justify-center mb-4 shadow-xl shadow-slate-200/40 animate-pulse">
                         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -1097,8 +1197,8 @@
                 </div>
             @endif
 
-            <!-- Submission History -->
-            @if($milestone->submissions->count() > 0)
+            {{-- Submission History (Shown to Students and Admins; hidden for Supervisors who use the focused Thesis Review card above) --}}
+            @if($milestone->submissions->count() > 0 && !$isSupervisorViewer)
                 <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-8 mt-6">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                         <h3 class="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
@@ -1261,7 +1361,7 @@
                                                         $showInlineCardReviewForm = $isPostDefenceSubCard
                                                             && ($isAssignedInternalExaminer || auth()->user()->hasRole('Admin'))
                                                             && !in_array($ieDec, ['approved', 'revision_required']);
-                                                    } elseif ($isPrimarySubCard && ($isAssignedSupervisorForCard || auth()->user()->hasRole('Admin'))) {
+                                                    } elseif (!$showTopSupReviewCard && $isPrimarySubCard && ($isAssignedSupervisorForCard || auth()->user()->hasRole('Admin'))) {
                                                         if ($mySupReviewDetails) {
                                                             $showInlineCardReviewForm = in_array($mySupReviewDetails['status'], ['pending', 'pending_re_review']);
                                                         } else {
@@ -1367,6 +1467,7 @@
 
         <!-- Sidebar Info -->
         <div class="space-y-6">
+            @if(!$isSupervisorViewer)
             <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-6">
                 <h3 class="text-sm font-bold text-slate-900 tracking-tight mb-4 uppercase">Guidelines</h3>
                 <div class="flex gap-4">
@@ -1388,6 +1489,7 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <!-- Contacts Section -->
             <div class="bg-white rounded-[2.5rem] border-t-4 border-emerald-500 shadow-xl shadow-slate-200/40 p-6">
@@ -1454,7 +1556,7 @@
                         }
                     }
                 @endphp
-                @if($showExaminerSection)
+                @if($showExaminerSection && ($milestone->thesis->internalExaminer || $canAssignExaminer || !$isSupervisorViewer))
                     <div class="mb-6 p-4 rounded-2xl border {{ $milestone->thesis->internalExaminer ? 'bg-indigo-50/40 border-indigo-100' : 'bg-amber-50/50 border-amber-200' }}">
                         <div class="flex items-center justify-between mb-2">
                             <p class="text-[10px] font-black {{ $milestone->thesis->internalExaminer ? 'text-indigo-600' : 'text-amber-700' }} uppercase tracking-widest">
