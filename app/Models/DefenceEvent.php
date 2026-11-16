@@ -107,20 +107,52 @@ class DefenceEvent extends Model
             }
         }
 
-        // 3. Check Thesis Examiners and Supervisors
-        $thesis = $this->thesis()->with(['internalExaminer.user', 'externalExaminer.user', 'assignments.supervisor'])->first();
+        // 3. Check Thesis Internal / External Examiners (including ExaminerAssignment records)
+        $thesis = $this->thesis()->with(['internalExaminer.user', 'externalExaminer.user'])->first();
         
         if ($thesis) {
-            if ($thesis->internalExaminer && $thesis->internalExaminer->user_id == $userId) {
+            if ($this->type === 'internal' && $thesis->internalExaminer && $thesis->internalExaminer->user_id == $userId) {
+                \App\Models\PanelMember::firstOrCreate([
+                    'defence_event_id' => $this->id,
+                    'user_id' => $userId,
+                ], [
+                    'role' => 'examiner',
+                    'invitation_status' => 'accepted'
+                ]);
                 return true;
             }
-            if ($thesis->externalExaminer && $thesis->externalExaminer->user_id == $userId) {
+            if (in_array($this->type, ['external', 'viva']) && $thesis->externalExaminer && $thesis->externalExaminer->user_id == $userId) {
+                \App\Models\PanelMember::firstOrCreate([
+                    'defence_event_id' => $this->id,
+                    'user_id' => $userId,
+                ], [
+                    'role' => 'examiner',
+                    'invitation_status' => 'accepted'
+                ]);
                 return true;
             }
-            if (in_array($this->type, ['internal', 'seminar', 'proposal', 'progress_report_1', 'progress_report_2'])) {
-                if ($thesis->assignments()->whereHas('supervisor', fn($q) => $q->where('user_id', $userId))->exists()) {
+            if ($this->type === 'internal') {
+                $panelIds = app(\App\Services\MilestoneWorkflowService::class)->getInternalDefencePanelUserIds($thesis);
+                if (in_array((string) $userId, array_map('strval', $panelIds), true)) {
+                    \App\Models\PanelMember::firstOrCreate([
+                        'defence_event_id' => $this->id,
+                        'user_id' => $userId,
+                        'role' => 'examiner',
+                    ], [
+                        'invitation_status' => 'accepted',
+                    ]);
                     return true;
                 }
+            }
+            if (in_array($this->type, ['external', 'viva']) && \App\Models\ExaminerAssignment::where('thesis_project_id', $thesis->id)->where('type', 'external_examiner')->where('examiner_id', $userId)->exists()) {
+                \App\Models\PanelMember::firstOrCreate([
+                    'defence_event_id' => $this->id,
+                    'user_id' => $userId,
+                ], [
+                    'role' => 'examiner',
+                    'invitation_status' => 'accepted'
+                ]);
+                return true;
             }
         }
 

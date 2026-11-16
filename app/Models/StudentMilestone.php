@@ -136,28 +136,34 @@ class StudentMilestone extends Model
         if ($slug === 'supervisors_assigned') {
             $hasProposal = $this->relationLoaded('submissions') ? $this->submissions->isNotEmpty() : $this->submissions()->exists();
             $hasSupervisors = $this->thesis?->relationLoaded('assignments') ? $this->thesis->assignments->where('status', 'active')->isNotEmpty() : $this->thesis?->assignments()->where('status', 'active')->exists();
+            $hasSelfInserted = !empty($this->approvals['student_inserted_supervisors']);
+            $requestPending = ($this->approvals['supervisor_request']['status'] ?? null) === 'pending';
             $isApproved = $this->status === 'approved';
 
             $tasks = [
                 [
                     'id' => 'tentative_proposal',
-                    'name' => 'Upload Tentative Proposal',
-                    'completed' => $hasProposal || $isApproved,
-                    'details' => $hasProposal ? 'Tentative proposal received' : 'Awaiting tentative proposal upload (PDF)',
+                    'name' => $hasSelfInserted ? 'Supervisor Confirmation' : 'Supervisor Allocation / Request',
+                    'completed' => $hasProposal || $hasSelfInserted || $hasSupervisors || $isApproved,
+                    'details' => $hasSelfInserted
+                        ? 'Existing supervisors inserted by candidate'
+                        : ($hasSupervisors ? 'Supervisory panel allocated' : ($hasProposal ? 'Tentative proposal received' . ($requestPending ? ' & request sent to coordinator' : '') : 'Insert existing supervisors or upload tentative proposal (PDF)')),
                     'action_type' => 'none',
                 ],
                 [
                     'id' => 'assign_supervisors',
                     'name' => 'Supervisors Assigned',
                     'completed' => $hasSupervisors || $isApproved,
-                    'details' => $hasSupervisors ? 'Supervisors allocated by coordinator' : 'Awaiting supervisor allocation',
+                    'details' => $hasSupervisors
+                        ? ($hasSelfInserted ? 'Supervisors recorded by candidate' : 'Supervisors allocated by coordinator')
+                        : ($requestPending ? 'Request sent — awaiting coordinator allocation' : 'Awaiting supervisor allocation'),
                     'action_type' => 'none',
                 ],
                 [
                     'id' => 'auto_advance',
                     'name' => 'Advancement to Proposal Defence',
                     'completed' => $isApproved,
-                    'details' => $isApproved ? 'Advanced to Proposal Defence' : 'Automatic upon upload & assignment',
+                    'details' => $isApproved ? 'Advanced to Proposal Defence' : 'Automatic once supervisors are recorded or assigned',
                     'action_type' => 'none',
                 ],
             ];
@@ -222,6 +228,84 @@ class StudentMilestone extends Model
                     'name' => 'End Presentation Clearance',
                     'completed' => $isApproved,
                     'details' => $isApproved ? 'Presentation session ended by Admin' : 'Admin concludes presentation session',
+                    'action_type' => 'none',
+                ],
+            ];
+            $completedTasks = count(array_filter($tasks, fn($t) => $t['completed']));
+            $percentage = $isApproved ? 100 : floor(($completedTasks / count($tasks)) * 100);
+
+            return [
+                'tasks' => $tasks,
+                'total' => count($tasks),
+                'completed' => $completedTasks,
+                'percentage' => $percentage,
+                'is_fully_complete' => $percentage == 100,
+            ];
+        }
+
+        if ($slug === 'internal_defence' || $this->template?->order == 6) {
+            $workflow = app(\App\Services\MilestoneWorkflowService::class);
+            $hasUploaded = $workflow->hasUploadedPresentation($this) || ($this->relationLoaded('submissions') ? $this->submissions->isNotEmpty() : $this->submissions()->exists());
+            $isSupervisorApproved = $workflow->isSupervisorApproved($this);
+            $isScheduled = !empty($this->defence_date);
+            $hasGraded = $workflow->hasBeenGraded($this);
+            $gradeOutcome = $workflow->getAverageGradingOutcome($this);
+            $isPostDefence = $workflow->isPostDefencePhase($this);
+            $hasPostDefenceUpload = $workflow->hasPostDefenceSubmission($this);
+            $isApproved = $this->status === 'approved';
+            $ieDecision = $this->approvals['internal_examiner_review']['decision'] ?? null;
+
+            $tasks = [
+                [
+                    'id' => 'upload_ppt',
+                    'name' => 'Upload Pre-Defence Thesis Manuscript',
+                    'completed' => $hasUploaded || $isPostDefence || $isApproved,
+                    'details' => ($hasUploaded || $isPostDefence || $isApproved) ? 'Pre-defence manuscript uploaded' : 'Awaiting student manuscript upload',
+                    'action_type' => 'none',
+                ],
+                [
+                    'id' => 'supervisor_approval',
+                    'name' => 'Supervisor Pre-Defence Approval',
+                    'completed' => $isSupervisorApproved || $isPostDefence || $isApproved,
+                    'details' => ($isSupervisorApproved || $isPostDefence || $isApproved) ? 'Approved by supervisor for defence' : 'Awaiting supervisor review & acceptance',
+                    'action_type' => 'none',
+                ],
+                [
+                    'id' => 'examiner_grading',
+                    'name' => 'Internal Defence Presentation & Grading',
+                    'completed' => ($hasGraded && $gradeOutcome === 'pass') || $isPostDefence || $isApproved,
+                    'details' => ($isPostDefence || $isApproved)
+                        ? 'Passed internal defence presentation'
+                        : ($hasGraded ? ($gradeOutcome === 'pass' ? 'Passed evaluation — awaiting Admin session end' : 'Failed evaluation (repeat required)') : ($isScheduled ? 'Scheduled for ' . \Carbon\Carbon::parse($this->defence_date)->format('M d, Y') : 'Awaiting schedule & examiner grading')),
+                    'action_type' => 'none',
+                ],
+                [
+                    'id' => 'admin_end_presentation',
+                    'name' => 'Admin Concludes Presentation Session',
+                    'completed' => $isPostDefence || $isApproved,
+                    'details' => ($isPostDefence || $isApproved) ? 'Presentation session ended — Post-Defence Correction active' : 'Admin ends session after PASS grade',
+                    'action_type' => 'none',
+                ],
+                [
+                    'id' => 'post_defence_upload',
+                    'name' => 'Post-Defence Corrected Thesis Submission',
+                    'completed' => ($hasPostDefenceUpload && $ieDecision !== 'revision_required') || $isApproved,
+                    'details' => $isApproved
+                        ? 'Corrected thesis submitted & verified'
+                        : ($hasPostDefenceUpload
+                            ? ($ieDecision === 'revision_required' ? 'Further corrections requested by Internal Examiner — re-upload required' : 'Corrected thesis uploaded for Internal Examiner review')
+                            : ($isPostDefence ? 'Action Required: Candidate must upload corrected thesis manuscript' : 'Unlocks after presentation session ends')),
+                    'action_type' => 'none',
+                ],
+                [
+                    'id' => 'internal_examiner_approval',
+                    'name' => 'Internal Examiner Approval (Advance to Viva)',
+                    'completed' => $isApproved,
+                    'details' => $isApproved
+                        ? 'Approved by Internal Examiner — Advanced to Viva Voce'
+                        : ($hasPostDefenceUpload
+                            ? ($ieDecision === 'revision_required' ? 'Awaiting candidate re-upload of further corrections' : 'Awaiting Internal Examiner review & approval of corrections')
+                            : 'Awaiting candidate post-defence correction upload'),
                     'action_type' => 'none',
                 ],
             ];
@@ -327,7 +411,7 @@ class StudentMilestone extends Model
             
             foreach($requiredRoles as $role) {
                 if ($role === 'Supervisor') {
-                    $activeSupervisors = $this->thesis->assignments->where('status', 'active');
+                    $activeSupervisors = $this->thesis?->assignments?->where('status', 'active') ?? collect();
 
                     if ($activeSupervisors->count() > 0) {
                         foreach ($activeSupervisors as $assignment) {
@@ -412,16 +496,26 @@ class StudentMilestone extends Model
     }
 
     /**
-     * Resolve the discipline group for this milestone via student's program
+     * Resolve the discipline group for this milestone via override or student's program
      */
     public function getDisciplineGroupAttribute(): string
     {
+        $override = is_array($this->approvals) ? ($this->approvals['discipline_group'] ?? null) : null;
+        if (!empty($override) && in_array($override, ['cybersecurity', 'artificial_intelligence', 'management_information_systems'], true)) {
+            return $override;
+        }
+
         return $this->thesis?->student?->discipline_group ?? 'other';
     }
 
     public function getDisciplineGroupLabelAttribute(): string
     {
-        return $this->thesis?->student?->discipline_group_label ?? 'General';
+        return match($this->discipline_group) {
+            'cybersecurity' => 'Cybersecurity',
+            'artificial_intelligence' => 'Artificial Intelligence',
+            'management_information_systems' => 'Management Information Systems',
+            default => $this->thesis?->student?->discipline_group_label ?? 'General',
+        };
     }
 
     /**

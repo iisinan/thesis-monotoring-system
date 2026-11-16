@@ -8,7 +8,10 @@ use App\Models\Cohort;
 use App\Models\Program;
 use App\Models\Level;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
 use Illuminate\Validation\Rule;
 
@@ -742,5 +745,92 @@ class UserManagementController extends Controller
         \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\PasswordResetDispatched($user, $password));
 
         return redirect()->back()->with('success', 'User password has been reset to default and credentials dispatched via email.');
+    }
+
+    /**
+     * Allow an Administrator to view the portal as the specified user.
+     */
+    public function impersonate(Request $request, User $user)
+    {
+        $originalAdminId = session('impersonate_admin_id');
+        $actor = $originalAdminId ? User::find($originalAdminId) : Auth::user();
+        if (!$actor || !$actor->hasRole('Admin')) {
+            abort(403, 'Only Administrators can view user accounts.');
+        }
+
+        if ($user->id === $actor->id) {
+            if ($originalAdminId) {
+                return $this->stopImpersonating($request);
+            }
+
+            return redirect()->back()->with('warning', 'You are already signed in as this account.');
+        }
+
+        if (!$originalAdminId) {
+            $previousUrl = url()->previous() ?: route('admin.users.index');
+            $previousPath = (string) parse_url($previousUrl, PHP_URL_PATH);
+            $safeReturnUrl = (str_ends_with($previousPath, '/impersonate') || str_ends_with($previousPath, '/impersonation/leave'))
+                ? route('admin.users.index')
+                : $previousUrl;
+
+            session()->put('impersonate_admin_id', $actor->id);
+            session()->put('impersonate_admin_name', $actor->name);
+            session()->put('impersonate_return_url', $safeReturnUrl);
+        }
+
+        Log::info('Admin impersonation started', [
+            'admin_id' => session('impersonate_admin_id'),
+            'target_user_id' => $user->id,
+            'target_email' => $user->email,
+        ]);
+
+        // Preserve session ID and CSRF token so open tabs and browser Back navigation remain valid
+        $this->switchSessionUser($request, $user);
+        Cookie::queue(Cookie::forget('active_dashboard_role'));
+
+        $requestedRole = $request->input('role');
+        $targetRole = ($requestedRole && $user->hasRole($requestedRole))
+            ? $requestedRole
+            : $user->getRoleNames()->first();
+
+        return redirect()->route('dashboard', $targetRole ? ['role' => $targetRole] : [])
+            ->with('success', "Viewing portal as {$user->name}. Use the top banner to return to your Admin session.");
+    }
+
+    /**
+     * Exit impersonation and restore the original Administrator session.
+     */
+    public function stopImpersonating(Request $request)
+    {
+        $adminId = session('impersonate_admin_id');
+        if (!$adminId) {
+            return redirect()->route('dashboard');
+        }
+
+        $admin = User::find($adminId);
+        $returnUrl = session('impersonate_return_url', route('admin.users.index'));
+        session()->forget(['impersonate_admin_id', 'impersonate_admin_name', 'impersonate_return_url']);
+
+        if (!$admin || !$admin->hasRole('Admin')) {
+            Auth::logout();
+            return redirect()->route('login')->with('error', 'Original Admin session could not be restored.');
+        }
+
+        Log::info('Admin impersonation ended', [
+            'admin_id' => $admin->id,
+        ]);
+
+        $this->switchSessionUser($request, $admin);
+        Cookie::queue(Cookie::forget('active_dashboard_role'));
+
+        return redirect()->to($returnUrl ?: route('admin.users.index'))
+            ->with('success', 'Returned to your Administrator account.');
+    }
+
+    private function switchSessionUser(Request $request, User $targetUser): void
+    {
+        $guard = Auth::guard('web');
+        $request->session()->put($guard->getName(), $targetUser->getAuthIdentifier());
+        $guard->setUser($targetUser);
     }
 }

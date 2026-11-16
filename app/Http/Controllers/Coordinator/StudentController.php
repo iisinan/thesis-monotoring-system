@@ -254,6 +254,8 @@ class StudentController extends Controller
                     ]);
                 }
             }
+
+            app(\App\Services\MilestoneWorkflowService::class)->tryAutoAdvanceSupervisorsAssigned($thesis->fresh());
             
             // Notifications logic
             $coordinatorId = auth()->id();

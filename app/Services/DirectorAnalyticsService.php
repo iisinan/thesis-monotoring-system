@@ -17,21 +17,36 @@ use Carbon\Carbon;
 
 class DirectorAnalyticsService
 {
+    private function likeOperator(): string
+    {
+        return DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+    }
+
+    private function responseHoursAvgExpression(): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => 'AVG(EXTRACT(EPOCH FROM (m2.created_at - m1.created_at))/3600) as avg_hours',
+            'sqlite' => "AVG((strftime('%s', m2.created_at) - strftime('%s', m1.created_at))/3600.0) as avg_hours",
+            default => 'AVG(TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at)/3600) as avg_hours',
+        };
+    }
+
     /**
      * Get Section 1: Key Institutional Metrics
      */
     public function getInstitutionalMetrics($filters = [])
     {
+        $like = $this->likeOperator();
         try {
             return [
                 'total_students' => $this->applyFilters(StudentProfile::query(), $filters)->count(),
                 'active_students' => $this->applyFilters(StudentProfile::where('enrollment_status', 'active'), $filters)->count(),
                 'graduated_students' => $this->applyFilters(StudentProfile::where('enrollment_status', 'graduated'), $filters)->count(),
-                'proposal_stage' => $this->applyFilters(StudentProfile::whereHas('thesis.currentMilestone.template', function($q) {
-                    $q->where('name', 'ilike', '%proposal%');
+                'proposal_stage' => $this->applyFilters(StudentProfile::whereHas('thesis.currentMilestone.template', function($q) use ($like) {
+                    $q->where('name', $like, '%proposal%');
                 }), $filters)->count(),
-                'internal_defence' => $this->applyFilters(StudentProfile::whereHas('thesis.currentMilestone.template', function($q) {
-                    $q->where('name', 'ilike', '%internal%');
+                'internal_defence' => $this->applyFilters(StudentProfile::whereHas('thesis.currentMilestone.template', function($q) use ($like) {
+                    $q->where('name', $like, '%internal%');
                 }), $filters)->count(),
                 'cleared_for_external' => $this->applyFilters(StudentProfile::whereHas('thesis', function($q) {
                     $q->whereNotNull('cleared_for_internal_at'); 
@@ -98,10 +113,10 @@ class DirectorAnalyticsService
                     $q->where('programs.id', $program->id);
                 })->count(),
                 'proposal_stage' => $this->applyFilters(StudentProfile::where('program_id', $program->id)->whereHas('thesis.currentMilestone.template', function($q) {
-                    $q->where('name', 'ilike', '%proposal%');
+                    $q->where('name', $this->likeOperator(), '%proposal%');
                 }), $filters)->count(),
                 'internal_stage' => $this->applyFilters(StudentProfile::where('program_id', $program->id)->whereHas('thesis.currentMilestone.template', function($q) {
-                    $q->where('name', 'ilike', '%internal%');
+                    $q->where('name', $this->likeOperator(), '%internal%');
                 }), $filters)->count(),
                 'cleared_external' => $this->applyFilters(StudentProfile::where('program_id', $program->id)->whereHas('thesis', function($q) {
                     $q->whereNotNull('cleared_for_internal_at');
@@ -240,7 +255,7 @@ class DirectorAnalyticsService
             ->join('roles as r2', 'mhr2.role_id', '=', 'r2.id')
             ->where('r1.name', 'Student')
             ->whereIn('r2.name', ['Supervisor', 'Program Coordinator'])
-            ->select(DB::raw('AVG(EXTRACT(EPOCH FROM (m2.created_at - m1.created_at))/3600) as avg_hours'))
+            ->select(DB::raw($this->responseHoursAvgExpression()))
             ->value('avg_hours') ?: 0;
 
         $waitingForFeedback = StudentMilestone::where('status', 'submitted')
@@ -349,7 +364,7 @@ class DirectorAnalyticsService
             ->join('roles as r1', 'mhr1.role_id', '=', 'r1.id')
             ->where('r1.name', 'Student')
             ->groupBy('m2.user_id')
-            ->select('m2.user_id', DB::raw('AVG(EXTRACT(EPOCH FROM (m2.created_at - m1.created_at))/3600) as avg_hours'))
+            ->select('m2.user_id', DB::raw($this->responseHoursAvgExpression()))
             ->pluck('avg_hours', 'm2.user_id');
 
         return $supervisors->map(function($s) use ($responseTimes) {
@@ -381,10 +396,11 @@ class DirectorAnalyticsService
             
             if (isset($filters['search_student']) && !empty($filters['search_student'])) {
                 $search = $filters['search_student'];
-                $query->whereHas('user', function($q) use ($search) {
-                    $q->where('name', 'ilike', "%{$search}%")
-                      ->orWhere('email', 'ilike', "%{$search}%");
-                })->orWhere('student_id_number', 'ilike', "%{$search}%");
+                $like = $this->likeOperator();
+                $query->whereHas('user', function($q) use ($search, $like) {
+                    $q->where('name', $like, "%{$search}%")
+                      ->orWhere('email', $like, "%{$search}%");
+                })->orWhere('student_id_number', $like, "%{$search}%");
             }
         } elseif ($entity === 'supervisor') {
             if (isset($filters['program_id'])) {

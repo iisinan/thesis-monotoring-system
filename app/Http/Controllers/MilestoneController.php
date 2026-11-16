@@ -24,7 +24,7 @@ class MilestoneController extends Controller
                   return redirect()->route('dashboard')->with('error', 'No active thesis found.');
             }
             $thesis = $student->thesis;
-        } elseif ($user->hasRole(['Supervisor', 'Program Coordinator', 'Internal Examiner', 'Admin'])) {
+        } elseif ($user->hasAnyRole(['Supervisor', 'Program Coordinator', 'Internal Examiner', 'Admin', 'Director'])) {
             $thesisId = $request->query('thesis_id');
             if (!$thesisId) {
                 return redirect()->route('dashboard')->with('error', 'No thesis specified.');
@@ -32,11 +32,15 @@ class MilestoneController extends Controller
             $thesis = \App\Models\ThesisProject::findOrFail($thesisId);
             
             // Basic security check: Is the user authorized for this thesis?
-            // (In a real app, use a Policy, but for now we'll check relations)
             $isAuthorized = false;
-            if ($user->hasRole('Admin')) $isAuthorized = true;
-            if ($user->hasRole('Supervisor') && $thesis->assignments()->where('supervisor_profile_id', '=', $user->supervisorProfile?->id)->exists()) $isAuthorized = true;
-            if ($user->hasRole('Internal Examiner') && $user->internalExaminerProfiles()->where('id', $thesis->internal_examiner_profile_id)->exists()) $isAuthorized = true;
+            if ($user->hasAnyRole(['Admin', 'Director'])) $isAuthorized = true;
+            if ($user->hasRole('Supervisor')) {
+                $supIds = $user->supervisorProfiles()->pluck('id');
+                if ($supIds->isNotEmpty() && $thesis->assignments()->whereIn('supervisor_profile_id', $supIds)->exists()) {
+                    $isAuthorized = true;
+                }
+            }
+            if (app(\App\Services\MilestoneWorkflowService::class)->isAssignedInternalExaminerForThesis($thesis, $user)) $isAuthorized = true;
             if ($user->hasRole('Program Coordinator')) {
                 if ($thesis->student && ($user->hasCoordinatorAccess($thesis->student) || $user->coordinatorProfiles()->where('program_id', '=', $thesis->student->program_id)->exists())) {
                     $isAuthorized = true;
@@ -50,6 +54,7 @@ class MilestoneController extends Controller
 
         if ($thesis) {
             try {
+                app(\App\Services\MilestoneWorkflowService::class)->tryAutoAdvanceSupervisorsAssigned($thesis);
                 $thesis->load(['student.user', 'assignments.supervisor.user', 'internalExaminer.user']);
                 
                 $milestones = $thesis->milestones()
@@ -89,7 +94,7 @@ class MilestoneController extends Controller
                 // Internal Examiner
                 $internalExaminer = $thesis->internalExaminer;
 
-                // All supervisors and internal examiners for assignment (Coordinators/Admins only) - Restricted by Program Scope
+                // All supervisors and internal examiners for assignment (Coordinators/Admins scoped by program; Students see faculty supervisors to record existing panels)
                 $allSupervisors = collect();
                 $allInternalExaminers = collect();
                 if ($user->hasAnyRole(['Program Coordinator', 'Admin']) && $thesis->student) {
@@ -103,6 +108,16 @@ class MilestoneController extends Controller
                         ->where('program_id', $thesis->student->program_id)
                         ->where('active', true)
                         ->get();
+                } elseif ($user->hasRole('Student') && $thesis->student) {
+                    $allSupervisors = \App\Models\SupervisorProfile::with(['user', 'programs'])
+                        ->whereHas('user', fn($q) => $q->where('id', '!=', $user->id))
+                        ->get()
+                        ->sortBy(function ($sup) use ($thesis) {
+                            $inProgram = $sup->programs->contains('id', $thesis->student->program_id) ? 0 : 1;
+                            $isProf = stripos($sup->rank ?? '', 'prof') !== false ? 0 : 1;
+                            return "{$inProgram}-{$isProf}-" . strtolower($sup->user?->name ?? 'zzz');
+                        })
+                        ->values();
                 }
 
                 // Identify the "Ongoing" milestone (first one that's not 100% complete)
@@ -137,48 +152,58 @@ class MilestoneController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        $isAssignedSupervisor = $user->hasRole('Supervisor') && 
-            $user->supervisorProfile && 
-            $milestone->thesis->assignments()->where('supervisor_profile_id', $user->supervisorProfile->id)->where('status', 'active')->exists();
+        $workflowService = app(\App\Services\MilestoneWorkflowService::class);
 
-        $isAssignedInternalExaminer = $user->hasRole('Internal Examiner') && 
-            ($milestone->template?->slug === 'internal_defence' || $milestone->template?->order == 6) &&
-            $user->internalExaminerProfiles()->where('id', $milestone->thesis->internal_examiner_profile_id)->exists();
+        $supIds = $user->supervisorProfiles()->pluck('id');
+        $isAssignedSupervisor = $user->hasRole('Supervisor') && 
+            $supIds->isNotEmpty() && 
+            $milestone->thesis->assignments()->whereIn('supervisor_profile_id', $supIds)->where('status', 'active')->exists();
+
+        $isAssignedInternalExaminer = $workflowService->isAssignedInternalExaminer($milestone, $user);
+        $isPostDefenceStage = $workflowService->isPostDefencePhase($milestone);
 
         if (!$user->hasRole('Admin') && !$isAssignedSupervisor && !$isAssignedInternalExaminer) {
             abort(403, 'Unauthorized. Supervisors can only review uploads for their assigned supervisees, and internal examiners review post-defence corrected manuscripts.');
         }
 
         $request->validate([
-            'remarks' => 'required|string|max:2000'
-        ], [
-            'remarks.required' => 'A comment is required to explain your decision.'
+            'remarks' => 'nullable|string|max:2000',
         ]);
 
-        $workflowService = app(\App\Services\MilestoneWorkflowService::class);
-
-        // When Internal Examiner (or Admin) accepts the corrected thesis for internal defence, approve the milestone and advance to Viva Voce!
-        if ($isAssignedInternalExaminer || ($user->hasRole('Admin') && ($milestone->template?->slug === 'internal_defence' || $milestone->template?->order == 6))) {
-            $latestSub = $milestone->submissions()->latest()->first();
-            if ($latestSub) {
-                \App\Models\Feedback::updateOrCreate(
-                    ['submission_id' => $latestSub->id],
-                    [
-                        'user_id' => $user->id,
-                        'decision' => 'approved',
-                        'remarks' => $request->input('remarks'),
-                    ]
-                );
+        // When Internal Examiner (or Admin) accepts the post-defence corrected thesis for internal defence, approve the milestone and advance to Viva Voce!
+        if ($isPostDefenceStage && ($isAssignedInternalExaminer || $user->hasRole('Admin'))) {
+            $postDefenceSub = $workflowService->getPostDefenceSubmission($milestone);
+            if (!$postDefenceSub) {
+                return back()->with('error', 'Cannot approve yet: the candidate has not uploaded the corrected thesis manuscript after the defence presentation.');
             }
+
+            \App\Models\Feedback::updateOrCreate(
+                [
+                    'submission_id' => $postDefenceSub->id,
+                    'created_by' => $user->id,
+                ],
+                [
+                    'decision' => 'approved',
+                    'remarks' => $request->input('remarks'),
+                ]
+            );
 
             $approverRole = $isAssignedInternalExaminer ? 'Internal Examiner' : 'Admin';
             $approvals = $milestone->approvals ?? [];
             $approvalKey = $approverRole . ':' . $user->id;
             $approvals[$approvalKey] = [
                 'user_id' => $user->id,
+                'user_name' => $user->name,
                 'role' => $approverRole,
                 'approved_at' => now()->toDateTimeString(),
                 'remarks' => $request->input('remarks'),
+            ];
+            $approvals['internal_examiner_review'] = [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'decision' => 'approved',
+                'remarks' => $request->input('remarks'),
+                'reviewed_at' => now()->toDateTimeString(),
             ];
             $milestone->approvals = $approvals;
             $milestone->status = 'approved';
@@ -189,9 +214,22 @@ class MilestoneController extends Controller
             // Advance candidate to next milestone (Milestone 7: Viva)
             $workflowService->afterApproval($milestone);
 
-            $workflowService->notifyUpdate($milestone, "{$approverRole} {$user->name} officially approved the corrected thesis for: {$milestone->template->name}. Candidate advanced to Viva Voce.");
+            $workflowService->notifyPostDefenceReviewOutcome($milestone, $user, 'approved', $request->input('remarks'));
+            $workflowService->notifyUpdate($milestone, "{$approverRole} {$user->name} officially approved the post-defence corrected thesis for: {$milestone->template->name}. Candidate advanced to Viva Voce.");
 
-            return back()->with('success', 'Corrected thesis approved successfully. Candidate has been officially cleared and advanced to Milestone 7 (Viva Voce).');
+            $msg = 'Corrected thesis approved successfully. Candidate has been officially cleared and advanced to Milestone 7 (Viva Voce).';
+            if (str_contains((string) url()->previous(), '/milestones')) {
+                return redirect()->route('milestones.index', [
+                    'thesis_id' => $milestone->thesis_project_id,
+                    'expanded' => $milestone->id,
+                ])->with('success', $msg);
+            }
+
+            return back()->with('success', $msg);
+        }
+
+        if (!$isAssignedSupervisor && !$user->hasRole('Admin')) {
+            return back()->with('error', 'Pre-defence manuscript uploads are reviewed by the assigned Supervisor. The Internal Examiner reviews post-defence corrections after the presentation session has ended.');
         }
 
         $summary = $workflowService->recordSupervisorReview(
@@ -207,6 +245,13 @@ class MilestoneController extends Controller
             ? 'Upload accepted successfully. All active reviews are approved — candidate is eligible to present.'
             : 'Upload accepted. Your approval stands. Note: Candidate still has pending or revision requests from co-supervisor(s).';
 
+        if (str_contains((string) url()->previous(), '/milestones')) {
+            return redirect()->route('milestones.index', [
+                'thesis_id' => $milestone->thesis_project_id,
+                'expanded' => $milestone->id,
+            ])->with('success', $msg);
+        }
+
         return back()->with('success', $msg);
     }
 
@@ -217,13 +262,15 @@ class MilestoneController extends Controller
             abort(403, 'Unauthorized.');
         }
 
-        $isAssignedSupervisor = $user->hasRole('Supervisor') && 
-            $user->supervisorProfile && 
-            $milestone->thesis->assignments()->where('supervisor_profile_id', $user->supervisorProfile->id)->where('status', 'active')->exists();
+        $workflowService = app(\App\Services\MilestoneWorkflowService::class);
 
-        $isAssignedInternalExaminer = $user->hasRole('Internal Examiner') && 
-            ($milestone->template?->slug === 'internal_defence' || $milestone->template?->order == 6) &&
-            $user->internalExaminerProfiles()->where('id', $milestone->thesis->internal_examiner_profile_id)->exists();
+        $supIds = $user->supervisorProfiles()->pluck('id');
+        $isAssignedSupervisor = $user->hasRole('Supervisor') && 
+            $supIds->isNotEmpty() && 
+            $milestone->thesis->assignments()->whereIn('supervisor_profile_id', $supIds)->where('status', 'active')->exists();
+
+        $isAssignedInternalExaminer = $workflowService->isAssignedInternalExaminer($milestone, $user);
+        $isPostDefenceStage = $workflowService->isPostDefencePhase($milestone);
 
         if (!$user->hasRole('Admin') && !$isAssignedSupervisor && !$isAssignedInternalExaminer) {
             abort(403, 'Unauthorized.');
@@ -235,24 +282,48 @@ class MilestoneController extends Controller
             'remarks.required' => 'A comment is required to explain your decision.'
         ]);
 
-        $workflowService = app(\App\Services\MilestoneWorkflowService::class);
-
-        if ($isAssignedInternalExaminer) {
-            $latestSub = $milestone->submissions()->latest()->first();
-            if ($latestSub) {
+        if ($isPostDefenceStage && ($isAssignedInternalExaminer || $user->hasRole('Admin'))) {
+            $targetSub = $workflowService->getPostDefenceSubmission($milestone) ?? $milestone->submissions()->latest()->first();
+            if ($targetSub) {
                 \App\Models\Feedback::updateOrCreate(
-                    ['submission_id' => $latestSub->id],
                     [
-                        'user_id' => $user->id,
+                        'submission_id' => $targetSub->id,
+                        'created_by' => $user->id,
+                    ],
+                    [
                         'decision' => 'revision_required',
                         'remarks' => $request->input('remarks'),
                     ]
                 );
             }
-            $milestone->update(['status' => 'revision_required']);
-            $workflowService->notifyUpdate($milestone, "Internal Examiner {$user->name} requested corrections for: {$milestone->template->name}");
+            $approvals = $milestone->approvals ?? [];
+            $approvals['internal_examiner_review'] = [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'decision' => 'revision_required',
+                'remarks' => $request->input('remarks'),
+                'reviewed_at' => now()->toDateTimeString(),
+            ];
+            $milestone->approvals = $approvals;
+            $milestone->status = 'revision_required';
+            $milestone->save();
 
-            return back()->with('success', 'Corrections requested. The student has been notified to revise the thesis manuscript.');
+            $workflowService->notifyPostDefenceReviewOutcome($milestone, $user, 'revision_required', $request->input('remarks'));
+            $workflowService->notifyUpdate($milestone, "Internal Examiner {$user->name} requested further post-defence corrections for: {$milestone->template->name}");
+
+            $msg = 'Corrections requested. The student has been notified to revise and re-upload the corrected thesis manuscript.';
+            if (str_contains((string) url()->previous(), '/milestones')) {
+                return redirect()->route('milestones.index', [
+                    'thesis_id' => $milestone->thesis_project_id,
+                    'expanded' => $milestone->id,
+                ])->with('success', $msg);
+            }
+
+            return back()->with('success', $msg);
+        }
+
+        if (!$isAssignedSupervisor && !$user->hasRole('Admin')) {
+            return back()->with('error', 'Pre-defence manuscript uploads are reviewed by the assigned Supervisor.');
         }
 
         $workflowService->recordSupervisorReview(
@@ -264,7 +335,16 @@ class MilestoneController extends Controller
 
         $workflowService->notifyUpdate($milestone, "Supervisor {$user->name} requested revisions for: {$milestone->template->name}");
 
-        return back()->with('success', 'Upload rejected successfully. The student has been notified to revise it and is not eligible to present until revised.');
+        $rejectMsg = 'Upload rejected successfully. The student has been notified to revise it and is not eligible to present until revised.';
+
+        if (str_contains((string) url()->previous(), '/milestones')) {
+            return redirect()->route('milestones.index', [
+                'thesis_id' => $milestone->thesis_project_id,
+                'expanded' => $milestone->id,
+            ])->with('success', $rejectMsg);
+        }
+
+        return back()->with('success', $rejectMsg);
     }
 
     public function quickApprove(Request $request, StudentMilestone $milestone)
@@ -412,14 +492,11 @@ class MilestoneController extends Controller
             return back()->with('warning', $failMsg);
         }
 
-        $isInternalDefence = ($milestone->template?->slug === 'internal_defence' || $milestone->template?->order == 6);
+        $isInternalDefence = $workflow->isInternalDefence($milestone);
         if ($isInternalDefence) {
             // Internal defence: Conclude presentation session and transition candidate to post-defence corrections!
             // Candidate must upload corrected thesis, which must be approved by the Internal Examiner to advance.
-            $milestone->update([
-                'status' => 'revision_required',
-            ]);
-            $workflow->notifyUpdate($milestone, "Internal defence presentation session concluded. Candidate must upload corrected thesis incorporating defence comments for Internal Examiner review.");
+            $workflow->concludeInternalDefencePresentation($milestone, $user);
 
             $successMsg = "Internal defence presentation session concluded for {$studentName}. Candidate transitioned to Post-Defence Correction stage and notified to upload corrected thesis for Internal Examiner review.";
             if ($request->expectsJson()) {
@@ -475,9 +552,9 @@ class MilestoneController extends Controller
         $hasPptSub = $milestone->submissions()->where('type', 'ppt')->exists();
         $hasFileSub = $milestone->submissions()->whereIn('type', ['file', 'manuscript'])->exists();
 
-        $isInternalDefence = ($milestone->template?->slug === 'internal_defence' || $milestone->template?->order == 6);
-        $defenceDate = $milestone->defence_date ? \Carbon\Carbon::parse($milestone->defence_date) : null;
-        $isPostDefenceStage = $isInternalDefence && $defenceDate && ($defenceDate->isPast() || $defenceDate->isToday());
+        $workflowService = app(\App\Services\MilestoneWorkflowService::class);
+        $isInternalDefence = $workflowService->isInternalDefence($milestone);
+        $isPostDefenceStage = $workflowService->isPostDefencePhase($milestone);
 
         if (in_array('ppt', $subTypes) && in_array('file', $subTypes)) {
             $requirePpt = !$hasPptSub && !$request->hasFile('file') && !$isPostDefenceStage;
@@ -558,27 +635,27 @@ class MilestoneController extends Controller
             foreach ($parsedPubs as $pIdx => $pubItem) {
                 $slotNum = $pIdx + 1;
                 if (empty($pubItem['file'])) {
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Please upload the PDF manuscript for Publication #{$slotNum}."
                     ]);
                 }
                 if (!$pubItem['file']->isValid() || strtolower($pubItem['file']->getClientOriginalExtension()) !== 'pdf') {
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Publication #{$slotNum} file must be a valid PDF document."
                     ]);
                 }
                 if ($pubItem['file']->getSize() > 51200 * 1024) {
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Publication #{$slotNum} file exceeds the maximum size limit of 50MB."
                     ]);
                 }
                 if (empty($pubItem['title'])) {
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Please enter the title for Publication #{$slotNum}."
                     ]);
                 }
                 if (empty($pubItem['doi'])) {
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Please provide the DOI for Publication #{$slotNum} (e.g. 10.1016/j...)."
                     ]);
                 }
@@ -587,21 +664,21 @@ class MilestoneController extends Controller
                 try {
                     $scopusInfo = $scopusVerifier->verify($pubItem['doi'], $assignedSupervisors);
                 } catch (\Throwable $e) {
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Error verifying Publication #{$slotNum} DOI against Scopus: " . $e->getMessage()
                     ]);
                 }
 
                 if (empty($scopusInfo['valid'])) {
                     $doiErr = $scopusInfo['error'] ?? 'Invalid or unrecognized DOI.';
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Publication #{$slotNum} DOI verification failed: {$doiErr}"
                     ]);
                 }
 
                 // Institutional Gate 1: ONLY Scopus-indexed publications are allowed!
                 if (empty($scopusInfo['is_scopus_indexed'])) {
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Institutional Requirement: Every publication for Internal Defence must be indexed in Scopus. Publication #{$slotNum} with DOI '{$pubItem['doi']}' is not indexed in Scopus. You cannot submit this milestone until all required publications are verified as Scopus-indexed."
                     ]);
                 }
@@ -610,7 +687,7 @@ class MilestoneController extends Controller
                 if (!empty($assignedSupervisors) && empty($scopusInfo['has_supervisor_coauthor'])) {
                     $supNamesStr = implode(', ', $assignedSupervisors);
                     $authNamesStr = !empty($scopusInfo['authors']) ? implode(', ', $scopusInfo['authors']) : 'None found in DOI registry';
-                    return back()->withInput()->withErrors([
+                    throw \Illuminate\Validation\ValidationException::withMessages([
                         'publications' => "Institutional Requirement: For a publication to be accepted, your assigned supervisor ({$supNamesStr}) must be an author. Publication #{$slotNum} authors ({$authNamesStr}) do not match any of your assigned supervisors. You cannot submit this milestone until your publication is co-authored with your supervisor."
                     ]);
                 }
@@ -659,7 +736,7 @@ class MilestoneController extends Controller
         // Handle PPT Upload
         if (in_array('ppt', $subTypes) && $request->hasFile('ppt')) {
             $pptFile = $request->file('ppt');
-            $pptPath = $pptFile->store('submissions/' . $milestone->thesis_project_id . '/ppt');
+            $pptPath = $this->storeSubmissionFile($pptFile, 'submissions/' . $milestone->thesis_project_id . '/ppt');
 
             $milestone->submissions()->create([
                 'submitted_by' => Auth::id(),
@@ -677,9 +754,10 @@ class MilestoneController extends Controller
         }
 
         // Handle Manuscript
+        $createdManuscriptSub = null;
         if (in_array('file', $subTypes) && $request->hasFile('file')) {
             $file = $request->file('file');
-            $path = $file->store('submissions/' . $milestone->thesis_project_id);
+            $path = $this->storeSubmissionFile($file, 'submissions/' . $milestone->thesis_project_id);
 
             $submission = $milestone->submissions()->create([
                 'submitted_by' => Auth::id(),
@@ -691,9 +769,10 @@ class MilestoneController extends Controller
                     'size' => $file->getSize(),
                 ],
                 'checksum' => md5_file($file->getRealPath()),
-                'description' => $request->description,
+                'description' => $request->description ?: ($isPostDefenceStage ? 'Post-Defence Corrected Thesis Manuscript' : null),
                 'version' => $milestone->submissions()->where('type', 'manuscript')->count() + 1,
             ]);
+            $createdManuscriptSub = $submission;
 
             // Automate Plagiarism Analysis (Turnitin Integration)
             try {
@@ -717,7 +796,7 @@ class MilestoneController extends Controller
                 $publicationAuthors = $pubItem['publication_authors'] ?? [];
                 $scopusData = $pubItem['scopus_data'];
 
-                $pubPath = $pubFile->store('submissions/' . $milestone->thesis_project_id . '/publications');
+                $pubPath = $this->storeSubmissionFile($pubFile, 'submissions/' . $milestone->thesis_project_id . '/publications');
 
                 $milestone->submissions()->create([
                     'submitted_by' => Auth::id(),
@@ -757,52 +836,394 @@ class MilestoneController extends Controller
             'approved_at' => $approvedAt,
         ]);
 
-        // Multi-supervisor re-upload policy:
-        // Standing approvals are preserved; rejecting supervisors are set to pending re-review.
         $workflowService = app(\App\Services\MilestoneWorkflowService::class);
-        $workflowService->handleStudentReUpload($milestone);
+
+        if ($isPostDefenceStage && $createdManuscriptSub) {
+            $approvals = $milestone->approvals ?? [];
+            $approvals['post_defence_submission_id'] = $createdManuscriptSub->id;
+            $approvals['post_defence_submitted_at'] = now()->toDateTimeString();
+            if (($approvals['internal_examiner_review']['decision'] ?? null) === 'revision_required') {
+                $approvals['internal_examiner_review']['decision'] = 'pending_re_review';
+                $approvals['internal_examiner_review']['re_uploaded_at'] = now()->toDateTimeString();
+            }
+            $milestone->approvals = $approvals;
+            $milestone->save();
+        } else {
+            // Multi-supervisor re-upload policy:
+            // Standing approvals are preserved; rejecting supervisors are set to pending re-review.
+            $workflowService->handleStudentReUpload($milestone);
+        }
 
         if ($status === 'approved') {
             $workflowService->afterApproval($milestone);
         }
 
         // Check if Supervisors Assigned milestone is now eligible to auto-advance
-        (new \App\Services\MilestoneWorkflowService())->tryAutoAdvanceSupervisorsAssigned($milestone->thesis);
+        $autoAdvancedSup = $workflowService->tryAutoAdvanceSupervisorsAssigned($milestone->thesis);
 
-        // Dispatch Real-time events to supervisors and coordinators
-        $recipients = collect();
-        // Supervisors
-        foreach ($milestone->thesis->assignments as $assignment) {
-            if ($assignment->supervisor) $recipients->push($assignment->supervisor->user_id);
+        $isSupervisorRequest = $milestone->template?->slug === 'supervisors_assigned'
+            && !$autoAdvancedSup
+            && !$milestone->thesis->assignments()->where('status', 'active')->exists();
+
+        $notifiedCoordinators = [];
+        if ($isSupervisorRequest) {
+            $notifiedCoordinators = $workflowService->notifyCoordinatorsOfSupervisorRequest(
+                $milestone,
+                Auth::user(),
+                $createdManuscriptSub ?? null,
+                $request->input('description')
+            );
+        } else {
+            // Dispatch Real-time events to supervisors and coordinators
+            $recipients = collect();
+            foreach ($milestone->thesis->assignments as $assignment) {
+                if ($assignment->supervisor) $recipients->push($assignment->supervisor->user_id);
+            }
+            $coords = \App\Models\CoordinatorProfile::where('program_id', $milestone->thesis->student->program_id)->where('active', true)->pluck('user_id');
+            $recipients = $recipients->merge($coords);
+
+            if ($milestone->thesis->internalExaminer && $milestone->thesis->internalExaminer->user_id) {
+                $recipients->push($milestone->thesis->internalExaminer->user_id);
+            }
+            foreach ($milestone->examiners as $examinerUser) {
+                $recipients->push($examinerUser->id);
+            }
+
+            foreach ($recipients->unique() as $userId) {
+                \App\Events\MilestoneSubmitted::dispatch($milestone, $userId);
+            }
         }
-        // Program Coordinators
-        $coords = \App\Models\CoordinatorProfile::where('program_id', $milestone->thesis->student->program_id)->where('active', true)->pluck('user_id');
-        $recipients = $recipients->merge($coords);
 
-        // Internal Examiner (for internal defence / milestones with assigned examiner)
-        if ($milestone->thesis->internalExaminer && $milestone->thesis->internalExaminer->user_id) {
-            $recipients->push($milestone->thesis->internalExaminer->user_id);
-        }
+        // Send Portal Inbox notification to assigned Supervisors (or Internal Examiner for post-defence)
+        try {
+            $studentUser = Auth::user();
+            $milestoneTitle = $milestone->template?->name ?? 'Milestone Submission';
+            $inboxRecipientIds = collect();
 
-        $recipients = $recipients->unique();
+            if ($isPostDefenceStage && $milestone->thesis->internalExaminer && $milestone->thesis->internalExaminer->user_id) {
+                $inboxRecipientIds->push($milestone->thesis->internalExaminer->user_id);
+            } else {
+                foreach ($milestone->thesis->assignments as $assignment) {
+                    if ($assignment->status === 'active' && $assignment->supervisor?->user_id) {
+                        $inboxRecipientIds->push($assignment->supervisor->user_id);
+                    }
+                }
+            }
 
-        foreach ($recipients as $userId) {
-            \App\Events\MilestoneSubmitted::dispatch($milestone, $userId);
+            $inboxRecipientIds = $inboxRecipientIds->unique()->filter();
+            if ($inboxRecipientIds->isNotEmpty() && $studentUser) {
+                $inboxMsg = \App\Models\InboxMessage::create([
+                    'sender_id' => $studentUser->id,
+                    'subject' => "Thesis Submission Ready for Review: {$studentUser->name} ({$milestoneTitle})",
+                    'body' => "Dear Supervisor,\n\n"
+                        . "{$studentUser->name} ({$milestone->thesis?->student?->student_id_number}) has uploaded a submission for \"{$milestoneTitle}\""
+                        . (!empty($milestone->thesis?->title) ? " titled \"{$milestone->thesis->title}\"" : "") . ".\n\n"
+                        . "Please open your Supervisor Dashboard or the candidate's Milestones page to review and Approve or Reject (Request Revision) the uploaded thesis manuscript.\n\n"
+                        . "ACETEL Academic Portal",
+                    'delivery_method' => 'in_app',
+                ]);
+
+                foreach ($inboxRecipientIds as $supUserId) {
+                    $inboxMsg->recipients()->attach($supUserId, [
+                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'recipient_type' => 'to',
+                    ]);
+                    \App\Events\MessageReceived::dispatch($inboxMsg, $supUserId);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to send supervisor inbox notification on milestone submission: " . $e->getMessage());
         }
 
         // Invalidate student dashboard query cache
         \Illuminate\Support\Facades\Cache::forget('user_thesis_' . Auth::id());
 
+        $successMessage = $isSupervisorRequest
+            ? ('Tentative proposal uploaded and supervisor request emailed immediately to your Program Coordinator'
+                . (!empty($notifiedCoordinators) ? ' (' . implode(', ', $notifiedCoordinators) . ')' : '') . '.')
+            : 'Milestone submitted successfully.';
+
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Milestone submitted successfully.',
+                'message' => $successMessage,
                 'milestone_id' => $milestone->id,
             ]);
         }
 
-        return redirect()->route('milestones.index')
-            ->with('success', 'Milestone submitted successfully.');
+        return redirect()->route('milestones.index', [
+            'expanded' => $milestone->id,
+            'thesis_id' => $milestone->thesis_project_id,
+        ])->with('success', $successMessage);
+    }
+
+    /**
+     * Option A on Supervisors Assigned milestone:
+     * Allow a student who already has supervisors to insert/record their existing supervisory panel.
+     */
+    public function submitSelfSupervisors(Request $request, StudentMilestone $milestone)
+    {
+        $this->authorize('submit', $milestone);
+
+        if ($milestone->template?->slug !== 'supervisors_assigned') {
+            return back()->with('error', 'Supervisors can only be recorded on the Supervisors Assigned milestone.');
+        }
+
+        $ongoing = $milestone->thesis->milestones()->get()->sortBy(fn($m) => $m->template->order ?? 999)->first(fn($m) => $m->status !== 'approved');
+        if ($ongoing && $ongoing->id !== $milestone->id && !Auth::user()->hasAnyRole(['Admin', 'Director'])) {
+            return back()->with('error', 'Workflow Violation: This milestone is currently locked. Actions must be performed on the ongoing node: ' . $ongoing->template->name);
+        }
+
+        $student = $milestone->thesis->student;
+        $studentUser = Auth::user();
+        $levelName = $student?->level?->name ?? '';
+        $isPhd = $levelName !== ''
+            ? stripos($levelName, 'phd') !== false
+            : ($student ? $student->isPhd() : false);
+        $requiredCount = $isPhd ? 3 : 2;
+
+        $request->validate([
+            'supervisor_ids' => 'nullable|array',
+            'supervisor_ids.*' => 'nullable|string',
+            'new_supervisors' => 'nullable|array',
+            'new_supervisors.*.name' => 'nullable|string|max:255',
+            'new_supervisors.*.email' => 'nullable|email|max:255',
+            'new_supervisors.*.rank' => 'nullable|string|max:100',
+        ]);
+
+        $submittedIds = $request->input('supervisor_ids', []);
+        $submittedNew = $request->input('new_supervisors', []);
+
+        $resolvedIds = [];
+        $slotErrors = [];
+
+        for ($i = 0; $i < $requiredCount; $i++) {
+            $slotLabel = $i === 0 ? 'Lead Supervisor' : ($isPhd ? "Co-Supervisor {$i}" : 'Co-Supervisor');
+            $selectedId = trim((string) ($submittedIds[$i] ?? ''));
+            $manualName = trim((string) ($submittedNew[$i]['name'] ?? ''));
+            $manualEmail = trim((string) ($submittedNew[$i]['email'] ?? ''));
+            $manualRank = trim((string) ($submittedNew[$i]['rank'] ?? ($i === 0 ? 'Professor' : 'Senior Lecturer')));
+
+            if ($selectedId !== '' && $selectedId !== '__manual__') {
+                $profile = \App\Models\SupervisorProfile::with('user')->find($selectedId);
+                if (!$profile || !$profile->user) {
+                    $slotErrors["supervisor_ids.{$i}"] = "{$slotLabel}: Selected supervisor profile could not be found.";
+                    continue;
+                }
+                if ($profile->user_id === $studentUser->id) {
+                    $slotErrors["supervisor_ids.{$i}"] = "{$slotLabel}: You cannot assign yourself as your own supervisor.";
+                    continue;
+                }
+                $resolvedIds[] = $profile->id;
+            } elseif ($manualName !== '' || $manualEmail !== '') {
+                if ($manualName === '' || $manualEmail === '') {
+                    $slotErrors["new_supervisors.{$i}.email"] = "{$slotLabel}: Both full name and valid email address are required when entering an unlisted supervisor.";
+                    continue;
+                }
+                if (strcasecmp($manualEmail, $studentUser->email) === 0) {
+                    $slotErrors["new_supervisors.{$i}.email"] = "{$slotLabel}: Supervisor email cannot be your own student email.";
+                    continue;
+                }
+
+                $plainPassword = \Illuminate\Support\Str::random(12);
+                $supUser = \App\Models\User::firstOrCreate(
+                    ['email' => strtolower($manualEmail)],
+                    [
+                        'name' => $manualName,
+                        'password' => \Illuminate\Support\Facades\Hash::make($plainPassword),
+                    ]
+                );
+
+                if ($supUser->wasRecentlyCreated) {
+                    try {
+                        \Illuminate\Support\Facades\Mail::to($supUser->email)->send(new \App\Mail\WelcomeUser($supUser, $plainPassword));
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning("Failed to send welcome email to inserted supervisor {$supUser->email}: " . $e->getMessage());
+                    }
+                }
+
+                if (!$supUser->hasRole('Supervisor')) {
+                    $supUser->assignRole('Supervisor');
+                }
+
+                $supProfile = \App\Models\SupervisorProfile::firstOrCreate(
+                    ['user_id' => $supUser->id],
+                    [
+                        'rank' => $manualRank ?: ($i === 0 ? 'Professor' : 'Senior Lecturer'),
+                        'max_students' => 5,
+                        'current_load' => 0,
+                        'specialization' => $student?->program?->name,
+                    ]
+                );
+
+                if ($student?->program_id) {
+                    $supProfile->programs()->syncWithoutDetaching([$student->program_id]);
+                }
+
+                $resolvedIds[] = $supProfile->id;
+            } else {
+                $slotErrors["supervisor_ids.{$i}"] = "{$slotLabel}: Please select an existing supervisor or enter their name and email.";
+            }
+        }
+
+        if (!empty($slotErrors)) {
+            return back()->withErrors($slotErrors)->withInput();
+        }
+
+        if (count($resolvedIds) !== count(array_unique($resolvedIds))) {
+            return back()->withErrors([
+                'supervisor_ids' => 'Each slot must be a distinct supervisor (a supervisor cannot be selected twice).',
+            ])->withInput();
+        }
+
+        $profiles = \App\Models\SupervisorProfile::with('user')->whereIn('id', $resolvedIds)->get()->keyBy('id');
+        $orderedProfiles = collect($resolvedIds)->map(fn($id) => $profiles->get($id))->filter()->values();
+
+        $approvals = $milestone->approvals ?? [];
+        $approvals['student_path'] = 'insert_supervisors';
+        $approvals['student_inserted_supervisors'] = [
+            'submitted_at' => now()->toDateTimeString(),
+            'submitted_by' => $studentUser->id,
+            'supervisor_profile_ids' => $resolvedIds,
+            'supervisors' => $orderedProfiles->map(fn($s, $idx) => [
+                'profile_id' => $s->id,
+                'name' => $s->user?->name,
+                'email' => $s->user?->email,
+                'role' => $idx === 0 ? 'primary' : 'secondary',
+            ])->values()->all(),
+        ];
+        $milestone->approvals = $approvals;
+        $milestone->submitted_at = $milestone->submitted_at ?? now();
+        $milestone->save();
+
+        try {
+            app(\App\Services\ThesisService::class)->replaceSupervisors(
+                $milestone->thesis,
+                $resolvedIds,
+                false,
+                false
+            );
+        } catch (\Throwable $e) {
+            return back()->with('error', $e->getMessage())->withInput();
+        }
+
+        // Notify assigned supervisors & scoped coordinators
+        foreach ($orderedProfiles as $supProfile) {
+            if ($supProfile->user) {
+                try {
+                    $supProfile->user->notify(new \App\Notifications\SupervisorAssigned($milestone->thesis));
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Failed notifying self-inserted supervisor {$supProfile->user->email}: " . $e->getMessage());
+                }
+            }
+        }
+
+        app(\App\Services\MilestoneWorkflowService::class)->notifyCoordinatorsOfSelfInsertedSupervisors(
+            $milestone->fresh(),
+            $studentUser,
+            $orderedProfiles
+        );
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . Auth::id());
+
+        $msg = 'Supervisory panel recorded successfully. Your Supervisors Assigned milestone is complete and Proposal Defence is now unlocked.';
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'milestone_id' => $milestone->id,
+            ]);
+        }
+
+        return redirect()->route('milestones.index', [
+            'expanded' => $milestone->id,
+            'thesis_id' => $milestone->thesis_project_id,
+        ])->with('success', $msg);
+    }
+
+    /**
+     * Option B explicit/resend action on Supervisors Assigned milestone:
+     * Sends or re-sends an immediate coordinator email when a student requests supervisors
+     * (after uploading or along with their tentative proposal).
+     */
+    public function requestSupervisors(Request $request, StudentMilestone $milestone)
+    {
+        $this->authorize('submit', $milestone);
+
+        if ($milestone->template?->slug !== 'supervisors_assigned') {
+            return back()->with('error', 'Supervisor requests are only available on the Supervisors Assigned milestone.');
+        }
+
+        $ongoing = $milestone->thesis->milestones()->get()->sortBy(fn($m) => $m->template->order ?? 999)->first(fn($m) => $m->status !== 'approved');
+        if ($ongoing && $ongoing->id !== $milestone->id && !Auth::user()->hasAnyRole(['Admin', 'Director'])) {
+            return back()->with('error', 'Workflow Violation: This milestone is currently locked. Actions must be performed on the ongoing node: ' . $ongoing->template->name);
+        }
+
+        if ($milestone->thesis->assignments()->where('status', 'active')->exists()) {
+            return back()->with('info', 'Supervisors are already assigned to your thesis project.');
+        }
+
+        $request->validate([
+            'file' => 'nullable|file|mimes:pdf|max:51200',
+            'description' => 'nullable|string|max:1000',
+        ]);
+
+        $submission = $milestone->submissions()->latest()->first();
+
+        if ($request->hasFile('file')) {
+            $file = $request->file('file');
+            $path = $this->storeSubmissionFile($file, 'submissions/' . $milestone->thesis_project_id);
+
+            $submission = $milestone->submissions()->create([
+                'submitted_by' => Auth::id(),
+                'type' => 'manuscript',
+                'file_url' => $path,
+                'file_meta' => [
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize(),
+                ],
+                'checksum' => md5_file($file->getRealPath()),
+                'description' => $request->input('description') ?: 'Tentative Research Proposal',
+                'version' => $milestone->submissions()->where('type', 'manuscript')->count() + 1,
+            ]);
+        }
+
+        if (!$submission) {
+            return back()->withErrors([
+                'file' => 'Please upload your tentative proposal (PDF) before requesting supervisors.',
+            ])->withInput();
+        }
+
+        $milestone->update([
+            'status' => 'submitted',
+            'submitted_at' => $milestone->submitted_at ?? now(),
+        ]);
+
+        $notified = app(\App\Services\MilestoneWorkflowService::class)->notifyCoordinatorsOfSupervisorRequest(
+            $milestone,
+            Auth::user(),
+            $submission,
+            $request->input('description')
+        );
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . Auth::id());
+
+        $msg = 'Supervisor request emailed immediately to your Program Coordinator'
+            . (!empty($notified) ? ' (' . implode(', ', $notified) . ')' : '') . '.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => $msg,
+                'milestone_id' => $milestone->id,
+            ]);
+        }
+
+        return redirect()->route('milestones.index', [
+            'expanded' => $milestone->id,
+            'thesis_id' => $milestone->thesis_project_id,
+        ])->with('success', $msg);
     }
 
     /**
@@ -978,6 +1399,10 @@ class MilestoneController extends Controller
                     ]);
                 }
             }
+
+            if ($type === 'internal') {
+                app(\App\Services\MilestoneWorkflowService::class)->syncInternalDefencePanel($event);
+            }
         }
 
         \Illuminate\Support\Facades\Log::info("Defence date set successfully for milestone: {$milestone->id}");
@@ -1056,7 +1481,7 @@ class MilestoneController extends Controller
         $data['uploaded_at'] = now()->toDateTimeString();
         
         if ($request->hasFile('report_file')) {
-            $path = $request->file('report_file')->store('plagiarism_reports');
+            $path = $this->storeSubmissionFile($request->file('report_file'), 'plagiarism_reports');
             $data['report_url'] = $path;
         }
 
@@ -1090,7 +1515,7 @@ class MilestoneController extends Controller
         // Find the student's latest manuscript submission to link it
         $manuscript = $milestone->submissions()->where('type', 'manuscript')->latest()->first();
         
-        $path = $request->file('plagiarism_report')->store('plagiarism_reports/' . $milestone->thesis_project_id);
+        $path = $this->storeSubmissionFile($request->file('plagiarism_report'), 'plagiarism_reports/' . $milestone->thesis_project_id);
         
         // 1. Create a dedicated "Plagiarism Report" submission entry (so it shows in the docs list)
         $plagiarismSubmission = $milestone->submissions()->create([
@@ -1135,10 +1560,70 @@ class MilestoneController extends Controller
         // Use the same policy we just hardened
         $this->authorize('view', $milestone);
 
-        if (!Storage::disk('public')->exists($submission->file_url)) {
+        $fileUrl = $submission->file_url;
+        if (str_starts_with($fileUrl, 'http://') || str_starts_with($fileUrl, 'https://')) {
+            return redirect()->away($fileUrl);
+        }
+
+        $disks = array_values(array_unique(array_filter([
+            config('filesystems.default'),
+            'r2',
+            'public',
+            'local',
+        ])));
+
+        $foundDisk = null;
+        foreach ($disks as $diskName) {
+            try {
+                if (Storage::disk($diskName)->exists($fileUrl)) {
+                    $foundDisk = $diskName;
+                    break;
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
+        }
+
+        if (!$foundDisk) {
             abort(404, 'Artifact not found in institutional repository.');
         }
 
-        return Storage::disk('public')->response($submission->file_url, $submission->file_meta['original_name'] ?? 'artifact');
+        $filename = $submission->file_meta['original_name'] ?? basename($fileUrl) ?? 'artifact';
+        $mimeType = $submission->file_meta['mime_type'] ?? Storage::disk($foundDisk)->mimeType($fileUrl) ?? 'application/octet-stream';
+
+        return Storage::disk($foundDisk)->response($fileUrl, $filename, [
+            'Content-Type' => $mimeType,
+            'Content-Disposition' => 'inline; filename="' . str_replace('"', '\"', $filename) . '"',
+        ]);
+    }
+
+    /**
+     * Store a student upload reliably, falling back to local disk if the primary disk fails silently.
+     */
+    private function storeSubmissionFile(\Illuminate\Http\UploadedFile $file, string $directory): string
+    {
+        $path = false;
+        try {
+            $path = $file->store($directory);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Primary disk store failed, attempting local fallback: ' . $e->getMessage());
+            $path = false;
+        }
+
+        if (empty($path)) {
+            \Illuminate\Support\Facades\Log::warning('Primary disk store returned empty path; falling back to local disk.', [
+                'default_disk' => config('filesystems.default'),
+                'directory' => $directory,
+            ]);
+            $path = $file->store($directory, 'local');
+        }
+
+        if (empty($path)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'file' => 'Failed to store uploaded file in repository storage. Please try again.',
+            ]);
+        }
+
+        return $path;
     }
 }

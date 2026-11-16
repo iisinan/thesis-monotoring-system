@@ -402,7 +402,8 @@
             submitButtons.forEach((btn) => { btn.disabled = true; });
 
             try {
-                const res = await fetch(form.action, {
+                const actionUrl = form.getAttribute('action') || (typeof form.action === 'string' ? form.action : window.location.href);
+                const res = await fetch(actionUrl, {
                     method: 'POST',
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',

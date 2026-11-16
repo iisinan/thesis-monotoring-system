@@ -12,14 +12,16 @@
     rescheduleTrack: '{{ ($initialTrack ?? 'all') !== 'all' ? $initialTrack : '' }}',
     rescheduleFromDate: 'all',
     slotModalOpen: false,
-    slotStudentId: null,
+    slotIsAddMode: false,
+    slotStudentId: '',
     slotStudentName: '',
     slotAction: 'schedule',
     slotDate: '',
     slotTime: '',
     slotLink: '',
     slotTrack: '',
-    slotFormUrl: ''
+    slotFormUrl: '',
+    slotUrlBase: '{{ url("admin/milestone-templates/" . $template->id . "/students") }}'
 }">
 
     {{-- Presentation Milestone Specific Tabs --}}
@@ -190,6 +192,22 @@
                             <span x-text="activeTrack === 'cybersecurity' ? 'End Cyber Session' : (activeTrack === 'artificial_intelligence' ? 'End AI Session' : (activeTrack === 'management_information_systems' ? 'End MIS Session' : 'End Presentation Session'))">End Presentation Session</span>
                         </button>
                     </form>
+
+                    @if(isset($unscheduledMilestones) && $unscheduledMilestones->isNotEmpty())
+                        @php
+                            $firstUnsched = $unscheduledMilestones->first();
+                            $defaultPresDate = $allScheduled->first() ? \Carbon\Carbon::parse($allScheduled->first()->defence_date)->format('Y-m-d') : date('Y-m-d');
+                            $defaultPresTime = $allScheduled->first(fn($m) => !empty($m->defence_time)) ? \Carbon\Carbon::parse($allScheduled->first(fn($m) => !empty($m->defence_time))->defence_time)->format('H:i') : '10:00';
+                        @endphp
+                        <button type="button"
+                            @click="slotModalOpen = true; slotIsAddMode = true; slotStudentId = '{{ $firstUnsched->id }}'; slotStudentName = '{{ addslashes($firstUnsched->thesis?->student?->user?->name ?? 'Candidate') }}'; slotAction = 'schedule'; slotDate = (activeDate !== 'all' ? activeDate : '{{ $defaultPresDate }}'); slotTime = '{{ $defaultPresTime }}'; slotTrack = (activeTrack !== 'all' ? activeTrack : '{{ $firstUnsched->discipline_group ?? 'cybersecurity' }}'); slotLink = '{{ addslashes($meetingLink ?? '') }}'; slotFormUrl = slotUrlBase + '/{{ $firstUnsched->id }}/slot'"
+                            class="w-full inline-flex items-center justify-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer">
+                            <svg class="w-4 h-4 text-emerald-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            <span>Add Student to Presentation</span>
+                        </button>
+                    @endif
 
                     <button type="button" 
                         @click="rescheduleGroupModalOpen = true; rescheduleTrack = (activeTrack !== 'all' ? activeTrack : ''); rescheduleFromDate = (activeDate !== 'all' ? activeDate : 'all')"
@@ -625,7 +643,7 @@
                                     @if(!$presIsGraded)
                                         <div class="pt-2.5 border-t border-slate-100 grid grid-cols-3 gap-1.5">
                                             <button type="button" 
-                                                @click="slotModalOpen = true; slotStudentId = '{{ $pres->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($pres->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $pres->defence_time ? \Carbon\Carbon::parse($pres->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($pres->meeting_link ?? '') }}'; slotTrack = '{{ $pres->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $pres->id]) }}'"
+                                                @click="slotModalOpen = true; slotIsAddMode = false; slotStudentId = '{{ $pres->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($pres->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $pres->defence_time ? \Carbon\Carbon::parse($pres->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($pres->meeting_link ?? '') }}'; slotTrack = '{{ $pres->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $pres->id]) }}'"
                                                 title="Reschedule presentation"
                                                 class="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 transition-colors shadow-2xs cursor-pointer">
                                                 <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -636,7 +654,7 @@
 
                                             <form action="{{ route('admin.milestone-templates.update-student-slot', [$template->id, $pres->id]) }}" method="POST" class="w-full">
                                                 @csrf
-                                                <input type="hidden" name="action" value="remove">
+                                                <input type="hidden" name="slot_action" value="remove">
                                                 <button type="submit" 
                                                     data-confirm="Are you sure you want to cancel the presentation for {{ addslashes($studentName) }}? This will clear their presentation date, time, and link."
                                                     data-confirm-title="Cancel Candidate Presentation"
@@ -872,7 +890,7 @@
                                     @if(!$smIsGraded)
                                         <div class="pt-2 border-t border-slate-100 grid grid-cols-3 gap-1.5">
                                             <button type="button" 
-                                                @click="slotModalOpen = true; slotStudentId = '{{ $sm->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($sm->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $sm->defence_time ? \Carbon\Carbon::parse($sm->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($sm->meeting_link ?? '') }}'; slotTrack = '{{ $sm->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $sm->id]) }}'"
+                                                @click="slotModalOpen = true; slotIsAddMode = false; slotStudentId = '{{ $sm->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($sm->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $sm->defence_time ? \Carbon\Carbon::parse($sm->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($sm->meeting_link ?? '') }}'; slotTrack = '{{ $sm->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $sm->id]) }}'"
                                                 title="Reschedule presentation"
                                                 class="w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-xl text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 transition-colors shadow-2xs truncate">
                                                 <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -883,7 +901,7 @@
 
                                             <form action="{{ route('admin.milestone-templates.update-student-slot', [$template->id, $sm->id]) }}" method="POST" class="w-full">
                                                 @csrf
-                                                <input type="hidden" name="action" value="remove">
+                                                <input type="hidden" name="slot_action" value="remove">
                                                 <button type="submit" 
                                                     data-confirm="Are you sure you want to cancel the presentation for {{ addslashes($studentName) }}? This will clear their presentation date, time, and link."
                                                     data-confirm-title="Cancel Candidate Presentation"
@@ -1220,7 +1238,7 @@
                                                 @endphp
                                                 @if(!$rowIsGraded)
                                                     <button type="button" 
-                                                        @click="slotModalOpen = true; slotStudentId = '{{ $sm->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($sm->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $sm->defence_time ? \Carbon\Carbon::parse($sm->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($sm->meeting_link ?? '') }}'; slotTrack = '{{ $sm->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $sm->id]) }}'"
+                                                        @click="slotModalOpen = true; slotIsAddMode = false; slotStudentId = '{{ $sm->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($sm->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $sm->defence_time ? \Carbon\Carbon::parse($sm->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($sm->meeting_link ?? '') }}'; slotTrack = '{{ $sm->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $sm->id]) }}'"
                                                         title="Reschedule presentation"
                                                         class="p-1.5 rounded-xl text-amber-600 hover:text-white hover:bg-amber-600 border border-amber-200 hover:border-amber-600 transition-all shadow-2xs">
                                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1229,7 +1247,7 @@
                                                     </button>
                                                     <form action="{{ route('admin.milestone-templates.update-student-slot', [$template->id, $sm->id]) }}" method="POST" class="inline">
                                                         @csrf
-                                                        <input type="hidden" name="action" value="remove">
+                                                        <input type="hidden" name="slot_action" value="remove">
                                                         <button type="submit" 
                                                             data-confirm="Are you sure you want to cancel the presentation for {{ addslashes($studentName) }}? This will clear their presentation date, time, and link."
                                                             data-confirm-title="Cancel Candidate Presentation"
@@ -1392,18 +1410,18 @@
             <div @click.outside="slotModalOpen = false" class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
                 <form :action="slotFormUrl" method="POST" x-ref="slotForm">
                     @csrf
-                    <input type="hidden" name="action" :value="slotAction">
+                    <input type="hidden" name="slot_action" :value="slotAction">
 
                     {{-- Header --}}
                     <div class="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-4 bg-slate-50/50">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                            <div class="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" :class="slotIsAddMode ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'">
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
                             </div>
                             <div>
-                                <h3 class="text-base font-black text-slate-900" x-text="slotDate ? 'Manage Candidate Slot' : 'Schedule Candidate Presentation'"></h3>
+                                <h3 class="text-base font-black text-slate-900" x-text="slotIsAddMode ? 'Add Student to Presentation' : 'Manage Candidate Slot'"></h3>
                                 <p class="text-xs text-slate-500 mt-0.5 truncate max-w-[240px]" x-text="slotStudentName"></p>
                             </div>
                         </div>
@@ -1414,6 +1432,29 @@
 
                     {{-- Form fields --}}
                     <div class="p-6 space-y-4 text-xs text-left">
+                        @if(isset($unscheduledMilestones) && $unscheduledMilestones->isNotEmpty())
+                            <div x-show="slotIsAddMode" x-cloak>
+                                <label class="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
+                                    Select Candidate <span class="text-rose-500">*</span>
+                                </label>
+                                <select x-model="slotStudentId"
+                                    @change="slotFormUrl = slotUrlBase + '/' + slotStudentId + '/slot'; const opt = $event.target.selectedOptions[0]; if (opt) { slotStudentName = opt.getAttribute('data-name') || ''; if (opt.getAttribute('data-track')) slotTrack = opt.getAttribute('data-track'); }"
+                                    class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500">
+                                    @foreach($unscheduledMilestones as $usm)
+                                        @php
+                                            $uName = $usm->thesis?->student?->user?->name ?? 'Candidate';
+                                            $uMatric = $usm->thesis?->student?->student_id_number ?? '';
+                                            $uTrack = $usm->discipline_group ?? 'cybersecurity';
+                                        @endphp
+                                        <option value="{{ $usm->id }}" data-name="{{ $uName }}" data-track="{{ $uTrack }}">
+                                            {{ $uName }} {{ $uMatric ? "({$uMatric})" : '' }} — {{ $usm->discipline_group_label }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <p class="text-[10px] text-slate-400 mt-1">Select an unscheduled candidate on {{ $template->name }} to add to this presentation.</p>
+                            </div>
+                        @endif
+
                         @if($isSeminarCourse)
                             <div>
                                 <label class="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
@@ -1432,7 +1473,7 @@
                             <label class="block text-[11px] font-black text-slate-700 uppercase tracking-wider mb-1.5">
                                 Presentation Date <span class="text-rose-500">*</span>
                             </label>
-                            <input type="date" name="defence_date" x-model="slotDate" :required="slotAction === 'schedule'" min="{{ date('Y-m-d') }}" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
+                            <input type="date" name="defence_date" x-model="slotDate" :required="slotAction === 'schedule'" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500">
                             <p class="text-[10px] text-slate-400 mt-1">Assign or move this candidate to any presentation date.</p>
                         </div>
 
@@ -1470,15 +1511,15 @@
 
                         {{-- Notice --}}
                         <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600 text-[11px] leading-relaxed">
-                            <span x-show="slotDate">Moving this candidate will update their defence event, clear presentation cache, and notify the candidate.</span>
-                            <span x-show="!slotDate">Scheduling this candidate creates a new defence event and notifies the candidate.</span>
+                            <span x-show="!slotIsAddMode">Moving this candidate will update their defence event, clear presentation cache, and notify the candidate.</span>
+                            <span x-show="slotIsAddMode">Adding this candidate attaches their presentation slot, assigns track examiners, and sends them an invitation.</span>
                         </div>
                     </div>
 
                     {{-- Footer --}}
                     <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3 bg-slate-50/50">
                         <div>
-                            <template x-if="slotDate">
+                            <template x-if="!slotIsAddMode && slotDate">
                                 <button type="button" @click="if(confirm('Are you sure you want to cancel the presentation for ' + slotStudentName + '? This will remove them from the schedule.')) { slotAction = 'remove'; $nextTick(() => $refs.slotForm.submit()); }"
                                     class="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer">
                                     Remove from Schedule
@@ -1487,8 +1528,8 @@
                         </div>
                         <div class="flex items-center gap-2">
                             <button type="button" @click="slotModalOpen = false" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer">Cancel</button>
-                            <button type="submit" @click="slotAction = 'schedule'" class="px-5 py-2 rounded-xl text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-600/20 transition-all font-semibold cursor-pointer">
-                                <span x-text="slotDate ? 'Update Slot' : 'Schedule Candidate'"></span>
+                            <button type="submit" @click="slotAction = 'schedule'" class="px-5 py-2 rounded-xl text-xs font-bold text-white shadow-md transition-all font-semibold cursor-pointer" :class="slotIsAddMode ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'">
+                                <span x-text="slotIsAddMode ? 'Add to Presentation' : 'Update Slot'"></span>
                             </button>
                         </div>
                     </div>

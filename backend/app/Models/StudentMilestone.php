@@ -496,16 +496,26 @@ class StudentMilestone extends Model
     }
 
     /**
-     * Resolve the discipline group for this milestone via student's program
+     * Resolve the discipline group for this milestone via override or student's program
      */
     public function getDisciplineGroupAttribute(): string
     {
+        $override = is_array($this->approvals) ? ($this->approvals['discipline_group'] ?? null) : null;
+        if (!empty($override) && in_array($override, ['cybersecurity', 'artificial_intelligence', 'management_information_systems'], true)) {
+            return $override;
+        }
+
         return $this->thesis?->student?->discipline_group ?? 'other';
     }
 
     public function getDisciplineGroupLabelAttribute(): string
     {
-        return $this->thesis?->student?->discipline_group_label ?? 'General';
+        return match($this->discipline_group) {
+            'cybersecurity' => 'Cybersecurity',
+            'artificial_intelligence' => 'Artificial Intelligence',
+            'management_information_systems' => 'Management Information Systems',
+            default => $this->thesis?->student?->discipline_group_label ?? 'General',
+        };
     }
 
     /**

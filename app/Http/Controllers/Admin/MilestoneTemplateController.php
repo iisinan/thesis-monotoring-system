@@ -67,6 +67,24 @@ class MilestoneTemplateController extends Controller
             $coordinatorProgramId = $coordinatorProfile ? $coordinatorProfile->program_id : -1;
         }
 
+        // Auto-advance any candidate currently on Supervisors Assigned who already has supervisors supplied/attached
+        try {
+            $workflow = app(\App\Services\MilestoneWorkflowService::class);
+            $readySupMilestones = \App\Models\StudentMilestone::whereHas('template', fn($q) => $q->where('slug', 'supervisors_assigned'))
+                ->whereIn('status', ['in_progress', 'submitted', 'partially_approved', 'revision_required'])
+                ->whereHas('thesis.assignments', fn($aq) => $aq->where('status', 'active'))
+                ->with('thesis')
+                ->get();
+
+            foreach ($readySupMilestones as $readySm) {
+                if ($readySm->thesis) {
+                    $workflow->tryAutoAdvanceSupervisorsAssigned($readySm->thesis);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Auto-advance sync on Supervisors Assigned panel load failed: ' . $e->getMessage());
+        }
+
         $query = MilestoneTemplate::with('program')
             ->with(['studentMilestones' => function ($q) use ($isCoordinator, $coordinatorProgramId) {
                 $q->whereIn('status', ['in_progress', 'submitted', 'revision_required', 'partially_approved'])
@@ -1143,8 +1161,18 @@ class MilestoneTemplateController extends Controller
         }
 
         if ($template->slug === 'supervisors_assigned') {
-            return back()->with('error', 'Presentation scheduling is not applicable to the Supervisors Assigned milestone.');
+            return $this->respondMilestoneAction($request, $template, 'error', 'Presentation scheduling is not applicable to the Supervisors Assigned milestone.');
         }
+
+        $resolvedAction = $request->input('slot_action') ?: $request->input('action', 'schedule');
+        $rawLink = trim((string) $request->input('meeting_link', ''));
+        if ($rawLink !== '' && !str_starts_with(strtolower($rawLink), 'http://') && !str_starts_with(strtolower($rawLink), 'https://')) {
+            $rawLink = 'https://' . $rawLink;
+        }
+        $request->merge([
+            'action' => $resolvedAction,
+            'meeting_link' => $rawLink !== '' ? $rawLink : null,
+        ]);
 
         $request->validate([
             'action' => 'required|in:schedule,remove',
@@ -1159,12 +1187,12 @@ class MilestoneTemplateController extends Controller
         $studentName = $studentUser?->name ?? 'Candidate';
 
         if ($thesis && $thesis->isExemptFromMilestone($template)) {
-            return back()->with('error', "Candidate {$studentName} is exempt from {$template->name} based on their degree programme.");
+            return $this->respondMilestoneAction($request, $template, 'error', "Candidate {$studentName} is exempt from {$template->name} based on their degree programme.");
         }
 
         $workflow = app(\App\Services\MilestoneWorkflowService::class);
         if ($workflow->hasBeenGraded($milestone) || $workflow->isPostDefencePhase($milestone)) {
-            return back()->with('error', "Candidate {$studentName} has already been graded or concluded presentation and cannot be rescheduled or modified.");
+            return $this->respondMilestoneAction($request, $template, 'error', "Candidate {$studentName} has already been graded or concluded presentation and cannot be rescheduled or modified.");
         }
 
         $type = $template->defence_type ?? match($template->slug) {
@@ -1199,7 +1227,7 @@ class MilestoneTemplateController extends Controller
 
                 \Illuminate\Support\Facades\DB::commit();
                 \App\Models\MilestoneTemplate::clearPresentationCache();
-                return back()->with('success', "Cancelled presentation for {$studentName} and removed them from the schedule.");
+                return $this->respondMilestoneAction($request, $template, 'success', "Cancelled presentation for {$studentName} and removed them from the schedule.");
             }
 
             // Enforce supervisor approval before scheduling unscheduled candidates on supervisor-gated milestones
@@ -1207,8 +1235,16 @@ class MilestoneTemplateController extends Controller
                 || in_array($template->slug, ['proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence']);
             if ($requiresSupervisorApproval && !$workflow->isSupervisorApproved($milestone)) {
                 \Illuminate\Support\Facades\DB::rollBack();
-                return back()->with('error', "Cannot schedule {$studentName}: The candidate's uploaded thesis/document has not yet been approved by their supervisor.");
+                return $this->respondMilestoneAction($request, $template, 'error', "Cannot schedule {$studentName}: The candidate's uploaded thesis/document has not yet been approved by their supervisor.");
             }
+
+            // Persist optional discipline track override for Seminar Course
+            $previousTrack = $milestone->discipline_group;
+            $approvals = is_array($milestone->approvals) ? $milestone->approvals : [];
+            if ($request->filled('discipline_group') && in_array($request->discipline_group, ['cybersecurity', 'artificial_intelligence', 'management_information_systems'], true)) {
+                $approvals['discipline_group'] = $request->discipline_group;
+            }
+            $singleDiscGroup = $approvals['discipline_group'] ?? $milestone->discipline_group;
 
             // Schedule or change date
             $previousDate = $milestone->defence_date ? \Carbon\Carbon::parse($milestone->defence_date)->format('Y-m-d') : null;
@@ -1216,12 +1252,28 @@ class MilestoneTemplateController extends Controller
             $newDate = \Carbon\Carbon::parse($request->defence_date)->format('Y-m-d');
             $newTime = $request->defence_time ?: null;
             $newLink = $request->meeting_link ?: null;
+
+            if (empty($newLink) && $template->slug === 'seminar_as_a_course') {
+                $existingTrackMilestone = \App\Models\StudentMilestone::where('milestone_template_id', $template->id)
+                    ->whereNotNull('defence_date')
+                    ->whereNotNull('meeting_link')
+                    ->where('status', '!=', 'approved')
+                    ->with('thesis.student.program')
+                    ->get()
+                    ->first(fn($m) => $m->discipline_group === $singleDiscGroup && !empty($m->meeting_link));
+
+                $newLink = $existingTrackMilestone?->meeting_link
+                    ?? ($template->metadata['track_zoom_links'][$singleDiscGroup] ?? null)
+                    ?? ($template->metadata['group_examiners'][$singleDiscGroup]['meeting_link'] ?? null);
+            }
+
             $isMoved = !empty($previousDate) && ($previousDate !== $newDate || $previousTime !== $newTime || ($milestone->meeting_link ?: null) !== $newLink);
 
             $updateData = [
                 'defence_date' => $newDate,
                 'defence_time' => $newTime,
                 'meeting_link' => $newLink,
+                'approvals' => $approvals,
             ];
             $milestone->update($updateData);
 
@@ -1245,11 +1297,18 @@ class MilestoneTemplateController extends Controller
                 );
 
                 // Auto-attach template examiners if needed (track-specific for seminar course)
-                $singleDiscGroup = $milestone->discipline_group;
                 $singleGroupExaminers = $template->metadata['group_examiners'][$singleDiscGroup]['user_ids'] ?? null;
                 $singleExaminersToAttach = !empty($singleGroupExaminers)
                     ? $singleGroupExaminers
                     : ($template->slug === 'seminar_as_a_course' ? [] : ($template->metadata['examiner_user_ids'] ?? []));
+
+                if ($template->slug === 'seminar_as_a_course' && $previousTrack !== $singleDiscGroup && !empty($singleExaminersToAttach)) {
+                    $evaluatedUserIds = $event->evaluations()->pluck('evaluator_id')->all();
+                    \App\Models\PanelMember::where('defence_event_id', $event->id)
+                        ->where('role', 'examiner')
+                        ->whereNotIn('user_id', array_merge($singleExaminersToAttach, $evaluatedUserIds))
+                        ->delete();
+                }
 
                 if ($template->slug === 'internal_defence' && $thesis) {
                     if ($thesis->internalExaminer && $thesis->internalExaminer->user_id) {

@@ -232,6 +232,18 @@ class PresentationController extends Controller
             }
         }
 
+        $unscheduledMilestones = collect();
+        if ($isAdmin) {
+            $unscheduledMilestones = StudentMilestone::where('milestone_template_id', $template->id)
+                ->whereNull('defence_date')
+                ->where('status', '!=', 'approved')
+                ->with(['template', 'thesis.student.user', 'thesis.student.program', 'thesis.student.level'])
+                ->get()
+                ->reject(fn($sm) => $workflow->isPostDefencePhase($sm) || $workflow->hasBeenGraded($sm) || ($sm->thesis && $sm->template && $sm->thesis->isExemptFromMilestone($sm->template)))
+                ->sortBy(fn($sm) => strtolower($sm->thesis?->student?->user?->name ?? ''))
+                ->values();
+        }
+
         return view('presentations.show', compact(
             'template',
             'allScheduled',
@@ -247,7 +259,8 @@ class PresentationController extends Controller
             'trackData',
             'isScopedExaminer',
             'examinerTracks',
-            'initialTrack'
+            'initialTrack',
+            'unscheduledMilestones'
         ));
     }
 }

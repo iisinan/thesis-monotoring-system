@@ -79,6 +79,10 @@ try {
 echo "=== Starting Background Queue Worker ==="
 php -d max_execution_time=0 artisan queue:work --sleep=3 --tries=3 &
 
+# ── Start Laravel Scheduler (Background) ──
+echo "=== Starting Background Scheduler ==="
+php -d max_execution_time=0 artisan schedule:work &
+
 # ── Start Laravel Octane ─────────────────────────────────────────
 echo "=== Starting application server (Laravel Octane + FrankenPHP) ==="
 export PORT="${PORT:-8000}"

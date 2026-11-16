@@ -69,7 +69,7 @@ class ThesisController extends Controller
         $this->authorize('view', $thesis);
         
 
-        $thesis->load(['student.user', 'milestones.template', 'messages.sender', 'supervisors.supervisor.user', 'defenceEvents.panelMembers', 'actionItems']);
+        $thesis->load(['student.user', 'milestones.template', 'milestones.submissions.submittedBy', 'milestones.submissions.feedbacks', 'messages.sender', 'supervisors.supervisor.user', 'defenceEvents.panelMembers', 'actionItems']);
         
         // Institutional Isolation: Restrict supervisor pool to student's matching program context
         $allSupervisors = SupervisorProfile::with('user')
@@ -137,8 +137,9 @@ class ThesisController extends Controller
                     throw new \Exception("A supervisor cannot be attached to one student multiple times.");
                 }
 
-                // Bulk Assignment (Replace)
-                $this->thesisService->replaceSupervisors($thesis, $ids);
+                // Bulk Assignment (Replace); Admins may override capacity/rank when managing existing committees
+                $isAdminOverride = auth()->user()?->hasRole('Admin') ?? false;
+                $this->thesisService->replaceSupervisors($thesis, $ids, !$isAdminOverride, !$isAdminOverride);
                 $message = 'Institutional supervision panel authorized successfully.';
                 $data = ['success' => true, 'message' => $message];
             } else {
@@ -184,6 +185,34 @@ class ThesisController extends Controller
         $examiner = \App\Models\InternalExaminerProfile::with('user')->find($request->internal_examiner_profile_id);
         $studentName = $thesis->student?->user?->name ?? 'Candidate';
         $examinerName = $examiner?->user?->name ?? 'Internal Examiner';
+
+        if ($examiner && $examiner->user_id) {
+            \App\Models\ExaminerAssignment::updateOrCreate(
+                [
+                    'thesis_project_id' => $thesis->id,
+                    'type' => 'internal_examiner',
+                ],
+                [
+                    'examiner_id' => $examiner->user_id,
+                    'invitation_status' => 'accepted',
+                    'assigned_at' => now(),
+                ]
+            );
+
+            // Sync panel member on internal defence event if exists
+            $internalEvent = \App\Models\DefenceEvent::where('thesis_project_id', $thesis->id)
+                ->where('type', 'internal')
+                ->first();
+            if ($internalEvent) {
+                \App\Models\PanelMember::firstOrCreate([
+                    'defence_event_id' => $internalEvent->id,
+                    'user_id' => $examiner->user_id,
+                    'role' => 'examiner',
+                ], [
+                    'invitation_status' => 'accepted',
+                ]);
+            }
+        }
 
         $milestone = $thesis->milestones()->whereHas('template', function($q) {
             $q->where('slug', 'internal_defence')->orWhere('order', 6);

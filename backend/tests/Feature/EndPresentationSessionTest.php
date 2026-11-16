@@ -218,4 +218,89 @@ class EndPresentationSessionTest extends TestCase
             'Presentation tab should reappear once Admin schedules another presentation'
         );
     }
+
+    #[Test]
+    public function admin_can_add_unscheduled_student_to_existing_seminar_presentation_slot(): void
+    {
+        $misExaminer = User::factory()->create(['name' => 'Dr. MIS Examiner', 'is_active' => true]);
+        $this->seminarTemplate->update([
+            'metadata' => [
+                'track_zoom_links' => [
+                    'management_information_systems' => 'https://noun.zoom.us/j/91252764768',
+                ],
+                'group_examiners' => [
+                    'management_information_systems' => [
+                        'user_ids' => [$misExaminer->id],
+                        'meeting_link' => 'https://noun.zoom.us/j/91252764768',
+                    ],
+                ],
+            ],
+        ]);
+
+        // Create existing scheduled seminar candidate
+        [$existingUser, $existingThesis, $existingSem] = $this->createScheduledSeminarCandidate('Existing Presenter', 'ACE26/010', []);
+
+        // Create unscheduled seminar candidate
+        $newStudentUser = User::factory()->create(['name' => 'Enoh Clement Enoh', 'is_active' => true]);
+        $newStudentUser->assignRole('Student');
+        $newStudent = $newStudentUser->studentProfile()->create([
+            'program_id' => $this->cyberProgram->id,
+            'cohort_id' => $this->cohort->id,
+            'level_id' => $this->mscLevel->id,
+            'student_id_number' => 'ACE26/011',
+            'enrollment_status' => 'active',
+        ]);
+        $newThesis = ThesisProject::create([
+            'student_profile_id' => $newStudent->id,
+            'title' => 'MIS Research Project',
+            'status' => 'draft',
+            'started_at' => now(),
+        ]);
+        $newThesis->syncMilestones();
+        $newSemMilestone = $newThesis->milestones()
+            ->where('milestone_template_id', $this->seminarTemplate->id)
+            ->firstOrFail();
+
+        $targetDate = now()->addDay()->toDateString();
+
+        // Add student via AJAX JSON request (simulating the Manage Student Slot modal on milestone-templates)
+        $response = $this->actingAs($this->admin)->postJson(
+            route('admin.milestone-templates.update-student-slot', [$this->seminarTemplate->id, $newSemMilestone->id]),
+            [
+                'slot_action' => 'schedule',
+                'discipline_group' => 'management_information_systems',
+                'defence_date' => $targetDate,
+                'defence_time' => '10:00',
+                'meeting_link' => '', // Should inherit track Zoom link automatically
+            ]
+        );
+
+        $response->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('status', 'success');
+
+        $newSemMilestone->refresh();
+        $this->assertSame($targetDate, $newSemMilestone->defence_date?->format('Y-m-d'));
+        $this->assertSame('10:00', $newSemMilestone->defence_time);
+        $this->assertSame('https://noun.zoom.us/j/91252764768', $newSemMilestone->meeting_link);
+        $this->assertSame('management_information_systems', $newSemMilestone->discipline_group);
+
+        // Verify DefenceEvent and track examiner attachment
+        $event = DefenceEvent::where('thesis_project_id', $newThesis->id)->where('type', 'seminar')->first();
+        $this->assertNotNull($event);
+        $this->assertTrue(
+            $event->panelMembers()->where('user_id', $misExaminer->id)->where('role', 'examiner')->exists(),
+            'Track examiner must be automatically attached when adding student to Seminar Course presentation'
+        );
+
+        // Also verify removing student from schedule works via AJAX
+        $removeRes = $this->actingAs($this->admin)->postJson(
+            route('admin.milestone-templates.update-student-slot', [$this->seminarTemplate->id, $newSemMilestone->id]),
+            [
+                'slot_action' => 'remove',
+            ]
+        );
+        $removeRes->assertOk()->assertJsonPath('ok', true);
+        $this->assertNull($newSemMilestone->fresh()->defence_date);
+    }
 }

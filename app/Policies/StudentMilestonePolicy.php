@@ -27,20 +27,17 @@ class StudentMilestonePolicy
 
         // Supervisor can view if assigned to the thesis
         if ($user->hasRole('Supervisor')) {
-            if ($user->supervisorProfile && $milestone->thesis->assignments()
-                ->where('supervisor_profile_id', $user->supervisorProfile->id)
+            $supIds = $user->supervisorProfiles()->pluck('id');
+            if ($supIds->isNotEmpty() && $milestone->thesis->assignments()
+                ->whereIn('supervisor_profile_id', $supIds)
                 ->whereIn('status', ['active', 'ended']) 
                 ->exists()) {
                 return true;
             }
         }
 
-        if ($user->hasRole('Internal Examiner')) {
-            if ($user->internalExaminerProfiles()
-                ->where('id', $milestone->thesis->internal_examiner_profile_id)
-                ->exists()) {
-                return true;
-            }
+        if (app(\App\Services\MilestoneWorkflowService::class)->isAssignedInternalExaminerForThesis($milestone->thesis, $user)) {
+            return true;
         }
 
         if ($user->hasRole('External Examiner')) {
@@ -131,7 +128,8 @@ class StudentMilestonePolicy
             }
 
             if ($user->hasRole('Supervisor')) {
-                if ($user->supervisorProfile && $milestone->thesis->assignments()->where('supervisor_profile_id', $user->supervisorProfile->id)->whereIn('status', ['active', 'ended'])->exists()) {
+                $supIds = $user->supervisorProfiles()->pluck('id');
+                if ($supIds->isNotEmpty() && $milestone->thesis->assignments()->whereIn('supervisor_profile_id', $supIds)->whereIn('status', ['active', 'ended'])->exists()) {
                     return true;
                 }
             }
@@ -156,7 +154,8 @@ class StudentMilestonePolicy
                     return true;
                 }
             } elseif ($role === 'Supervisor') {
-                if ($user->supervisorProfile && $milestone->thesis->assignments()->where('supervisor_profile_id', $user->supervisorProfile->id)->whereIn('status', ['active', 'ended'])->exists()) {
+                $supIds = $user->supervisorProfiles()->pluck('id');
+                if ($supIds->isNotEmpty() && $milestone->thesis->assignments()->whereIn('supervisor_profile_id', $supIds)->whereIn('status', ['active', 'ended'])->exists()) {
                     return true;
                 }
             } elseif ($role === 'Internal Examiner') {
@@ -183,11 +182,18 @@ class StudentMilestonePolicy
         }
 
         // Assigned Internal Examiner can review and approve internal_defence milestone
-        if ($milestone->template?->slug === 'internal_defence' || $milestone->template?->order == 6) {
-            if ($user->hasRole('Internal Examiner')) {
-                return $user->internalExaminerProfiles()
-                    ->where('id', $milestone->thesis->internal_examiner_profile_id)
-                    ->exists();
+        if (app(\App\Services\MilestoneWorkflowService::class)->isAssignedInternalExaminer($milestone, $user)) {
+            return true;
+        }
+
+        // Assigned Supervisor can review their supervisee's milestone uploads
+        if ($user->hasRole('Supervisor')) {
+            $supIds = $user->supervisorProfiles()->pluck('id');
+            if ($supIds->isNotEmpty() && $milestone->thesis && $milestone->thesis->assignments()
+                ->whereIn('supervisor_profile_id', $supIds)
+                ->where('status', 'active')
+                ->exists()) {
+                return true;
             }
         }
 

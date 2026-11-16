@@ -15,18 +15,23 @@ class PresentationController extends Controller
         $todayDateStr = $today->format('Y-m-d');
 
         // Retrieve all scheduled milestones for this template
+        $workflow = app(\App\Services\MilestoneWorkflowService::class);
         $allScheduled = StudentMilestone::where('milestone_template_id', $template->id)
             ->whereNotNull('defence_date')
             ->where('status', '!=', 'approved')
             ->with([
+                'template',
                 'thesis.student.user',
                 'thesis.student.program',
+                'thesis.student.level',
                 'thesis.assignments.supervisor.user', 'thesis.defenceEvents.panelMembers.user', 'thesis.defenceEvents.evaluations',
                 'submissions' => fn($q) => $q->latest()
             ])
             ->orderBy('defence_date', 'asc')
             ->orderBy('defence_time', 'asc')
-            ->get();
+            ->get()
+            ->reject(fn($sm) => $workflow->isPostDefencePhase($sm) || ($sm->thesis && $sm->template && $sm->thesis->isExemptFromMilestone($sm->template)))
+            ->values();
 
         $targetEventType = $template->defence_type ?? match($template->slug) {
             'seminar_as_a_course' => 'seminar',
@@ -56,6 +61,17 @@ class PresentationController extends Controller
                     $examinersToAttach = $template->metadata['examiner_user_ids'];
                 }
 
+                if ($template->slug === 'internal_defence' && $sm->thesis) {
+                    if ($sm->thesis->internalExaminer && $sm->thesis->internalExaminer->user_id) {
+                        $examinersToAttach[] = $sm->thesis->internalExaminer->user_id;
+                    }
+                    $assignedExIds = \App\Models\ExaminerAssignment::where('thesis_project_id', $sm->thesis->id)
+                        ->where('type', 'internal_examiner')
+                        ->pluck('examiner_id')
+                        ->all();
+                    $examinersToAttach = array_values(array_unique(array_merge($examinersToAttach, $assignedExIds)));
+                }
+
                 foreach ($examinersToAttach as $uId) {
                     \App\Models\PanelMember::firstOrCreate([
                         'defence_event_id' => $ev->id,
@@ -65,6 +81,11 @@ class PresentationController extends Controller
                         'invitation_status' => 'accepted'
                     ]);
                 }
+
+                if ($targetEventType === 'internal') {
+                    app(\App\Services\MilestoneWorkflowService::class)->syncInternalDefencePanel($ev);
+                }
+
                 $missingEventFound = true;
             }
         }
@@ -211,6 +232,18 @@ class PresentationController extends Controller
             }
         }
 
+        $unscheduledMilestones = collect();
+        if ($isAdmin) {
+            $unscheduledMilestones = StudentMilestone::where('milestone_template_id', $template->id)
+                ->whereNull('defence_date')
+                ->where('status', '!=', 'approved')
+                ->with(['template', 'thesis.student.user', 'thesis.student.program', 'thesis.student.level'])
+                ->get()
+                ->reject(fn($sm) => $workflow->isPostDefencePhase($sm) || $workflow->hasBeenGraded($sm) || ($sm->thesis && $sm->template && $sm->thesis->isExemptFromMilestone($sm->template)))
+                ->sortBy(fn($sm) => strtolower($sm->thesis?->student?->user?->name ?? ''))
+                ->values();
+        }
+
         return view('presentations.show', compact(
             'template',
             'allScheduled',
@@ -226,7 +259,8 @@ class PresentationController extends Controller
             'trackData',
             'isScopedExaminer',
             'examinerTracks',
-            'initialTrack'
+            'initialTrack',
+            'unscheduledMilestones'
         ));
     }
 }

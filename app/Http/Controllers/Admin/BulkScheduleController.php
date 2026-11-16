@@ -19,6 +19,7 @@ class BulkScheduleController extends Controller
             ->with([
                 'students.user',
                 'students.program',
+                'students.level',
                 'students.thesis',
             ])
             ->get();
@@ -38,7 +39,7 @@ class BulkScheduleController extends Controller
         ]);
 
         $students = StudentProfile::whereIn('id', $request->student_ids)
-            ->with('user', 'thesis.milestones.template')
+            ->with('user', 'program', 'level', 'thesis.student.program', 'thesis.student.level', 'thesis.milestones.template')
             ->get();
 
         $updatedCount  = 0;
@@ -48,7 +49,11 @@ class BulkScheduleController extends Controller
             if (!$student->thesis) continue;
 
             // Find the milestone(s) matching the chosen defence type
-            $milestonesToUpdate = $student->thesis->milestones->filter(function ($m) use ($request) {
+            $milestonesToUpdate = $student->thesis->milestones->filter(function ($m) use ($request, $student) {
+                if (!$m->template || $student->thesis->isExemptFromMilestone($m->template)) {
+                    return false;
+                }
+
                 // Direct match via database field
                 if ($m->template->defence_type === $request->defence_type) {
                     return true;
@@ -74,6 +79,35 @@ class BulkScheduleController extends Controller
                 $milestone->meeting_link = $request->meeting_link;
                 $milestone->save();
                 $updatedCount++;
+
+                if ($request->defence_type === 'internal' && $milestone->thesis) {
+                    $start = \Carbon\Carbon::parse($request->defence_date);
+                    if (!empty($request->defence_time)) {
+                        try {
+                            $timeParts = \Carbon\Carbon::parse($request->defence_time);
+                            $start->setTime($timeParts->hour, $timeParts->minute);
+                        } catch (\Throwable $e) {
+                            $start->setTime(9, 0);
+                        }
+                    } else {
+                        $start->setTime(9, 0);
+                    }
+
+                    $event = \App\Models\DefenceEvent::updateOrCreate(
+                        [
+                            'thesis_project_id' => $milestone->thesis->id,
+                            'type' => 'internal',
+                        ],
+                        [
+                            'schedule_start' => $start,
+                            'schedule_end' => $start->copy()->addHour(),
+                            'location' => $request->meeting_link ?: null,
+                            'outcome' => 'pending',
+                        ]
+                    );
+
+                    app(\App\Services\MilestoneWorkflowService::class)->syncInternalDefencePanel($event);
+                }
             }
 
             // Queue one email per unique student (even if multiple milestones matched)

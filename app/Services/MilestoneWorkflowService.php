@@ -42,8 +42,8 @@ class MilestoneWorkflowService
             }
         }
 
-        // 1. Missing artifact
-        if ($template->requires_submission && $milestone->submissions()->count() === 0 && !$user->hasRole('Admin')) {
+        // 1. Missing artifact (Supervisors Assigned does not require a document upload once supervisors are attached or supplied)
+        if ($template->requires_submission && $template->slug !== 'supervisors_assigned' && $milestone->submissions()->count() === 0 && !$user->hasRole('Admin')) {
             return "Documentation Required: Student has not uploaded the required artifacts for this stage.";
         }
 
@@ -63,15 +63,12 @@ class MilestoneWorkflowService
             return "Submission Gated: Post-submission authorization is required before clearance.";
         }
 
-        // Supervisors Assigned validation: tentative proposal + supervisor allocation
+        // Supervisors Assigned validation: student-supplied supervisors or coordinator-attached supervisors
         if ($template->slug === 'supervisors_assigned') {
-            $hasProposal = $milestone->submissions()->exists();
             $hasSupervisors = $milestone->thesis->assignments()->where('status', 'active')->exists();
-            if (!$hasProposal && !$user->hasRole('Admin')) {
-                return "Tentative Proposal Required: Candidate must upload their tentative proposal before clearance.";
-            }
-            if (!$hasSupervisors && !$user->hasRole('Admin')) {
-                return "Supervision Required: Programme coordinator must assign supervisors before clearance.";
+            $hasSelfInserted = !empty($milestone->approvals['student_inserted_supervisors']);
+            if (!$hasSupervisors && !$hasSelfInserted && !$user->hasRole('Admin')) {
+                return "Supervision Required: Candidate must supply their supervisors or have supervisors attached by the Program Coordinator before clearance.";
             }
         }
 
@@ -98,10 +95,19 @@ class MilestoneWorkflowService
             }
         }
 
+        // 3b. Internal Defence Post-Presentation Correction Gate
+        if ($this->isInternalDefence($milestone)) {
+            if (!$this->isPostDefencePhase($milestone)) {
+                return "Presentation Session Required: The Internal Defence presentation must be graded as PASS and ended by Admin before post-defence correction clearance.";
+            }
+            if (!$this->hasPostDefenceSubmission($milestone)) {
+                return "Post-Defence Correction Required: Candidate must upload their corrected thesis manuscript after the presentation before advancing to Viva.";
+            }
+        }
+
         // 4. Authorization Check: Admin can approve all; Internal Examiner can approve internal_defence
-        $isInternalExaminerForThis = ($template->slug === 'internal_defence' || $template->order == 6) && 
-            ($role === 'Internal Examiner' || $user->hasRole('Internal Examiner')) &&
-            $user->internalExaminerProfiles()->where('id', $milestone->thesis->internal_examiner_profile_id)->exists();
+        $isInternalExaminerForThis = $this->isInternalDefence($milestone) &&
+            $this->isAssignedInternalExaminer($milestone, $user);
 
         if ($role && $role !== 'Admin' && !$isInternalExaminerForThis) {
             return "Institutional Authority Required: Only an Administrator or assigned Internal Examiner can approve this milestone.";
@@ -121,16 +127,11 @@ class MilestoneWorkflowService
         switch ($template->slug) {
             case 'seminar_as_a_course':
                 $this->activateCommunicationChannels($project);
-                $studentUser = $project->student->user ?? null;
-                if ($studentUser) {
-                    try {
-                        \Illuminate\Support\Facades\Mail::raw("Your 'Seminar as a course' milestone has been marked as done.", function($msg) use ($studentUser) {
-                            $msg->to($studentUser->email)->subject("Milestone Completed: Seminar as a course");
-                        });
-                    } catch (\Throwable $e) {
-                        \Illuminate\Support\Facades\Log::warning('Seminar completion mail failed: ' . $e->getMessage());
-                    }
-                }
+                $this->sendSeminarOutcomeInboxMessage(
+                    $milestone,
+                    true,
+                    $this->getSeminarAverageScoreDetails($milestone)
+                );
                 break;
             case 'supervisors_assigned':
                 $this->activateCommunicationChannels($project);
@@ -200,7 +201,274 @@ class MilestoneWorkflowService
         'proposal_defence',
         'progress_report_1',
         'progress_report_2',
+        'internal_defence',
     ];
+
+    /**
+     * Is this the Internal Defence milestone?
+     */
+    public function isInternalDefence(StudentMilestone $milestone): bool
+    {
+        return ($milestone->template?->slug === 'internal_defence' || (int) ($milestone->template?->order ?? 0) === 6);
+    }
+
+    /**
+     * Has the Internal Defence live presentation been concluded with a PASS grade by Admin,
+     * placing the student in the Post-Defence Correction stage?
+     */
+    public function isPostDefencePhase(StudentMilestone $milestone): bool
+    {
+        if (!$this->isInternalDefence($milestone) || $milestone->status === 'approved') {
+            return false;
+        }
+
+        $approvals = $milestone->approvals ?? [];
+        if (is_string($approvals)) {
+            $approvals = json_decode($approvals, true) ?: [];
+        }
+
+        if (!empty($approvals['presentation_concluded'])) {
+            return true;
+        }
+
+        // Fallback: check if the internal DefenceEvent already has outcome = 'pass'
+        if ($milestone->relationLoaded('thesis') && $milestone->thesis && $milestone->thesis->relationLoaded('defenceEvents')) {
+            $internalEvent = $milestone->thesis->defenceEvents->where('type', 'internal')->first();
+            if ($internalEvent && $internalEvent->outcome === 'pass') {
+                return true;
+            }
+        } elseif ($milestone->thesis_project_id) {
+            if (\App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)->where('type', 'internal')->where('outcome', 'pass')->exists()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the latest manuscript uploaded by the student AFTER the Internal Defence presentation ended.
+     */
+    public function getPostDefenceSubmission(StudentMilestone $milestone): ?\App\Models\Submission
+    {
+        if (!$this->isPostDefencePhase($milestone)) {
+            return null;
+        }
+
+        $approvals = $milestone->approvals ?? [];
+        if (is_string($approvals)) {
+            $approvals = json_decode($approvals, true) ?: [];
+        }
+
+        $subs = $milestone->relationLoaded('submissions')
+            ? $milestone->submissions->whereIn('type', ['manuscript', 'file'])->sortByDesc('created_at')
+            : $milestone->submissions()->whereIn('type', ['manuscript', 'file'])->latest()->get();
+
+        if ($subs->isEmpty()) {
+            return null;
+        }
+
+        $postSubId = $approvals['post_defence_submission_id'] ?? null;
+        if ($postSubId) {
+            $found = $subs->firstWhere('id', $postSubId);
+            if ($found) {
+                return $found;
+            }
+        }
+
+        $concludedAt = $approvals['presentation_concluded']['concluded_at'] ?? null;
+        $lastPreSubId = $approvals['presentation_concluded']['last_pre_defence_submission_id'] ?? null;
+        if ($concludedAt) {
+            $concludedTime = \Carbon\Carbon::parse($concludedAt);
+            $afterConcluded = $subs->first(fn($s) => ($lastPreSubId ? $s->id !== $lastPreSubId : true) && $s->created_at && $s->created_at->gte($concludedTime));
+            if ($afterConcluded) {
+                return $afterConcluded;
+            }
+        }
+
+        // Legacy fallback: if description explicitly says Post-Defence or if uploaded after defence_date when >1 manuscript exists
+        $explicitPost = $subs->first(fn($s) => str_contains(strtolower($s->description ?? ''), 'post-defence') || str_contains(strtolower($s->description ?? ''), 'corrected'));
+        if ($explicitPost) {
+            return $explicitPost;
+        }
+
+        if ($subs->count() > 1 && $milestone->defence_date) {
+            $defDate = \Carbon\Carbon::parse($milestone->defence_date)->startOfDay();
+            $afterDef = $subs->first(fn($s) => $s->created_at && $s->created_at->gte($defDate));
+            if ($afterDef) {
+                return $afterDef;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Has the student uploaded their corrected thesis manuscript after the Internal Defence presentation ended?
+     */
+    public function hasPostDefenceSubmission(StudentMilestone $milestone): bool
+    {
+        return !is_null($this->getPostDefenceSubmission($milestone));
+    }
+
+    /**
+     * Alias for hasPostDefenceSubmission used by blade templates.
+     */
+    public function hasUploadedPostDefenceCorrection(StudentMilestone $milestone): bool
+    {
+        return $this->hasPostDefenceSubmission($milestone);
+    }
+
+    /**
+     * Send an official Portal Inbox notification to the student when the Internal Examiner (or Admin)
+     * approves or requests further revisions on the post-defence corrected thesis manuscript.
+     */
+    public function notifyPostDefenceReviewOutcome(StudentMilestone $milestone, \App\Models\User $reviewer, string $decision, ?string $remarks): void
+    {
+        $studentUserId = $milestone->thesis?->student?->user_id;
+        if (!$studentUserId) {
+            return;
+        }
+
+        \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUserId);
+
+        try {
+            $milestoneTitle = $milestone->template?->title ?? $milestone->template?->name ?? 'Internal Defence';
+            $studentName = $milestone->thesis?->student?->user?->name ?? 'Candidate';
+            $isApproved = $decision === 'approved';
+
+            $subject = $isApproved
+                ? "Post-Defence Corrections Approved: {$milestoneTitle} — Advanced to Viva Voce"
+                : "Post-Defence Revision Requested: {$milestoneTitle}";
+
+            $body = "Dear {$studentName},\n\n"
+                . ($isApproved
+                    ? "{$reviewer->name} has reviewed and APPROVED your post-defence corrected thesis manuscript for \"{$milestoneTitle}\".\n\nCongratulations! Your Internal Defence milestone is now officially completed and you have been advanced to Milestone 7 (Viva Voce)."
+                    : "{$reviewer->name} has reviewed your post-defence corrected thesis manuscript for \"{$milestoneTitle}\" and requested further corrections before final Viva clearance.\n\nPlease review the remarks below, update your manuscript, and re-upload your corrected thesis on the Internal Defence milestone page.")
+                . (!empty($remarks) ? "\n\nReviewer Remarks:\n\"{$remarks}\"" : '')
+                . "\n\nAcademic Portal Administration";
+
+            $inboxMsg = \App\Models\InboxMessage::create([
+                'sender_id' => $reviewer->id,
+                'subject' => $subject,
+                'body' => $body,
+                'delivery_method' => 'in_app',
+            ]);
+
+            $inboxMsg->recipients()->attach($studentUserId, [
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'recipient_type' => 'to',
+            ]);
+
+            \App\Events\MessageReceived::dispatch($inboxMsg, $studentUserId);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Failed to send post-defence review inbox message: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Check whether the given user is an assigned Internal Examiner for the given thesis.
+     */
+    public function isAssignedInternalExaminerForThesis(?ThesisProject $thesis, ?\App\Models\User $user): bool
+    {
+        if (!$thesis || !$user) {
+            return false;
+        }
+
+        if ($thesis->internal_examiner_profile_id) {
+            if ($user->internalExaminerProfiles()->where('id', $thesis->internal_examiner_profile_id)->exists()) {
+                return true;
+            }
+        }
+
+        if (\App\Models\ExaminerAssignment::where('thesis_project_id', $thesis->id)
+            ->where('type', 'internal_examiner')
+            ->where('examiner_id', $user->id)
+            ->exists()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check whether the given user is an assigned Internal Examiner for the milestone's thesis.
+     */
+    public function isAssignedInternalExaminer(StudentMilestone $milestone, ?\App\Models\User $user): bool
+    {
+        return $this->isAssignedInternalExaminerForThesis($milestone->thesis, $user);
+    }
+
+    /**
+     * Conclude the Internal Defence live presentation session when the candidate scored PASS.
+     * Does NOT advance to Viva; transitions candidate to Post-Defence Correction stage.
+     */
+    public function concludeInternalDefencePresentation(StudentMilestone $milestone, ?\App\Models\User $admin = null): void
+    {
+        $approvals = $milestone->approvals ?? [];
+        if (is_string($approvals)) {
+            $approvals = json_decode($approvals, true) ?: [];
+        }
+
+        $lastPreSubId = $milestone->submissions()->whereIn('type', ['manuscript', 'file'])->latest()->value('id');
+        $approvals['presentation_concluded'] = [
+            'concluded_by' => $admin?->id ?? auth()->id(),
+            'concluded_by_name' => $admin?->name ?? auth()->user()?->name ?? 'Admin',
+            'concluded_at' => now()->toDateTimeString(),
+            'grading_outcome' => 'pass',
+            'last_pre_defence_submission_id' => $lastPreSubId,
+        ];
+        unset($approvals['post_defence_submission_id'], $approvals['post_defence_submitted_at'], $approvals['internal_examiner_review']);
+
+        $milestone->update([
+            'status' => 'in_progress',
+            'approvals' => $approvals,
+            'remark' => 'Internal defence presentation passed and concluded. Please upload your corrected thesis manuscript incorporating defence feedback for Internal Examiner approval.',
+        ]);
+
+        if ($milestone->thesis_project_id) {
+            \App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)
+                ->where('type', 'internal')
+                ->update(['outcome' => 'pass']);
+        }
+
+        $studentUserId = $milestone->thesis?->student?->user_id;
+        if ($studentUserId) {
+            \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUserId);
+
+            try {
+                $milestoneTitle = $milestone->template?->title ?? $milestone->template?->name ?? 'Internal Defence';
+                $studentName = $milestone->thesis?->student?->user?->name ?? 'Candidate';
+                $examinerName = $milestone->thesis?->internalExaminer?->user?->name ?? 'your assigned Internal Examiner';
+
+                $inboxMsg = \App\Models\InboxMessage::create([
+                    'sender_id' => $admin?->id ?? auth()->id() ?? $studentUserId,
+                    'subject' => "Internal Defence Presentation Passed — Upload Post-Defence Corrected Thesis",
+                    'body' => "Dear {$studentName},\n\n"
+                            . "Your \"{$milestoneTitle}\" presentation session has been concluded with a PASS grade.\n\n"
+                            . "Next Step Before Advancing to Viva:\n"
+                            . "Please incorporate all corrections and observations raised during your presentation and upload your corrected thesis manuscript on your Internal Defence milestone page.\n\n"
+                            . "Once uploaded, {$examinerName} will review your corrections. Upon their approval, you will automatically advance to the Viva milestone.\n\n"
+                            . "Academic Portal Administration",
+                    'delivery_method' => 'in_app',
+                ]);
+
+                $inboxMsg->recipients()->attach($studentUserId, [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'recipient_type' => 'to',
+                ]);
+
+                \App\Events\MessageReceived::dispatch($inboxMsg, $studentUserId);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Failed to create inbox message on internal defence conclusion: " . $e->getMessage());
+            }
+        }
+
+        $this->notifyUpdate(
+            $milestone,
+            "Internal defence presentation session concluded (PASS). Candidate must now upload the corrected thesis manuscript for Internal Examiner review and approval to advance to Viva."
+        );
+    }
 
     /**
      * Has at least one examiner graded this student's presentation for the milestone?
@@ -226,18 +494,39 @@ class MilestoneWorkflowService
             return false;
         }
 
-        $events = $milestone->thesis?->defenceEvents()
-            ->where('type', $type)
-            ->withCount('evaluations')
-            ->get() ?? collect();
+        // 1. Check in-memory eager loaded defenceEvents to avoid N+1 queries
+        if ($milestone->relationLoaded('thesis') && $milestone->thesis && $milestone->thesis->relationLoaded('defenceEvents')) {
+            $events = $milestone->thesis->defenceEvents->where('type', $type);
+            $hasEvals = $events->contains(function ($e) {
+                if ($e->relationLoaded('evaluations')) {
+                    return $e->evaluations->isNotEmpty();
+                }
+                return $e->evaluations()->exists();
+            });
+            if ($hasEvals) {
+                return true;
+            }
+        } else {
+            $events = $milestone->thesis?->defenceEvents()
+                ->where('type', $type)
+                ->withCount('evaluations')
+                ->get() ?? collect();
 
-        if ($events->sum('evaluations_count') > 0) {
-            return true;
+            if ($events->sum('evaluations_count') > 0) {
+                return true;
+            }
         }
 
-        if ($slug === 'seminar_as_a_course' && \Illuminate\Support\Facades\Schema::hasTable('seminar_grades')) {
-            if (\Illuminate\Support\Facades\DB::table('seminar_grades')->where('student_milestone_id', $milestone->id)->exists()) {
-                return true;
+        // 2. Check seminar_grades table if present (only for seminar_as_a_course)
+        if ($slug === 'seminar_as_a_course') {
+            static $hasSeminarGradesTable = null;
+            if ($hasSeminarGradesTable === null) {
+                $hasSeminarGradesTable = \Illuminate\Support\Facades\Schema::hasTable('seminar_grades');
+            }
+            if ($hasSeminarGradesTable) {
+                if (\Illuminate\Support\Facades\DB::table('seminar_grades')->where('student_milestone_id', $milestone->id)->exists()) {
+                    return true;
+                }
             }
         }
 
@@ -258,6 +547,11 @@ class MilestoneWorkflowService
             return true;
         }
 
+        // Once Internal Defence presentation is concluded with a pass, pre-defence supervisor approval is already complete
+        if ($this->isPostDefencePhase($milestone)) {
+            return true;
+        }
+
         if ($milestone->status === 'revision_required') {
             return false;
         }
@@ -270,7 +564,7 @@ class MilestoneWorkflowService
      */
     public function computeSupervisorApprovalEligibility(StudentMilestone $milestone): bool
     {
-        if ($milestone->status === 'approved') {
+        if ($milestone->status === 'approved' || $this->isPostDefencePhase($milestone)) {
             return true;
         }
 
@@ -404,6 +698,14 @@ class MilestoneWorkflowService
             ];
         }
 
+        // Also count any Admin override review recorded in supervisor_reviews
+        $assignedUserIds = collect($supervisorsList)->pluck('user_id')->map(fn($id) => (string) $id)->all();
+        foreach ($reviews as $rUserId => $review) {
+            if (!in_array((string) $rUserId, $assignedUserIds, true) && ($review['decision'] ?? null) === 'approved') {
+                $approvedCount++;
+            }
+        }
+
         // Policy rules:
         // 1. Any active rejection or pending re-review blocks eligibility.
         // 2. At least one supervisor must approve.
@@ -437,13 +739,21 @@ class MilestoneWorkflowService
      */
     public function recordSupervisorReview(StudentMilestone $milestone, \App\Models\User $user, string $decision, ?string $remarks = null): array
     {
-        $submission = $milestone->submissions()->latest()->first();
+        $submission = $milestone->submissions()->whereIn('type', ['manuscript', 'file', 'ppt'])->latest()->first()
+            ?? $milestone->submissions()->latest()->first();
 
-        // 1. Record feedback per supervisor
-        if ($submission) {
+        // 1. Record feedback per supervisor across the primary and latest submissions
+        $targetSubmissions = $milestone->submissions()
+            ->whereIn('type', ['manuscript', 'file', 'ppt'])
+            ->get();
+        if ($targetSubmissions->isEmpty() && $submission) {
+            $targetSubmissions = collect([$submission]);
+        }
+
+        foreach ($targetSubmissions as $sub) {
             \App\Models\Feedback::updateOrCreate(
                 [
-                    'submission_id' => $submission->id,
+                    'submission_id' => $sub->id,
                     'created_by' => $user->id,
                 ],
                 [
@@ -483,13 +793,53 @@ class MilestoneWorkflowService
 
         $milestone->save();
 
-        // Invalidate student dashboard query cache
+        $finalSummary = $this->getSupervisorReviewSummary($milestone);
+
+        // Invalidate student dashboard query cache & send portal Inbox notification
         $studentUser = $milestone->thesis?->student?->user;
         if ($studentUser) {
             \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUser->id);
+
+            try {
+                $milestoneTitle = $milestone->template?->name ?? 'Milestone Submission';
+                $isApprovedDecision = ($decision === 'approved');
+                $subject = $isApprovedDecision
+                    ? "Thesis Upload Approved by {$user->name} — {$milestoneTitle}"
+                    : "Revision Requested by {$user->name} — {$milestoneTitle}";
+
+                $remarksText = !empty($remarks) ? "\n\nSupervisor Remarks:\n\"{$remarks}\"" : '';
+                $eligibilityNote = $isApprovedDecision
+                    ? ($finalSummary['is_eligible']
+                        ? "\n\nStatus: Your submission has met supervisor clearance requirements and you are eligible to present at the defence."
+                        : "\n\nStatus: Your submission is still awaiting review or revision clearance from your co-supervisor(s).")
+                    : "\n\nAction Required: Please address the requested revisions and upload your revised PDF manuscript on the Milestones page.";
+
+                $body = "Dear {$studentUser->name},\n\n"
+                    . "Your supervisor ({$user->name}) has reviewed your uploaded submission for \"{$milestoneTitle}\" and recorded the following decision: "
+                    . ($isApprovedDecision ? "APPROVED" : "REVISION REQUIRED") . "."
+                    . $remarksText
+                    . $eligibilityNote . "\n\n"
+                    . "ACETEL Academic Portal";
+
+                $inboxMsg = \App\Models\InboxMessage::create([
+                    'sender_id' => $user->id,
+                    'subject' => $subject,
+                    'body' => $body,
+                    'delivery_method' => 'in_app',
+                ]);
+
+                $inboxMsg->recipients()->attach($studentUser->id, [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'recipient_type' => 'to',
+                ]);
+
+                \App\Events\MessageReceived::dispatch($inboxMsg, $studentUser->id);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Failed to create inbox message on supervisor review: " . $e->getMessage());
+            }
         }
 
-        return $this->getSupervisorReviewSummary($milestone);
+        return $finalSummary;
     }
 
     /**
@@ -565,21 +915,22 @@ class MilestoneWorkflowService
     {
         $slug = $milestone->template?->slug;
 
+        if ($this->isPostDefencePhase($milestone)) {
+            return 'presentation session already concluded — awaiting Internal Examiner approval of post-defence corrections';
+        }
+
         if (empty($milestone->defence_date)) {
             return 'not scheduled for presentation';
         }
 
         if ($slug === 'seminar_as_a_course') {
-            if (!$this->hasUploadedPresentation($milestone)) {
-                return 'presentation slides (PPT/PDF) not uploaded';
-            }
             if (!$this->hasBeenGraded($milestone)) {
                 return 'not yet graded by any examiner';
             }
             return null;
         }
 
-        if (in_array($slug, ['proposal_defence', 'progress_report_1', 'progress_report_2'])) {
+        if (in_array($slug, ['proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence'])) {
             if (!$this->hasUploadedPresentation($milestone)) {
                 return 'required document/presentation not uploaded';
             }
@@ -604,17 +955,159 @@ class MilestoneWorkflowService
             return null;
         }
 
-        // Internal defence / Viva rules are not yet defined — keep previous behaviour.
+        // Viva rules are handled separately.
         return null;
     }
 
     /**
+     * Compute rounded seminar course score details from evaluations or seminar_grades.
+     *
+     * @return array{average: int, count: int, passed: bool, examiner_scores: array<int, array{name: string, score: int}>}|null
+     */
+    public function getSeminarAverageScoreDetails(StudentMilestone $milestone): ?array
+    {
+        $type = $milestone->template?->defence_type ?? 'seminar';
+
+        $events = \App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)
+            ->where('type', $type)
+            ->with(['evaluations.evaluator'])
+            ->get();
+
+        $total = 0.0;
+        $count = 0;
+        $examinerScores = [];
+
+        foreach ($events as $event) {
+            foreach ($event->evaluations as $eval) {
+                if (isset($eval->score['total']) && is_numeric($eval->score['total'])) {
+                    $val = (float) $eval->score['total'];
+                    $total += $val;
+                    $count++;
+                    $examinerScores[] = [
+                        'name' => $eval->evaluator?->name ?? 'Examiner',
+                        'score' => (int) round($val),
+                    ];
+                }
+            }
+        }
+
+        if ($count === 0 && \Illuminate\Support\Facades\Schema::hasTable('seminar_grades')) {
+            $grades = \Illuminate\Support\Facades\DB::table('seminar_grades')
+                ->where('student_milestone_id', $milestone->id)
+                ->get();
+
+            if ($grades->isNotEmpty()) {
+                $userNames = \App\Models\User::whereIn('id', $grades->pluck('examiner_id')->filter()->unique())
+                    ->pluck('name', 'id');
+
+                foreach ($grades as $g) {
+                    if (is_numeric($g->grade)) {
+                        $val = (float) $g->grade;
+                        $total += $val;
+                        $count++;
+                        $examinerScores[] = [
+                            'name' => $userNames[$g->examiner_id] ?? 'Examiner',
+                            'score' => (int) round($val),
+                        ];
+                    }
+                }
+            }
+        }
+
+        if ($count === 0) {
+            return null;
+        }
+
+        $rounded = (int) round($total / $count);
+
+        return [
+            'average' => $rounded,
+            'count' => $count,
+            'passed' => $rounded >= 50,
+            'examiner_scores' => $examinerScores,
+        ];
+    }
+
+    /**
+     * Deliver an in-app inbox message (never email) to the candidate with their seminar score breakdown.
+     */
+    public function sendSeminarOutcomeInboxMessage(StudentMilestone $milestone, bool $passed, ?array $scoreDetails = null): void
+    {
+        $studentUser = $milestone->thesis?->student?->user;
+        if (!$studentUser) {
+            return;
+        }
+
+        $score = $scoreDetails['average'] ?? null;
+        $scoreDisplay = $score !== null ? "{$score} / 100" : 'Graded';
+
+        $breakdownText = '';
+        if (!empty($scoreDetails['examiner_scores'])) {
+            $lines = array_map(
+                fn ($item) => "- {$item['name']}: {$item['score']} / 100",
+                $scoreDetails['examiner_scores']
+            );
+            $breakdownText = "Examiner Score Breakdown:\n" . implode("\n", $lines) . "\n\n";
+        }
+
+        if ($passed) {
+            $subject = $score !== null
+                ? "Seminar Result: PASSED ({$score}/100) — Moved to Supervisors Assigned"
+                : "Seminar Result: PASSED — Moved to Supervisors Assigned";
+            $body = "Dear {$studentUser->name},\n\n"
+                . "Your Seminar as a Course presentation session has ended.\n\n"
+                . "Final Score: {$scoreDisplay}\n"
+                . "Outcome: PASSED (Pass Mark: 50 and above)\n\n"
+                . $breakdownText
+                . "Congratulations! You have been moved to the next milestone: Supervisors Assigned.\n"
+                . "Please visit your Milestones page to record your existing supervisors or upload your tentative proposal to request supervisors.\n\n"
+                . "Academic Portal Administration";
+        } else {
+            $subject = $score !== null
+                ? "Seminar Result: {$score}/100 — Repeat Presentation Required"
+                : "Milestone Outcome: Seminar as a course - Repeat Required";
+            $body = "Dear {$studentUser->name},\n\n"
+                . "Your Seminar as a Course presentation session has ended.\n\n"
+                . "Final Score: {$scoreDisplay}\n"
+                . "Outcome: BELOW PASS MARK (Minimum Pass Mark: 50)\n\n"
+                . $breakdownText
+                . "Because your score is below 50, you did not advance to Supervisors Assigned and will be required to present again when the next seminar presentation is scheduled.\n\n"
+                . "Academic Portal Administration";
+        }
+
+        try {
+            $inboxMsg = \App\Models\InboxMessage::create([
+                'sender_id' => auth()->id() ?? $studentUser->id,
+                'subject' => $subject,
+                'body' => $body,
+                'delivery_method' => 'in_app',
+            ]);
+
+            $inboxMsg->recipients()->attach($studentUser->id, [
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'recipient_type' => 'to',
+            ]);
+
+            \App\Events\MessageReceived::dispatch($inboxMsg, $studentUser->id);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to deliver seminar outcome inbox message: ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Compute average grading outcome from examiners for presentation defence milestones.
-     * Policy: Majority vote decides. Tie = Pass (benefit of doubt).
+     * Policy: For Seminar as a Course, rounded average >= 50 passes. For other stages, majority vote decides (tie = Pass).
      * Returns 'pass', 'fail', or null if not yet graded.
      */
     public function getAverageGradingOutcome(StudentMilestone $milestone): ?string
     {
+        if ($milestone->template?->slug === 'seminar_as_a_course') {
+            $scoreDetails = $this->getSeminarAverageScoreDetails($milestone);
+            if ($scoreDetails !== null) {
+                return $scoreDetails['passed'] ? 'pass' : 'fail';
+            }
+        }
+
         $type = $milestone->template?->defence_type ?? match($milestone->template?->slug) {
             'seminar_as_a_course' => 'seminar',
             'proposal_defence' => 'proposal',
@@ -707,29 +1200,37 @@ class MilestoneWorkflowService
         if ($studentUserId) {
             \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUserId);
 
-            // Deliver official outcome notice directly to candidate's personal inbox (Requirements 3 & 5)
-            try {
-                $milestoneTitle = $milestone->template?->title ?? $milestone->template?->name ?? 'Milestone Defence';
-                $studentName = $milestone->thesis?->student?->user?->name ?? 'Candidate';
-                $inboxMsg = \App\Models\InboxMessage::create([
-                    'sender_id' => auth()->id() ?? $studentUserId,
-                    'subject' => "Milestone Outcome: {$milestoneTitle} - FAIL (Repeat Required)",
-                    'body' => "Dear {$studentName},\n\n"
-                            . "Following the examiner panel evaluation for your \"{$milestoneTitle}\", your average grading outcome was recorded as FAIL.\n\n"
-                            . "Feedback / Reason: {$reason}\n\n"
-                            . "In accordance with institutional guidelines, you are required to repeat this milestone stage. Please liaise with your supervisor to make necessary revisions and re-submit your materials for approval.\n\n"
-                            . "Academic Portal Administration",
-                    'delivery_method' => 'in_app',
-                ]);
+            if ($milestone->template?->slug === 'seminar_as_a_course') {
+                $this->sendSeminarOutcomeInboxMessage(
+                    $milestone,
+                    false,
+                    $this->getSeminarAverageScoreDetails($milestone)
+                );
+            } else {
+                // Deliver official outcome notice directly to candidate's personal inbox (Requirements 3 & 5)
+                try {
+                    $milestoneTitle = $milestone->template?->title ?? $milestone->template?->name ?? 'Milestone Defence';
+                    $studentName = $milestone->thesis?->student?->user?->name ?? 'Candidate';
+                    $inboxMsg = \App\Models\InboxMessage::create([
+                        'sender_id' => auth()->id() ?? $studentUserId,
+                        'subject' => "Milestone Outcome: {$milestoneTitle} - FAIL (Repeat Required)",
+                        'body' => "Dear {$studentName},\n\n"
+                                . "Following the examiner panel evaluation for your \"{$milestoneTitle}\", your average grading outcome was recorded as FAIL.\n\n"
+                                . "Feedback / Reason: {$reason}\n\n"
+                                . "In accordance with institutional guidelines, you are required to repeat this milestone stage. Please liaise with your supervisor to make necessary revisions and re-submit your materials for approval.\n\n"
+                                . "Academic Portal Administration",
+                        'delivery_method' => 'in_app',
+                    ]);
 
-                $inboxMsg->recipients()->attach($studentUserId, [
-                    'id' => (string) \Illuminate\Support\Str::uuid(),
-                    'recipient_type' => 'to',
-                ]);
+                    $inboxMsg->recipients()->attach($studentUserId, [
+                        'id' => (string) \Illuminate\Support\Str::uuid(),
+                        'recipient_type' => 'to',
+                    ]);
 
-                \App\Events\MessageReceived::dispatch($inboxMsg, $studentUserId);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Failed to create inbox message on milestone failure: " . $e->getMessage());
+                    \App\Events\MessageReceived::dispatch($inboxMsg, $studentUserId);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Failed to create inbox message on milestone failure: " . $e->getMessage());
+                }
             }
         }
 
@@ -813,6 +1314,7 @@ class MilestoneWorkflowService
         $isAlreadyAtStage = in_array($milestone->status, ['in_progress', 'submitted', 'partially_approved', 'revision_required'], true);
 
         if (!$isAlreadyAtStage) {
+            // All earlier non-exempt milestones (e.g. Seminar course) must be completed first.
             $earlierMilestones = $project->milestones()
                 ->with('template')
                 ->whereHas('template', fn($q) => $q->where('order', '<', $milestone->template->order))
@@ -820,7 +1322,7 @@ class MilestoneWorkflowService
                 ->get();
 
             $pendingEarlier = $earlierMilestones->contains(function ($m) use ($project) {
-                return method_exists($project, 'isExemptFromMilestone') ? !$project->isExemptFromMilestone($m->template) : true;
+                return !$project->isExemptFromMilestone($m->template);
             });
 
             if ($pendingEarlier) {
@@ -834,16 +1336,253 @@ class MilestoneWorkflowService
         }
 
         $hasSelfInserted = !empty($approvals['student_inserted_supervisors']);
+
+        if ($hasSelfInserted && !$project->assignments()->where('status', 'active')->exists()) {
+            $insertedIds = $approvals['student_inserted_supervisors']['supervisor_profile_ids'] ?? [];
+            foreach (array_values(array_filter((array) $insertedIds)) as $idx => $supProfileId) {
+                if (\App\Models\SupervisorProfile::where('id', $supProfileId)->exists()) {
+                    SupervisionAssignment::firstOrCreate(
+                        [
+                            'thesis_project_id' => $project->id,
+                            'supervisor_profile_id' => $supProfileId,
+                        ],
+                        [
+                            'role' => $idx === 0 ? 'primary' : 'secondary',
+                            'status' => 'active',
+                            'assigned_at' => now(),
+                        ]
+                    );
+                }
+            }
+        }
+
         $hasSupervisors = $project->assignments()->where('status', 'active')->exists();
 
         if (!$hasSupervisors && !$hasSelfInserted) {
             return false;
         }
 
-        $this->approveAndAdvance($milestone, 'Auto-advanced: supervisors assigned to candidate.');
-        $this->notifyUpdate($milestone, 'Supervisors assigned — advanced to Proposal Defence.');
+        if ($isAlreadyAtStage) {
+            $earlierUnapproved = $project->milestones()
+                ->with('template')
+                ->whereHas('template', fn($q) => $q->where('order', '<', $milestone->template->order))
+                ->where('status', '!=', 'approved')
+                ->get();
+
+            foreach ($earlierUnapproved as $earlier) {
+                if ($project->isExemptFromMilestone($earlier->template)) {
+                    $earlier->delete();
+                } else {
+                    $earlier->update([
+                        'status' => 'approved',
+                        'approved_at' => $earlier->approved_at ?? now(),
+                    ]);
+                }
+            }
+        }
+
+        if (($approvals['supervisor_request']['status'] ?? null) === 'pending') {
+            $approvals['supervisor_request']['status'] = 'fulfilled';
+            $approvals['supervisor_request']['fulfilled_at'] = now()->toDateTimeString();
+            $milestone->approvals = $approvals;
+            $milestone->save();
+        }
+
+        $reason = $hasSelfInserted
+            ? 'Auto-advanced: student recorded existing supervisory panel.'
+            : 'Auto-advanced: supervisors assigned to candidate.';
+
+        $this->approveAndAdvance($milestone, $reason);
+        $this->notifyUpdate(
+            $milestone,
+            $hasSelfInserted
+                ? 'Supervisory panel recorded — advanced to Proposal Defence.'
+                : 'Supervisors assigned — advanced to Proposal Defence.'
+        );
 
         return true;
+    }
+
+    /**
+     * Resolve active Program Coordinators scoped to a student's program and level.
+     */
+    public function resolveScopedCoordinators(\App\Models\StudentProfile $student): \Illuminate\Support\Collection
+    {
+        $coordinators = collect();
+
+        if ($student->program_id) {
+            $profileUsers = \App\Models\CoordinatorProfile::with('user')
+                ->where('program_id', $student->program_id)
+                ->where('active', true)
+                ->where(function ($q) use ($student) {
+                    $q->whereNull('level_id');
+                    if ($student->level_id) {
+                        $q->orWhere('level_id', $student->level_id);
+                    }
+                })
+                ->get()
+                ->pluck('user')
+                ->filter();
+
+            $coordinators = $coordinators->merge($profileUsers);
+        }
+
+        $roleUsers = \App\Models\User::role('Program Coordinator')
+            ->get()
+            ->filter(fn ($u) => $u->hasCoordinatorAccess($student));
+
+        $coordinators = $coordinators->merge($roleUsers);
+
+        if ($coordinators->isEmpty() && $student->program_id) {
+            $coordinators = \App\Models\CoordinatorProfile::with('user')
+                ->where('program_id', $student->program_id)
+                ->where('active', true)
+                ->get()
+                ->pluck('user')
+                ->filter();
+        }
+
+        return $coordinators
+            ->filter(fn ($u) => $u && $u->id !== $student->user_id)
+            ->unique('id')
+            ->values();
+    }
+
+    /**
+     * Immediately email & notify Program Coordinators when a student requests supervisors
+     * on the Supervisors Assigned milestone (with student name and matric number).
+     */
+    public function notifyCoordinatorsOfSupervisorRequest(
+        StudentMilestone $milestone,
+        \App\Models\User $studentUser,
+        ?\App\Models\Submission $submission = null,
+        ?string $note = null
+    ): array {
+        $milestone->loadMissing(['thesis.student.user', 'thesis.student.program', 'thesis.student.level']);
+        $student = $milestone->thesis?->student;
+        if (!$student) {
+            return [];
+        }
+
+        $coordinators = $this->resolveScopedCoordinators($student);
+        $matric = $student->student_id_number ?? 'N/A';
+        $programName = $student->program?->name ?? 'Program';
+        $levelName = $student->level?->name ?? 'Postgraduate';
+
+        $approvals = $milestone->approvals ?? [];
+        $approvals['student_path'] = 'request_supervisors';
+        $approvals['supervisor_request'] = [
+            'status' => 'pending',
+            'requested_at' => now()->toDateTimeString(),
+            'requested_by' => $studentUser->id,
+            'student_name' => $studentUser->name,
+            'matric_number' => $matric,
+            'note' => $note ? trim($note) : null,
+            'submission_id' => $submission?->id,
+            'notified_coordinator_ids' => $coordinators->pluck('id')->values()->all(),
+            'notified_coordinator_names' => $coordinators->pluck('name')->values()->all(),
+        ];
+        $milestone->approvals = $approvals;
+        $milestone->save();
+
+        if ($coordinators->isEmpty()) {
+            \Illuminate\Support\Facades\Log::warning('No active Program Coordinator found for supervisor request.', [
+                'student_profile_id' => $student->id,
+                'program_id' => $student->program_id,
+                'level_id' => $student->level_id,
+            ]);
+            return [];
+        }
+
+        $notification = new \App\Notifications\SupervisorRequestedNotification($milestone, $submission, $note);
+        foreach ($coordinators as $coordinator) {
+            try {
+                \Illuminate\Support\Facades\Notification::sendNow($coordinator, clone $notification);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Failed immediate email/notification to coordinator for supervisor request', [
+                    'coordinator_id' => $coordinator->id,
+                    'coordinator_email' => $coordinator->email,
+                    'student_name' => $studentUser->name,
+                    'matric_number' => $matric,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        try {
+            $inboxBody = "Dear Program Coordinator,\n\n"
+                . "{$studentUser->name} (Matric Number: {$matric}) in {$programName} ({$levelName}) has uploaded a tentative proposal and is requesting supervisor assignment.\n"
+                . ($note ? "\nCandidate Note: {$note}\n" : '')
+                . "\nPlease open Coordinator -> Assign Supervisors or the candidate's Milestones page to review the tentative proposal and assign supervisors.\n\n"
+                . "ACETEL Academic Portal";
+
+            $inboxMsg = \App\Models\InboxMessage::create([
+                'sender_id' => $studentUser->id,
+                'subject' => "Supervisor Request: {$studentUser->name} ({$matric})",
+                'body' => $inboxBody,
+                'delivery_method' => 'in_app',
+            ]);
+
+            foreach ($coordinators as $coordinator) {
+                $inboxMsg->recipients()->attach($coordinator->id, [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'recipient_type' => 'to',
+                ]);
+                \App\Events\MessageReceived::dispatch($inboxMsg, $coordinator->id);
+                \App\Events\MilestoneSubmitted::dispatch($milestone, $coordinator->id);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed inbox/broadcast dispatch for supervisor request: ' . $e->getMessage());
+        }
+
+        return $coordinators->pluck('name')->values()->all();
+    }
+
+    /**
+     * Inform scoped Program Coordinators when a student inserts their own existing supervisors.
+     */
+    public function notifyCoordinatorsOfSelfInsertedSupervisors(
+        StudentMilestone $milestone,
+        \App\Models\User $studentUser,
+        \Illuminate\Support\Collection $supervisors
+    ): void {
+        $milestone->loadMissing(['thesis.student.program', 'thesis.student.level']);
+        $student = $milestone->thesis?->student;
+        if (!$student) {
+            return;
+        }
+
+        $coordinators = $this->resolveScopedCoordinators($student);
+        if ($coordinators->isEmpty()) {
+            return;
+        }
+
+        try {
+            $matric = $student->student_id_number ?? 'N/A';
+            $list = $supervisors->values()->map(function ($sup, $idx) {
+                $label = $idx === 0 ? 'Lead Supervisor' : 'Co-Supervisor ' . $idx;
+                return "- {$label}: " . ($sup->user?->name ?? 'Supervisor') . ' (' . ($sup->user?->email ?? 'N/A') . ')';
+            })->implode("\n");
+
+            $inboxMsg = \App\Models\InboxMessage::create([
+                'sender_id' => $studentUser->id,
+                'subject' => "Supervisors Recorded by Candidate: {$studentUser->name} ({$matric})",
+                'body' => "Dear Program Coordinator,\n\n"
+                    . "{$studentUser->name} (Matric Number: {$matric}) has recorded their existing supervisory panel on the Supervisors Assigned milestone:\n\n"
+                    . "{$list}\n\nACETEL Academic Portal",
+                'delivery_method' => 'in_app',
+            ]);
+
+            foreach ($coordinators as $coordinator) {
+                $inboxMsg->recipients()->attach($coordinator->id, [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'recipient_type' => 'to',
+                ]);
+                \App\Events\MessageReceived::dispatch($inboxMsg, $coordinator->id);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to notify coordinators of self-inserted supervisors: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -951,6 +1690,310 @@ class MilestoneWorkflowService
 
         foreach ($recipients as $userId) {
             \App\Events\MilestoneUpdated::dispatch($milestone, $message, $userId);
+        }
+    }
+
+    /**
+     * Remove seminar_as_a_course milestone and related seminar artifacts for PhD AI theses.
+     */
+    public function purgePhdAiSeminarCourse(ThesisProject $project): void
+    {
+        $seminarTemplate = \App\Models\MilestoneTemplate::where('slug', 'seminar_as_a_course')->first();
+        if (!$seminarTemplate) {
+            return;
+        }
+
+        DB::transaction(function () use ($project, $seminarTemplate) {
+            $milestoneIds = $project->milestones()
+                ->where('milestone_template_id', $seminarTemplate->id)
+                ->pluck('id')
+                ->all();
+
+            if (!empty($milestoneIds)) {
+                if (\Illuminate\Support\Facades\Schema::hasTable('seminar_grades')) {
+                    DB::table('seminar_grades')->whereIn('student_milestone_id', $milestoneIds)->delete();
+                }
+                \App\Models\Submission::whereIn('student_milestone_id', $milestoneIds)->delete();
+                \App\Models\Message::whereIn('student_milestone_id', $milestoneIds)->delete();
+                StudentMilestone::whereIn('id', $milestoneIds)->delete();
+            }
+
+            \App\Models\DefenceEvent::where('thesis_project_id', $project->id)
+                ->where('type', 'seminar')
+                ->get()
+                ->each->delete();
+        });
+    }
+
+    /**
+     * Remove progress_report_2 for MSc theses, migrating any active PR2 student back to
+     * progress_report_1 with all uploads, supervisor approvals, messages, and schedule details preserved.
+     */
+    public function migrateMscProgressReport2(ThesisProject $project): bool
+    {
+        $pr2Template = \App\Models\MilestoneTemplate::where('slug', 'progress_report_2')->first();
+        if (!$pr2Template) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($project, $pr2Template) {
+            $pr2 = $project->milestones()
+                ->where('milestone_template_id', $pr2Template->id)
+                ->first();
+
+            $pr2Events = \App\Models\DefenceEvent::where('thesis_project_id', $project->id)
+                ->where('type', 'progress_report_2')
+                ->with(['panelMembers', 'evaluations'])
+                ->get();
+
+            if (!$pr2 && $pr2Events->isEmpty()) {
+                return false;
+            }
+
+            $pr1Template = \App\Models\MilestoneTemplate::where('slug', 'progress_report_1')->first();
+            $hasPr2Submissions = $pr2 && $pr2->submissions()->exists();
+            $hasPr2Messages = $pr2 && $pr2->messages()->exists();
+            $pr2Approvals = $pr2 ? ($pr2->approvals ?? []) : [];
+            if (is_string($pr2Approvals)) {
+                $pr2Approvals = json_decode($pr2Approvals, true) ?: [];
+            }
+
+            $hasPr2Activity = $pr2 && (
+                in_array($pr2->status, ['in_progress', 'submitted', 'revision_required', 'partially_approved'], true)
+                || $hasPr2Submissions
+                || $hasPr2Messages
+                || !empty($pr2Approvals)
+                || !empty($pr2->defence_date)
+                || !empty($pr2->submitted_at)
+                || !empty($pr2->remark)
+                || $pr2Events->isNotEmpty()
+            );
+
+            // If student was actively on PR2 (or had any uploads/approvals/events on PR2), fold back to PR1
+            if ($pr2 && $pr1Template && $hasPr2Activity) {
+                $pr1 = $project->milestones()
+                    ->where('milestone_template_id', $pr1Template->id)
+                    ->first();
+
+                if (!$pr1) {
+                    $pr1 = StudentMilestone::create([
+                        'thesis_project_id' => $project->id,
+                        'milestone_template_id' => $pr1Template->id,
+                        'status' => 'in_progress',
+                    ]);
+                }
+
+                // 1. Reassign all submissions (PPTs, manuscripts, reports) preserving linked feedbacks & chronological versions
+                $maxPr1Version = (int) (\App\Models\Submission::where('student_milestone_id', $pr1->id)->max('version') ?? 0);
+                $pr2Submissions = \App\Models\Submission::where('student_milestone_id', $pr2->id)
+                    ->orderBy('created_at')
+                    ->orderBy('version')
+                    ->get();
+
+                foreach ($pr2Submissions as $sub) {
+                    $maxPr1Version++;
+                    \App\Models\Submission::withoutEvents(function () use ($sub, $pr1, $maxPr1Version) {
+                        $sub->student_milestone_id = $pr1->id;
+                        $sub->version = $maxPr1Version;
+                        $sub->save();
+                    });
+                }
+
+                // 2. Reassign milestone chat messages
+                \App\Models\Message::where('student_milestone_id', $pr2->id)
+                    ->update(['student_milestone_id' => $pr1->id]);
+
+                // 3. Merge approvals JSON (supervisor_reviews + role-keyed entries)
+                $pr1Approvals = $pr1->approvals ?? [];
+                if (is_string($pr1Approvals)) {
+                    $pr1Approvals = json_decode($pr1Approvals, true) ?: [];
+                }
+
+                if (!empty($pr2Approvals) && is_array($pr2Approvals)) {
+                    $mergedApprovals = $pr1Approvals;
+                    if (isset($pr2Approvals['supervisor_reviews']) && is_array($pr2Approvals['supervisor_reviews'])) {
+                        $mergedApprovals['supervisor_reviews'] = array_replace(
+                            $mergedApprovals['supervisor_reviews'] ?? [],
+                            $pr2Approvals['supervisor_reviews']
+                        );
+                    }
+                    foreach ($pr2Approvals as $key => $val) {
+                        if ($key === 'supervisor_reviews') {
+                            continue;
+                        }
+                        if (!isset($mergedApprovals[$key]) || !empty($val)) {
+                            $mergedApprovals[$key] = $val;
+                        }
+                    }
+                    $pr1Approvals = $mergedApprovals;
+                }
+
+                // 4. Merge communication logs cleanly
+                $pr1Log = is_array($pr1->communication_log) ? $pr1->communication_log : [];
+                $pr2Log = is_array($pr2->communication_log) ? $pr2->communication_log : [];
+                $mergedLog = array_values(array_merge($pr1Log, $pr2Log, [[
+                    'action' => 'migrated_from_progress_report_2',
+                    'timestamp' => now()->toIso8601String(),
+                    'note' => 'Returned MSc candidate from removed Progress Report 2 stage to Progress Report 1 with uploads and supervisor approvals preserved.',
+                ]]));
+
+                // 5. Carry over defence scheduling & review metadata without overwriting existing PR1 values unnecessarily
+                $shouldReopenPr1 = in_array($pr2->status, ['in_progress', 'submitted', 'revision_required', 'partially_approved'], true);
+                $targetStatus = $shouldReopenPr1
+                    ? $pr2->status
+                    : ($pr1->status === 'approved' ? 'approved' : ($hasPr2Submissions ? 'submitted' : 'in_progress'));
+
+                $pr1->status = $targetStatus;
+                if ($shouldReopenPr1) {
+                    $pr1->approved_at = null;
+                    $pr1->date_approved_at = null;
+                    $pr1->date_approved_by = null;
+                }
+
+                $pr1->approvals = !empty($pr1Approvals) ? $pr1Approvals : null;
+                $pr1->defence_date = $pr2->defence_date ?? $pr1->defence_date;
+                $pr1->defence_time = $pr2->defence_time ?? $pr1->defence_time;
+                $pr1->defence_location = $pr2->defence_location ?? $pr1->defence_location;
+                $pr1->meeting_link = $pr2->meeting_link ?? $pr1->meeting_link;
+                $pr1->due_date = $pr2->due_date ?? $pr1->due_date;
+                $pr1->submitted_at = $pr2->submitted_at ?? $pr1->submitted_at;
+                $pr1->reviewed_at = $pr2->reviewed_at ?? $pr1->reviewed_at;
+                $pr1->remark = $pr2->remark ?: $pr1->remark;
+                $pr1->is_submission_unlocked = (bool) ($pr1->is_submission_unlocked || $pr2->is_submission_unlocked);
+                $pr1->submission_unlocked_at = $pr2->submission_unlocked_at ?? $pr1->submission_unlocked_at;
+                $pr1->submission_unlocked_by = $pr2->submission_unlocked_by ?? $pr1->submission_unlocked_by;
+                $pr1->communication_log = $mergedLog;
+                $pr1->is_supervisor_approved = (bool) (
+                    ($pr1->getRawOriginal('is_supervisor_approved') ?? false)
+                    || ($pr2->getRawOriginal('is_supervisor_approved') ?? false)
+                    || $this->computeSupervisorApprovalEligibility($pr1)
+                );
+                $pr1->save();
+
+                // 6. Migrate progress_report_2 defence events & evaluations onto progress_report_1
+                if ($pr2Events->isNotEmpty()) {
+                    $existingPr1Event = \App\Models\DefenceEvent::where('thesis_project_id', $project->id)
+                        ->where('type', 'progress_report_1')
+                        ->first();
+
+                    foreach ($pr2Events as $ev) {
+                        if (!$existingPr1Event) {
+                            $ev->update(['type' => 'progress_report_1']);
+                            $existingPr1Event = $ev;
+                        } else {
+                            foreach ($ev->panelMembers as $pm) {
+                                \App\Models\PanelMember::firstOrCreate([
+                                    'defence_event_id' => $existingPr1Event->id,
+                                    'user_id' => $pm->user_id,
+                                    'role' => $pm->role,
+                                ], [
+                                    'invitation_status' => $pm->invitation_status,
+                                    'is_present' => $pm->is_present,
+                                ]);
+                            }
+                            foreach ($ev->evaluations as $evaluation) {
+                                $alreadyExists = \App\Models\Evaluation::where('defence_event_id', $existingPr1Event->id)
+                                    ->where('evaluator_id', $evaluation->evaluator_id)
+                                    ->exists();
+                                if (!$alreadyExists) {
+                                    $evaluation->update(['defence_event_id' => $existingPr1Event->id]);
+                                }
+                            }
+                            $ev->delete();
+                        }
+                    }
+                }
+            } else {
+                // Clean up unused PR2 defence events
+                $pr2Events->each->delete();
+            }
+
+            if ($pr2) {
+                if (\Illuminate\Support\Facades\Schema::hasTable('seminar_grades')) {
+                    DB::table('seminar_grades')->where('student_milestone_id', $pr2->id)->delete();
+                }
+                $pr2->delete();
+            }
+
+            return true;
+        });
+    }
+
+    /**
+     * Collect all user IDs who should automatically sit on an Internal Defence panel:
+     * all active thesis supervisors, all Program Coordinators, all Directors,
+     * plus any designated Internal Examiner on the thesis.
+     */
+    public function getInternalDefencePanelUserIds(ThesisProject $thesis): array
+    {
+        $studentUserId = $thesis->student?->user_id;
+
+        $supervisorUserIds = $thesis->assignments()
+            ->where('status', 'active')
+            ->with('supervisor')
+            ->get()
+            ->pluck('supervisor.user_id')
+            ->filter()
+            ->all();
+
+        $leadershipUserIds = \App\Models\User::whereHas('roles', function ($q) {
+                $q->whereIn('name', ['Program Coordinator', 'Director']);
+            })
+            ->where('is_active', true)
+            ->pluck('id')
+            ->all();
+
+        $coordinatorProfileUserIds = \App\Models\CoordinatorProfile::where('active', true)
+            ->pluck('user_id')
+            ->all();
+
+        $designatedIds = [];
+        if ($thesis->internalExaminer && $thesis->internalExaminer->user_id) {
+            $designatedIds[] = $thesis->internalExaminer->user_id;
+        }
+        $assignmentIds = \App\Models\ExaminerAssignment::where('thesis_project_id', $thesis->id)
+            ->where('type', 'internal_examiner')
+            ->pluck('examiner_id')
+            ->all();
+
+        return collect(array_merge(
+                $supervisorUserIds,
+                $leadershipUserIds,
+                $coordinatorProfileUserIds,
+                $designatedIds,
+                $assignmentIds
+            ))
+            ->filter(fn($id) => !empty($id) && (string) $id !== (string) $studentUserId)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Synchronize all required Internal Defence panel examiners onto the given DefenceEvent.
+     */
+    public function syncInternalDefencePanel(\App\Models\DefenceEvent $event): void
+    {
+        if ($event->type !== 'internal') {
+            return;
+        }
+
+        $thesis = $event->relationLoaded('thesis')
+            ? $event->thesis
+            : $event->thesis()->with(['student', 'internalExaminer'])->first();
+
+        if (!$thesis) {
+            return;
+        }
+
+        foreach ($this->getInternalDefencePanelUserIds($thesis) as $userId) {
+            \App\Models\PanelMember::firstOrCreate([
+                'defence_event_id' => $event->id,
+                'user_id' => $userId,
+                'role' => 'examiner',
+            ], [
+                'invitation_status' => 'accepted',
+            ]);
         }
     }
 }
