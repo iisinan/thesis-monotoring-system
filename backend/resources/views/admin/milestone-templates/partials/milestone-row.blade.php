@@ -688,6 +688,7 @@
                                                 batchOnlyEmpty: false,
                                                 batchDate: '',
                                                 batchTime: '',
+                                                batchExaminer: '',
                                                 toastMessage: '',
                                                 showToast: false,
                                                 swapSourceId: null,
@@ -761,7 +762,7 @@
                                                         return;
                                                     }
                                                     let count = 0;
-                                                    const rows = document.querySelectorAll('tr[data-sched-id]');
+                                                    const rows = (this.$refs.editScheduleModal || document).querySelectorAll('tr[data-sched-id]');
                                                     rows.forEach(row => {
                                                         const track = row.getAttribute('data-sched-track');
                                                         const name = row.getAttribute('data-sched-name') || '';
@@ -771,7 +772,7 @@
 
                                                         if (matchesTrack && matchesSearch) {
                                                             const linkInput = row.querySelector('input[data-field=link]');
-                                                            if (linkInput) {
+                                                            if (linkInput && !linkInput.disabled) {
                                                                 if (!this.batchOnlyEmpty || !linkInput.value.trim()) {
                                                                     linkInput.value = this.batchLink;
                                                                     count++;
@@ -789,7 +790,7 @@
                                                         return;
                                                     }
                                                     let count = 0;
-                                                    const rows = document.querySelectorAll('tr[data-sched-id]');
+                                                    const rows = (this.$refs.editScheduleModal || document).querySelectorAll('tr[data-sched-id]');
                                                     rows.forEach(row => {
                                                         const track = row.getAttribute('data-sched-track');
                                                         const name = row.getAttribute('data-sched-name') || '';
@@ -799,7 +800,7 @@
 
                                                         if (matchesTrack && matchesSearch) {
                                                             const dateInput = row.querySelector('input[data-field=date]');
-                                                            if (dateInput) {
+                                                            if (dateInput && !dateInput.disabled) {
                                                                 dateInput.value = this.batchDate;
                                                                 count++;
                                                             }
@@ -814,7 +815,7 @@
                                                         return;
                                                     }
                                                     let count = 0;
-                                                    const rows = document.querySelectorAll('tr[data-sched-id]');
+                                                    const rows = (this.$refs.editScheduleModal || document).querySelectorAll('tr[data-sched-id]');
                                                     let [startH, startM] = this.batchTime.split(':').map(Number);
 
                                                     rows.forEach(row => {
@@ -826,7 +827,7 @@
 
                                                         if (matchesTrack && matchesSearch) {
                                                             const timeInput = row.querySelector('input[data-field=time]');
-                                                            if (timeInput) {
+                                                            if (timeInput && !timeInput.disabled) {
                                                                 if (staggerMinutes > 0) {
                                                                     let totalM = (startH * 60 + startM) + (count * staggerMinutes);
                                                                     let h = Math.floor(totalM / 60) % 24;
@@ -842,6 +843,34 @@
                                                     this.notify(staggerMinutes > 0 
                                                         ? 'Staggered times (+30m) starting from ' + this.batchTime + ' across ' + count + ' student(s).' 
                                                         : 'Applied time (' + this.batchTime + ') to ' + count + ' student(s).');
+                                                },
+
+                                                applyBatchExaminer() {
+                                                    if (!this.batchExaminer) {
+                                                        alert('Please select an Internal Examiner to apply.');
+                                                        return;
+                                                    }
+                                                    const targetValue = this.batchExaminer === '__clear__' ? '' : this.batchExaminer;
+                                                    let count = 0;
+                                                    const rows = (this.$refs.editScheduleModal || document).querySelectorAll('tr[data-sched-id]');
+                                                    rows.forEach(row => {
+                                                        const track = row.getAttribute('data-sched-track');
+                                                        const name = row.getAttribute('data-sched-name') || '';
+                                                        const matric = row.getAttribute('data-sched-matric') || '';
+                                                        const matchesTrack = (this.editTrackFilter === 'all' || this.editTrackFilter === track);
+                                                        const matchesSearch = (!this.editSearch || name.toLowerCase().includes(this.editSearch.toLowerCase()) || matric.toLowerCase().includes(this.editSearch.toLowerCase()));
+
+                                                        if (matchesTrack && matchesSearch) {
+                                                            const exSelect = row.querySelector('select[data-field=examiner]');
+                                                            if (exSelect && !exSelect.disabled) {
+                                                                exSelect.value = targetValue;
+                                                                count++;
+                                                            }
+                                                        }
+                                                    });
+                                                    this.notify(targetValue === ''
+                                                        ? 'Cleared Internal Examiner for ' + count + ' student(s).'
+                                                        : 'Applied Internal Examiner to ' + count + ' student(s).');
                                                 }
                                             }" class="inline">
                                                 <button type="button" @click="editOpen = true"
@@ -867,21 +896,49 @@
 
                                             <template x-teleport="body">
                                                 <div x-show="editOpen" x-cloak x-transition.opacity data-teleported-modal="{{ $template->id }}" class="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm" @keydown.escape.window="if(!swapSourceId) editOpen = false">
-                                                    <div @click.outside="if(!swapSourceId) editOpen = false" class="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-100">
+                                                    <div x-ref="editScheduleModal" @click.outside="if(!swapSourceId) editOpen = false" class="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-100">
+                                                        @php
+                                                            $scheduleInternalExaminers = collect();
+                                                            $promotableSupervisors = collect();
+                                                            if ($template->slug === 'internal_defence') {
+                                                                $scheduleInternalExaminers = $internalExaminers->values();
+                                                                foreach ($scheduledMilestones as $esmItem) {
+                                                                    $assignedEx = $esmItem->thesis?->internalExaminer;
+                                                                    if ($assignedEx && !$scheduleInternalExaminers->contains('id', $assignedEx->id)) {
+                                                                        $scheduleInternalExaminers->push($assignedEx);
+                                                                    }
+                                                                }
+                                                                $existingExaminerUserIds = $scheduleInternalExaminers->pluck('user_id')->filter()->all();
+                                                                $promotableSupervisors = $supervisors->reject(fn($s) => in_array($s->user_id, $existingExaminerUserIds, true))->values();
+                                                            }
+                                                        @endphp
                                                         <form data-milestone-ajax="{{ $template->id }}" action="{{ route('admin.milestone-templates.update-schedule', $template->id) }}" method="POST" class="flex flex-col min-h-0 flex-1">
                                                                 @csrf
 
                                                                 {{-- Modal Header --}}
                                                                 <div class="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-4 bg-white shrink-0">
                                                                     <div>
-                                                                        <div class="flex items-center gap-2 mb-1">
+                                                                        <div class="flex flex-wrap items-center gap-2 mb-1">
                                                                             <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-200">
                                                                                 Schedule Manager
                                                                             </span>
                                                                             <span class="text-xs font-bold text-slate-400">• {{ $scheduledCount }} Scheduled Candidates</span>
+                                                                            @if(!$template->isScheduleApproved())
+                                                                                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                                                                                    Draft • Emails Held Until Approved
+                                                                                </span>
+                                                                            @else
+                                                                                <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200">
+                                                                                    Changes save as Draft (no emails until approved)
+                                                                                </span>
+                                                                            @endif
                                                                         </div>
                                                                         <h3 class="text-lg font-black text-slate-900">Edit {{ $template->presentation_title }} Schedule</h3>
-                                                                        <p class="text-xs text-slate-500 mt-0.5">Filter by discipline group, assign Zoom links to all in a group, shift dates, or swap slots between candidates.</p>
+                                                                        <p class="text-xs text-slate-500 mt-0.5">
+                                                                            {{ $template->slug === 'internal_defence'
+                                                                                ? 'Assign or update Internal Examiners, Zoom links, dates, times, or swap slots. No emails are sent until you click Approve Schedule.'
+                                                                                : 'Filter by discipline group, assign Zoom links to all in a group, shift dates, or swap slots between candidates.' }}
+                                                                        </p>
                                                                     </div>
                                                                     <div class="flex items-center gap-2">
                                                                         @if($template->slug === 'seminar_as_a_course')
@@ -1019,6 +1076,35 @@
                                                                             </button>
                                                                         </div>
                                                                     </div>
+
+                                                                    @if($template->slug === 'internal_defence')
+                                                                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+                                                                            <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1.5 rounded-xl shrink-0">
+                                                                                Internal Examiner
+                                                                            </span>
+                                                                            <select x-model="batchExaminer" class="flex-1 min-w-[240px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                                                                                <option value="">Select Internal Examiner to apply to visible candidates...</option>
+                                                                                <option value="__clear__">-- Unassign / Clear Internal Examiner --</option>
+                                                                                @if($scheduleInternalExaminers->isNotEmpty())
+                                                                                    <optgroup label="Internal Examiners">
+                                                                                        @foreach($scheduleInternalExaminers as $iex)
+                                                                                            <option value="iex:{{ $iex->id }}">{{ $iex->user->name ?? 'Examiner' }}{{ $iex->program?->code ? ' (' . $iex->program->code . ')' : '' }}</option>
+                                                                                        @endforeach
+                                                                                    </optgroup>
+                                                                                @endif
+                                                                                @if($promotableSupervisors->isNotEmpty())
+                                                                                    <optgroup label="Faculty / Supervisors (Auto-Promote)">
+                                                                                        @foreach($promotableSupervisors as $sup)
+                                                                                            <option value="sup:{{ $sup->id }}">{{ $sup->user->name ?? 'Faculty' }}{{ $sup->programs->first()?->code ? ' (' . $sup->programs->first()->code . ')' : '' }}</option>
+                                                                                        @endforeach
+                                                                                    </optgroup>
+                                                                                @endif
+                                                                            </select>
+                                                                            <button type="button" @click="applyBatchExaminer()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition-all shrink-0">
+                                                                                Apply Examiner to Visible
+                                                                            </button>
+                                                                        </div>
+                                                                    @endif
                                                                 </div>
 
                                                                 {{-- Per-student rows Table --}}
@@ -1030,6 +1116,9 @@
                                                                                 <th class="px-4 py-3.5">Presentation Date</th>
                                                                                 <th class="px-4 py-3.5">Slot Time</th>
                                                                                 <th class="px-4 py-3.5">Meeting Link (Zoom)</th>
+                                                                                @if($template->slug === 'internal_defence')
+                                                                                    <th class="px-4 py-3.5">Internal Examiner</th>
+                                                                                @endif
                                                                                 <th class="px-6 py-3.5 text-center">Actions / Swap</th>
                                                                             </tr>
                                                                         </thead>
@@ -1041,6 +1130,7 @@
                                                                                     $track = $esm->discipline_group ?? 'cybersecurity';
                                                                                     $dateVal = $esm->defence_date ? \Carbon\Carbon::parse($esm->defence_date)->format('Y-m-d') : '';
                                                                                     $timeVal = $esm->defence_time ? \Carbon\Carbon::parse($esm->defence_time)->format('H:i') : '';
+                                                                                    $currentExaminerKey = $esm->thesis?->internal_examiner_profile_id ? ('iex:' . $esm->thesis->internal_examiner_profile_id) : '';
                                                                                 @endphp
                                                                                 <tr id="sched-row-{{ $esm->id }}"
                                                                                     data-sched-id="{{ $esm->id }}"
@@ -1077,7 +1167,7 @@
                                                                                     <td class="px-4 py-3">
                                                                                         <div class="flex items-center gap-1.5">
                                                                                             <input type="url" data-field="link" name="entries[{{ $esm->id }}][meeting_link]" value="{{ $esm->meeting_link }}" placeholder="https://zoom.us/j/..." :disabled="rm"
-                                                                                                class="w-full min-w-[220px] px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                                                                                                class="w-full {{ $template->slug === 'internal_defence' ? 'min-w-[180px]' : 'min-w-[220px]' }} px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-medium focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
                                                                                             @if(!empty($trackZoomLinks[$track]))
                                                                                                 <button type="button" @click="$el.previousElementSibling.value = '{{ $trackZoomLinks[$track] }}'" class="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition" title="Fill with track default Zoom link">
                                                                                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
@@ -1085,6 +1175,32 @@
                                                                                             @endif
                                                                                         </div>
                                                                                     </td>
+                                                                                    @if($template->slug === 'internal_defence')
+                                                                                        <td class="px-4 py-3">
+                                                                                            <select data-field="examiner" name="entries[{{ $esm->id }}][internal_examiner_key]" :disabled="rm"
+                                                                                                class="w-48 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                                                                                                <option value="">-- Unassigned --</option>
+                                                                                                @if($scheduleInternalExaminers->isNotEmpty())
+                                                                                                    <optgroup label="Internal Examiners">
+                                                                                                        @foreach($scheduleInternalExaminers as $iex)
+                                                                                                            <option value="iex:{{ $iex->id }}" {{ $currentExaminerKey === ('iex:' . $iex->id) ? 'selected' : '' }}>
+                                                                                                                {{ $iex->user->name ?? 'Examiner' }}{{ $iex->program?->code ? ' (' . $iex->program->code . ')' : '' }}
+                                                                                                            </option>
+                                                                                                        @endforeach
+                                                                                                    </optgroup>
+                                                                                                @endif
+                                                                                                @if($promotableSupervisors->isNotEmpty())
+                                                                                                    <optgroup label="Faculty / Supervisors (Auto-Promote)">
+                                                                                                        @foreach($promotableSupervisors as $sup)
+                                                                                                            <option value="sup:{{ $sup->id }}">
+                                                                                                                {{ $sup->user->name ?? 'Faculty' }}{{ $sup->programs->first()?->code ? ' (' . $sup->programs->first()->code . ')' : '' }}
+                                                                                                            </option>
+                                                                                                        @endforeach
+                                                                                                    </optgroup>
+                                                                                                @endif
+                                                                                            </select>
+                                                                                        </td>
+                                                                                    @endif
                                                                                     <td class="px-6 py-3 text-center">
                                                                                         <div class="flex items-center justify-center gap-1.5">
                                                                                             {{-- Swap Actions --}}
@@ -1128,7 +1244,7 @@
                                                                     <div class="text-[11px] text-slate-500 flex items-center gap-3">
                                                                         <span>Total Scheduled: <strong>{{ $scheduledCount }}</strong> candidates</span>
                                                                         <span class="text-slate-300">•</span>
-                                                                        <span class="text-slate-400">Slots update automatically when saved; candidates receive an instant timetable notification.</span>
+                                                                        <span class="text-amber-700 font-semibold">Changes save in draft mode — no emails are sent to candidates or examiners until you click Approve Schedule.</span>
                                                                     </div>
                                                                     <div class="flex gap-2 shrink-0">
                                                                         <button type="button" @click="editOpen = false; cancelSwap();" class="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">Close</button>
