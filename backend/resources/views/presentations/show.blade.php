@@ -81,6 +81,50 @@
         </div>
     @endif
 
+    @php
+        $isScheduleApproved = $template->isScheduleApproved();
+    @endphp
+
+    {{-- Draft Schedule Pending Approval Banner (Admin / Coordinator) --}}
+    @if(!$isScheduleApproved && $allScheduled->isNotEmpty() && auth()->user()->hasAnyRole(['Admin', 'Program Coordinator']))
+        <div class="bg-amber-50 border-2 border-amber-300 rounded-3xl p-5 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div class="flex items-start gap-4">
+                <div class="w-11 h-11 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                    <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-200 text-amber-900">Draft Schedule • Pending Approval</span>
+                    </div>
+                    <h3 class="text-sm sm:text-base font-black text-amber-950 mt-1">
+                        Emails have NOT been sent to candidates or examiners yet.
+                    </h3>
+                    <p class="text-xs font-medium text-amber-800 mt-0.5">
+                        Review the presentation dates, Zoom links, and assigned examiners below. When everything is ready, click <strong>Approve Schedule &amp; Send Emails</strong> to publish the schedule and notify all participants.
+                    </p>
+                </div>
+            </div>
+            @if(auth()->user()->hasRole('Admin'))
+                <form action="{{ route('admin.milestone-templates.approve-schedule', $template->id) }}" method="POST" class="shrink-0">
+                    @csrf
+                    <button type="submit"
+                        data-confirm="Approve this presentation schedule and send email notifications to all {{ $allScheduled->count() }} scheduled candidate(s) and assigned examiner(s)?"
+                        data-confirm-title="Approve Schedule & Send Emails"
+                        data-confirm-type="success"
+                        data-confirm-btn="Approve & Send Emails"
+                        class="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Approve Schedule &amp; Send Emails</span>
+                    </button>
+                </form>
+            @endif
+        </div>
+    @endif
+
     {{-- Top Hero Banner --}}
     <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white p-5 sm:p-8 lg:p-10 shadow-xl border border-emerald-900/50">
         {{-- Decorative glow shapes --}}
@@ -89,17 +133,28 @@
 
         <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             <div class="space-y-3 max-w-3xl">
-                @if($todayPresenters->isNotEmpty())
-                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-                        <span class="w-2 h-2 rounded-full bg-red-400 animate-pulse"></span>
-                        <span>Live Presentation</span>
-                    </div>
-                @else
-                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                        <span>Scheduled Presentation</span>
-                    </div>
-                @endif
+                <div class="flex flex-wrap items-center gap-2">
+                    @if($todayPresenters->isNotEmpty())
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+                            <span class="w-2 h-2 rounded-full bg-red-400 animate-pulse"></span>
+                            <span>Live Presentation</span>
+                        </div>
+                    @else
+                        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold uppercase tracking-wider backdrop-blur-sm">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span>Scheduled Presentation</span>
+                        </div>
+                    @endif
+                    @if(!$isScheduleApproved)
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/25 border border-amber-400/50 text-amber-200 text-xs font-black uppercase tracking-wider">
+                            <span>Draft • Emails Held</span>
+                        </div>
+                    @elseif(auth()->user()->hasAnyRole(['Admin', 'Program Coordinator']))
+                        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 text-xs font-bold uppercase tracking-wider">
+                            <span>✓ Schedule Approved</span>
+                        </div>
+                    @endif
+                </div>
                 <h1 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
                     {{ $presentationTitle }}
                 </h1>

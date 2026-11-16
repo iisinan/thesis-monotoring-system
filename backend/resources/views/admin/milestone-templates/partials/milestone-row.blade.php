@@ -850,6 +850,21 @@
                                                     <span>Edit Schedule</span>
                                                 </button>
 
+                                                @if(!$template->isScheduleApproved())
+                                                    <form data-milestone-ajax="{{ $template->id }}" action="{{ route('admin.milestone-templates.approve-schedule', $template->id) }}" method="POST" class="inline">
+                                                        @csrf
+                                                        <button type="submit"
+                                                            data-confirm="Approve this presentation schedule and send email notifications to all {{ $scheduledCount }} scheduled candidate(s) and assigned examiner(s)?"
+                                                            data-confirm-title="Approve Schedule & Send Emails"
+                                                            data-confirm-type="success"
+                                                            data-confirm-btn="Approve & Send"
+                                                            class="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm shadow-emerald-600/20">
+                                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                            <span>Approve Schedule</span>
+                                                        </button>
+                                                    </form>
+                                                @endif
+
                                             <template x-teleport="body">
                                                 <div x-show="editOpen" x-cloak x-transition.opacity data-teleported-modal="{{ $template->id }}" class="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm" @keydown.escape.window="if(!swapSourceId) editOpen = false">
                                                     <div @click.outside="if(!swapSourceId) editOpen = false" class="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-100">

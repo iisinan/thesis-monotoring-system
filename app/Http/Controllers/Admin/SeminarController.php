@@ -165,7 +165,7 @@ class SeminarController extends Controller
                 "invitation_status" => "accepted"
             ]);
             try {
-                if ($supervisor->user && $template) {
+                if ($supervisor->user && $template && $template->isScheduleApproved()) {
                     $supervisor->user->notify(new \App\Notifications\ExaminerNominated($template, null, 1, $milestone->discipline_group));
                 }
             } catch (\Throwable $e) {}

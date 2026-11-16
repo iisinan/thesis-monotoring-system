@@ -11,6 +11,11 @@ class PresentationController extends Controller
 {
     public function show(Request $request, MilestoneTemplate $template)
     {
+        $authUser = auth()->user();
+        if ($authUser && !$authUser->hasAnyRole(['Admin', 'Program Coordinator']) && !$template->isScheduleApproved()) {
+            return redirect()->route('dashboard')->with('info', 'This presentation schedule is currently in draft and awaiting Administrative approval.');
+        }
+
         $today = Carbon::today();
         $todayDateStr = $today->format('Y-m-d');
 

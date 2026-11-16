@@ -94,6 +94,7 @@ Route::resource('milestone-templates', MilestoneTemplateController::class)->only
 Route::post('milestone-templates/{template}/date', [MilestoneTemplateController::class, 'setDate'])->name('milestone-templates.set-date');
     Route::post('milestone-templates/schedule', [MilestoneTemplateController::class, 'schedule'])->name('milestone-templates.schedule');
     Route::post('milestone-templates/{template}/end-schedule', [MilestoneTemplateController::class, 'endSchedule'])->name('milestone-templates.end-schedule');
+    Route::post('milestone-templates/{template}/approve-schedule', [MilestoneTemplateController::class, 'approveSchedule'])->name('milestone-templates.approve-schedule');
     Route::get('past-presentations', [\App\Http\Controllers\Admin\PastPresentationController::class, 'index'])->name('past-presentations.index');
     Route::get('past-presentations/export-scores', [\App\Http\Controllers\Admin\PastPresentationController::class, 'exportScores'])->name('past-presentations.export-scores');
     Route::get('past-presentations/export-attendance', [\App\Http\Controllers\Admin\PastPresentationController::class, 'exportAttendance'])->name('past-presentations.export-attendance');

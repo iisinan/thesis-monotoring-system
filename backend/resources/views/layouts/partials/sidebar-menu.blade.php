@@ -107,7 +107,11 @@ x-init="
 <!-- Milestone Presentations (Visible to All Users when a Schedule is Active) -->
 @php
     $todayStr = now()->toDateString();
-    $activePresentations = \App\Models\MilestoneTemplate::getActivePresentations()->filter(function ($pt) {
+    $canViewDraftPresentations = auth()->check() && auth()->user()->hasAnyRole(['Admin', 'Program Coordinator']);
+    $activePresentations = \App\Models\MilestoneTemplate::getActivePresentations()->filter(function ($pt) use ($canViewDraftPresentations) {
+        if (!$canViewDraftPresentations && !$pt->isScheduleApproved()) {
+            return false;
+        }
         return $pt->studentMilestones
             ->where('status', '!=', 'approved')
             ->whereNotNull('defence_date')

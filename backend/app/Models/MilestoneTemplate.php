@@ -216,6 +216,19 @@ class MilestoneTemplate extends Model
     }
 
     /**
+     * Determine whether the active presentation schedule has been approved by Admin
+     * to dispatch notifications to candidates and examiners.
+     */
+    public function isScheduleApproved(): bool
+    {
+        $meta = $this->metadata ?? [];
+        if (!array_key_exists('schedule_approved', $meta)) {
+            return true;
+        }
+        return (bool) $meta['schedule_approved'];
+    }
+
+    /**
      * Resolve route binding by UUID id or slug.
      */
     public function resolveRouteBinding($value, $field = null)

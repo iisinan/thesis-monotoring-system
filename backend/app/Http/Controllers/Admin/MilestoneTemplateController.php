@@ -634,11 +634,6 @@ class MilestoneTemplateController extends Controller
                 
                 if ($thesis->student && $thesis->student->user) {
                     \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $thesis->student->user->id);
-                    try {
-                        $thesis->student->user->notify(new \App\Notifications\EventScheduled($event));
-                    } catch (\Throwable $e) {
-                        \Illuminate\Support\Facades\Log::error("Failed to send EventScheduled notification: " . $e->getMessage());
-                    }
                 }
 
                 $count++;
@@ -647,11 +642,17 @@ class MilestoneTemplateController extends Controller
                     $advanceToValidDate($currentDate);
                 }
             }
+            if ($count > 0 && $scheduledTemplate) {
+                $meta = $scheduledTemplate->metadata ?? [];
+                $meta['schedule_approved'] = false;
+                unset($meta['schedule_approved_at'], $meta['schedule_approved_by']);
+                $scheduledTemplate->update(['metadata' => $meta]);
+            }
             \Illuminate\Support\Facades\DB::commit();
             if ($count === 0 && $skippedUnapproved > 0) {
                 return $this->respondMilestoneAction($request, $scheduledTemplate, 'error', "No presentations were scheduled: {$skippedUnapproved} selected candidate(s) are still awaiting supervisor thesis/document approval.");
             }
-            $msg = 'Scheduled ' . $count . ' presentation(s) successfully with date, time, and Zoom link.';
+            $msg = 'Scheduled ' . $count . ' presentation(s) in Draft mode (no emails sent yet). Assign examiners if needed, then click "Approve Schedule" on the Presentation tab to send notifications.';
             if ($skippedUnapproved > 0) {
                 $msg .= " ({$skippedUnapproved} candidate(s) awaiting supervisor approval were skipped.)";
             }
@@ -845,19 +846,21 @@ class MilestoneTemplateController extends Controller
 
                     if ($studentUser) {
                         \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUser->id);
-                        try {
-                            if ($isRescheduled) {
-                                $studentUser->notify(new EventRescheduled(
-                                    $event,
-                                    $oldDate,
-                                    $oldTime,
-                                    $template->name
-                                ));
-                            } else {
-                                $studentUser->notify(new EventScheduled($event));
+                        if ($template->isScheduleApproved()) {
+                            try {
+                                if ($isRescheduled) {
+                                    $studentUser->notify(new EventRescheduled(
+                                        $event,
+                                        $oldDate,
+                                        $oldTime,
+                                        $template->name
+                                    ));
+                                } else {
+                                    $studentUser->notify(new EventScheduled($event));
+                                }
+                            } catch (\Throwable $e) {
+                                \Illuminate\Support\Facades\Log::error('Failed to send schedule notification: ' . $e->getMessage());
                             }
-                        } catch (\Throwable $e) {
-                            \Illuminate\Support\Facades\Log::error('Failed to send schedule notification: ' . $e->getMessage());
                         }
                     }
 
@@ -911,40 +914,42 @@ class MilestoneTemplateController extends Controller
 
             \Illuminate\Support\Facades\DB::commit();
 
-            // Notify examiners who have rescheduled candidates
-            foreach ($examinerRescheduledMap as $exId => $data) {
-                try {
-                    $exUser = $data['user'];
-                    $items = $data['items'];
-                    if (count($items) === 1) {
-                        $first = $items[0];
-                        $exUser->notify(new EventRescheduled(
-                            $first['event'],
-                            $first['previous_date'],
-                            $first['previous_time'],
-                            $template->name
-                        ));
-                    } else {
-                        $exUser->notify(new ExaminerBatchScheduleRescheduled(
-                            $template,
-                            $items,
-                            $template->name
-                        ));
+            if ($template->isScheduleApproved()) {
+                // Notify examiners who have rescheduled candidates
+                foreach ($examinerRescheduledMap as $exId => $data) {
+                    try {
+                        $exUser = $data['user'];
+                        $items = $data['items'];
+                        if (count($items) === 1) {
+                            $first = $items[0];
+                            $exUser->notify(new EventRescheduled(
+                                $first['event'],
+                                $first['previous_date'],
+                                $first['previous_time'],
+                                $template->name
+                            ));
+                        } else {
+                            $exUser->notify(new ExaminerBatchScheduleRescheduled(
+                                $template,
+                                $items,
+                                $template->name
+                            ));
+                        }
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to notify examiner {$exId} on batch reschedule: " . $e->getMessage());
                     }
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to notify examiner {$exId} on batch reschedule: " . $e->getMessage());
                 }
-            }
 
-            // Notify examiners of newly scheduled presentations
-            foreach ($examinerScheduledMap as $exId => $data) {
-                try {
-                    $exUser = $data['user'];
-                    foreach ($data['events'] as $ev) {
-                        $exUser->notify(new EventScheduled($ev));
+                // Notify examiners of newly scheduled presentations
+                foreach ($examinerScheduledMap as $exId => $data) {
+                    try {
+                        $exUser = $data['user'];
+                        foreach ($data['events'] as $ev) {
+                            $exUser->notify(new EventScheduled($ev));
+                        }
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to notify examiner {$exId} on initial schedule: " . $e->getMessage());
                     }
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to notify examiner {$exId} on initial schedule: " . $e->getMessage());
                 }
             }
 
@@ -1070,15 +1075,17 @@ class MilestoneTemplateController extends Controller
 
                     if ($studentUser) {
                         \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUser->id);
-                        try {
-                            $studentUser->notify(new EventRescheduled(
-                                $event,
-                                $previousDate,
-                                $previousTime,
-                                $template->name
-                            ));
-                        } catch (\Throwable $e) {
-                            \Illuminate\Support\Facades\Log::error('Reschedule notification failed: ' . $e->getMessage());
+                        if ($template->isScheduleApproved()) {
+                            try {
+                                $studentUser->notify(new EventRescheduled(
+                                    $event,
+                                    $previousDate,
+                                    $previousTime,
+                                    $template->name
+                                ));
+                            } catch (\Throwable $e) {
+                                \Illuminate\Support\Facades\Log::error('Reschedule notification failed: ' . $e->getMessage());
+                            }
                         }
                     }
 
@@ -1106,29 +1113,31 @@ class MilestoneTemplateController extends Controller
             }
             \Illuminate\Support\Facades\DB::commit();
 
-            // Notify examiners who have rescheduled candidates
-            foreach ($examinerRescheduledMap as $exId => $data) {
-                try {
-                    $exUser = $data['user'];
-                    $items = $data['items'];
-                    if (count($items) === 1) {
-                        $first = $items[0];
-                        $exUser->notify(new EventRescheduled(
-                            $first['event'],
-                            $first['previous_date'],
-                            $first['previous_time'],
-                            $template->name
-                        ));
-                    } else {
-                        $exUser->notify(new ExaminerBatchScheduleRescheduled(
-                            $template,
-                            $items,
-                            $template->name,
-                            $request->discipline_group
-                        ));
+            if ($template->isScheduleApproved()) {
+                // Notify examiners who have rescheduled candidates
+                foreach ($examinerRescheduledMap as $exId => $data) {
+                    try {
+                        $exUser = $data['user'];
+                        $items = $data['items'];
+                        if (count($items) === 1) {
+                            $first = $items[0];
+                            $exUser->notify(new EventRescheduled(
+                                $first['event'],
+                                $first['previous_date'],
+                                $first['previous_time'],
+                                $template->name
+                            ));
+                        } else {
+                            $exUser->notify(new ExaminerBatchScheduleRescheduled(
+                                $template,
+                                $items,
+                                $template->name,
+                                $request->discipline_group
+                            ));
+                        }
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to notify examiner {$exId} on rescheduleDay: " . $e->getMessage());
                     }
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to notify examiner {$exId} on rescheduleDay: " . $e->getMessage());
                 }
             }
 
@@ -1339,38 +1348,42 @@ class MilestoneTemplateController extends Controller
 
                 if ($studentUser) {
                     \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUser->id);
-                    try {
-                        if ($isMoved) {
-                            $studentUser->notify(new EventRescheduled(
-                                $event,
-                                $previousDate,
-                                $previousTime,
-                                $template->name
-                            ));
-                        } else {
-                            $studentUser->notify(new EventScheduled($event));
+                    if ($template->isScheduleApproved()) {
+                        try {
+                            if ($isMoved) {
+                                $studentUser->notify(new EventRescheduled(
+                                    $event,
+                                    $previousDate,
+                                    $previousTime,
+                                    $template->name
+                                ));
+                            } else {
+                                $studentUser->notify(new EventScheduled($event));
+                            }
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::error('Event notification error: ' . $e->getMessage());
                         }
-                    } catch (\Throwable $e) {
-                        \Illuminate\Support\Facades\Log::error('Event notification error: ' . $e->getMessage());
                     }
                 }
 
-                // Notify assigned examiners as well
-                $examiners = $this->getExaminersForMilestone($milestone, $template, $event);
-                foreach ($examiners as $ex) {
-                    try {
-                        if ($isMoved) {
-                            $ex->notify(new EventRescheduled(
-                                $event,
-                                $previousDate,
-                                $previousTime,
-                                $template->name
-                            ));
-                        } else {
-                            $ex->notify(new EventScheduled($event));
+                // Notify assigned examiners as well (only once schedule is approved)
+                if ($template->isScheduleApproved()) {
+                    $examiners = $this->getExaminersForMilestone($milestone, $template, $event);
+                    foreach ($examiners as $ex) {
+                        try {
+                            if ($isMoved) {
+                                $ex->notify(new EventRescheduled(
+                                    $event,
+                                    $previousDate,
+                                    $previousTime,
+                                    $template->name
+                                ));
+                            } else {
+                                $ex->notify(new EventScheduled($event));
+                            }
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::error("Failed to notify examiner {$ex->id} in updateStudentSlot: " . $e->getMessage());
                         }
-                    } catch (\Throwable $e) {
-                        \Illuminate\Support\Facades\Log::error("Failed to notify examiner {$ex->id} in updateStudentSlot: " . $e->getMessage());
                     }
                 }
             }
@@ -1551,6 +1564,125 @@ class MilestoneTemplateController extends Controller
         }
     }
 
+    /**
+     * Approve a draft presentation schedule and dispatch email notifications
+     * to all scheduled candidates and assigned examiners.
+     */
+    public function approveSchedule(Request $request, MilestoneTemplate $template)
+    {
+        if (!auth()->user()->hasRole('Admin')) {
+            abort(403, 'Institutional authority required. Only an Administrator can approve presentation schedules.');
+        }
+
+        $type = $template->defence_type ?? match($template->slug) {
+            'seminar_as_a_course' => 'seminar',
+            'proposal_defence' => 'proposal',
+            'progress_report_1' => 'progress_report_1',
+            'progress_report_2' => 'progress_report_2',
+            'internal_defence' => 'internal',
+            'viva' => 'external',
+            default => 'first_seminar',
+        };
+
+        $workflow = app(\App\Services\MilestoneWorkflowService::class);
+        $scheduledMilestones = \App\Models\StudentMilestone::where('milestone_template_id', $template->id)
+            ->whereNotNull('defence_date')
+            ->where('status', '!=', 'approved')
+            ->with([
+                'template',
+                'thesis.student.user',
+                'thesis.student.program',
+                'thesis.defenceEvents.panelMembers.user',
+            ])
+            ->get()
+            ->reject(fn($m) => $workflow->isPostDefencePhase($m))
+            ->values();
+
+        if ($scheduledMilestones->isEmpty()) {
+            return $this->respondMilestoneAction($request, $template, 'error', 'No scheduled candidates found to approve.');
+        }
+
+        $meta = $template->metadata ?? [];
+        $meta['schedule_approved'] = true;
+        $meta['schedule_approved_at'] = now()->toDateTimeString();
+        $meta['schedule_approved_by'] = auth()->id();
+        $template->update(['metadata' => $meta]);
+        \App\Models\MilestoneTemplate::clearPresentationCache();
+
+        $studentNotified = 0;
+        $examinerAgg = [];
+
+        foreach ($scheduledMilestones as $sm) {
+            $thesis = $sm->thesis;
+            if (!$thesis) {
+                continue;
+            }
+
+            $event = $thesis->defenceEvents->where('type', $type)->first();
+            if (!$event) {
+                $start = \Carbon\Carbon::parse($sm->defence_date);
+                if (!empty($sm->defence_time)) {
+                    $parsedTime = \Carbon\Carbon::parse($sm->defence_time);
+                    $start->setTime($parsedTime->hour, $parsedTime->minute);
+                } else {
+                    $start->setTime(10, 0);
+                }
+                $event = \App\Models\DefenceEvent::create([
+                    'thesis_project_id' => $thesis->id,
+                    'type' => $type,
+                    'schedule_start' => $start,
+                    'schedule_end' => $start->copy()->addHour(),
+                    'location' => $sm->meeting_link ?: null,
+                ]);
+            }
+
+            // Notify scheduled student
+            $studentUser = $thesis->student?->user;
+            if ($studentUser) {
+                \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUser->id);
+                try {
+                    $studentUser->notify(new \App\Notifications\EventScheduled($event));
+                    $studentNotified++;
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error("approveSchedule student notify failed: " . $e->getMessage());
+                }
+            }
+
+            // Aggregate examiners for notification
+            $examiners = $this->getExaminersForMilestone($sm, $template, $event);
+            $discGroup = $template->slug === 'seminar_as_a_course' ? $sm->discipline_group : null;
+            foreach ($examiners as $ex) {
+                $aggKey = $ex->id . ($discGroup ? '_' . $discGroup : '');
+                if (!isset($examinerAgg[$aggKey])) {
+                    $examinerAgg[$aggKey] = [
+                        'user' => $ex,
+                        'count' => 0,
+                        'group' => $discGroup,
+                    ];
+                }
+                $examinerAgg[$aggKey]['count']++;
+            }
+        }
+
+        $examinerNotified = 0;
+        foreach ($examinerAgg as $entry) {
+            try {
+                $entry['user']->notify(new \App\Notifications\ExaminerNominated(
+                    $template,
+                    null,
+                    $entry['count'],
+                    $entry['group']
+                ));
+                $examinerNotified++;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("approveSchedule examiner notify failed: " . $e->getMessage());
+            }
+        }
+
+        $msg = "Schedule approved! Email notifications sent to {$studentNotified} candidate(s) and {$examinerNotified} examiner(s).";
+        return $this->respondMilestoneAction($request, $template, 'success', $msg);
+    }
+
     public function cancelSchedule(Request $request, MilestoneTemplate $template)
     {
         if (!auth()->user()->hasRole('Admin')) {
@@ -1620,13 +1752,15 @@ class MilestoneTemplateController extends Controller
             }
 
             // Only clear global examiner metadata if cancelling globally (not group-specific and not internal_defence)
-            if (!$discGroup && $template->slug !== 'internal_defence') {
+            if (!$discGroup) {
                 $metadata = $template->metadata ?? [];
-                if (isset($metadata['examiner_profile_ids'])) {
+                $metadata['schedule_approved'] = false;
+                unset($metadata['schedule_approved_at'], $metadata['schedule_approved_by']);
+                if ($template->slug !== 'internal_defence' && isset($metadata['examiner_profile_ids'])) {
                     unset($metadata['examiner_profile_ids']);
-                    $template->metadata = $metadata;
-                    $template->save();
                 }
+                $template->metadata = $metadata;
+                $template->save();
             }
 
             \Illuminate\Support\Facades\DB::commit();
@@ -1786,12 +1920,14 @@ class MilestoneTemplateController extends Controller
                 'invitation_status' => 'accepted'
             ]);
 
-            try {
-                if ($template) {
-                    $user->notify(new \App\Notifications\ExaminerNominated($template, null, 1, $milestone->discipline_group));
-                }
-                $user->notify(new \App\Notifications\EventScheduled($event));
-            } catch (\Throwable $e) {}
+            if (!$template || $template->isScheduleApproved()) {
+                try {
+                    if ($template) {
+                        $user->notify(new \App\Notifications\ExaminerNominated($template, null, 1, $milestone->discipline_group));
+                    }
+                    $user->notify(new \App\Notifications\EventScheduled($event));
+                } catch (\Throwable $e) {}
+            }
         }
 
         if ($type === 'internal' || $template?->slug === 'internal_defence') {
@@ -1959,16 +2095,20 @@ class MilestoneTemplateController extends Controller
                 $assignedCount++;
             }
 
-            try {
-                foreach ($supervisors as $supervisor) {
-                    $supervisor->user->notify(new \App\Notifications\ExaminerNominated($template, $request->custom_message, $assignedCount, $disciplineGroup));
+            $isApproved = $template->isScheduleApproved();
+            if ($isApproved) {
+                try {
+                    foreach ($supervisors as $supervisor) {
+                        $supervisor->user->notify(new \App\Notifications\ExaminerNominated($template, $request->custom_message, $assignedCount, $disciplineGroup));
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('Notification failed in assignExaminerGlobal: ' . $e->getMessage());
                 }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Notification failed in assignExaminerGlobal: ' . $e->getMessage());
             }
 
             $names = $supervisors->map(fn($s) => $s->user->name)->implode(', ');
-            return back()->with('success', "Examiner(s) ({$names}) assigned to {$assignedCount} candidate(s) in the {$groupLabel} track for {$template->name} and notified successfully.");
+            $notifyNote = $isApproved ? ' and notified successfully.' : ' (emails held until schedule is approved).';
+            return back()->with('success', "Examiner(s) ({$names}) assigned to {$assignedCount} candidate(s) in the {$groupLabel} track for {$template->name}{$notifyNote}");
         }
 
         // If no supervisors selected, clear/unassign all examiners
@@ -2063,17 +2203,21 @@ class MilestoneTemplateController extends Controller
             $assignedCount++;
         }
 
-        // 3. Notify the examiners once
-        try {
-            foreach ($supervisors as $supervisor) {
-                $supervisor->user->notify(new \App\Notifications\ExaminerNominated($template, $request->custom_message, $assignedCount));
+        // 3. Notify the examiners once (only if schedule is already approved)
+        $isApproved = $template->isScheduleApproved();
+        if ($isApproved) {
+            try {
+                foreach ($supervisors as $supervisor) {
+                    $supervisor->user->notify(new \App\Notifications\ExaminerNominated($template, $request->custom_message, $assignedCount));
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Notification failed in assignExaminerGlobal: ' . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Notification failed in assignExaminerGlobal: ' . $e->getMessage());
         }
         
         $names = $supervisors->map(fn($s) => $s->user->name)->implode(', ');
-        return $this->respondMilestoneAction($request, $template, 'success', "Examiner(s) ({$names}) assigned to all {$assignedCount} candidate(s) for {$template->name} and notified successfully.");
+        $notifyNote = $isApproved ? ' and notified successfully.' : ' (emails held until schedule is approved).';
+        return $this->respondMilestoneAction($request, $template, 'success', "Examiner(s) ({$names}) assigned to all {$assignedCount} candidate(s) for {$template->name}{$notifyNote}");
     }
 
     /**
@@ -2205,17 +2349,21 @@ class MilestoneTemplateController extends Controller
             $assignedCount++;
         }
 
-        try {
-            $examinerUser->notify(new \App\Notifications\ExaminerNominated($template, $validated['custom_message'] ?? null, $assignedCount));
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Notification failed in bulkAssignInternalExaminer: ' . $e->getMessage());
+        $isApproved = $template->isScheduleApproved();
+        if ($isApproved) {
+            try {
+                $examinerUser->notify(new \App\Notifications\ExaminerNominated($template, $validated['custom_message'] ?? null, $assignedCount));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Notification failed in bulkAssignInternalExaminer: ' . $e->getMessage());
+            }
         }
 
+        $notifyNote = $isApproved ? ' successfully.' : ' (emails held until schedule is approved).';
         return $this->respondMilestoneAction(
             $request,
             $template,
             'success',
-            "Internal Examiner ({$examinerUser->name}) assigned to {$assignedCount} selected candidate(s) successfully."
+            "Internal Examiner ({$examinerUser->name}) assigned to {$assignedCount} selected candidate(s){$notifyNote}"
         );
     }
 
