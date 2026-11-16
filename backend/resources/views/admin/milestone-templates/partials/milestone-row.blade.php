@@ -680,6 +680,45 @@
                                                 <span>Add Students</span>
                                             </button>
 
+                                            @php
+                                                $scheduleExaminerPool = [];
+                                                $rowExaminerInit = [];
+                                                if ($template->slug === 'internal_defence') {
+                                                    $scheduleExaminerPool = ($internalExaminerUsers ?? collect())
+                                                        ->filter(fn($u) => $u && $u->hasRole('Internal Examiner'))
+                                                        ->unique('id')
+                                                        ->map(function ($u) {
+                                                            $roleNames = $u->roles->pluck('name')->values()->all();
+                                                            $isSupToo = in_array('Supervisor', $roleNames, true);
+                                                            return [
+                                                                'key' => 'usr:' . $u->id,
+                                                                'user_id' => (string) $u->id,
+                                                                'name' => $u->name ?? 'Internal Examiner',
+                                                                'email' => $u->email ?? '',
+                                                                'role_badge' => $isSupToo ? 'Internal Examiner & Supervisor' : 'Internal Examiner',
+                                                            ];
+                                                        })
+                                                        ->values()
+                                                        ->all();
+
+                                                    foreach ($scheduledMilestones as $esmItem) {
+                                                        $assignedUser = $esmItem->thesis?->internalExaminer?->user;
+                                                        if ($assignedUser) {
+                                                            $rowExaminerInit[(string) $esmItem->id] = [
+                                                                'key' => 'usr:' . $assignedUser->id,
+                                                                'name' => $assignedUser->name ?? 'Internal Examiner',
+                                                                'email' => $assignedUser->email ?? '',
+                                                            ];
+                                                        } else {
+                                                            $rowExaminerInit[(string) $esmItem->id] = [
+                                                                'key' => '',
+                                                                'name' => '-- Unassigned --',
+                                                                'email' => '',
+                                                            ];
+                                                        }
+                                                    }
+                                                }
+                                            @endphp
                                             <div x-data="{ 
                                                 editOpen: false,
                                                 editTrackFilter: 'all',
@@ -688,7 +727,14 @@
                                                 batchOnlyEmpty: false,
                                                 batchDate: '',
                                                 batchTime: '',
-                                                batchExaminer: '',
+                                                examinerPool: {{ \Illuminate\Support\Js::from($scheduleExaminerPool) }},
+                                                rowExaminers: {{ \Illuminate\Support\Js::from($rowExaminerInit) }},
+                                                batchExaminerKey: '',
+                                                batchExaminerQuery: '',
+                                                batchExaminerOpen: false,
+                                                rowPickerRowId: null,
+                                                rowPickerQuery: '',
+                                                rowPickerStyle: '',
                                                 toastMessage: '',
                                                 showToast: false,
                                                 swapSourceId: null,
@@ -696,6 +742,64 @@
                                                 swapSourceDate: '',
                                                 swapSourceTime: '',
                                                 swapSourceTrack: '',
+
+                                                filteredExaminers(query) {
+                                                    const term = (query || '').trim().toLowerCase();
+                                                    if (!term) return this.examinerPool;
+                                                    return this.examinerPool.filter(item =>
+                                                        (item.name || '').toLowerCase().includes(term) ||
+                                                        (item.email || '').toLowerCase().includes(term)
+                                                    );
+                                                },
+
+                                                selectBatchExaminer(item) {
+                                                    if (item === null) {
+                                                        this.batchExaminerKey = '__clear__';
+                                                        this.batchExaminerQuery = '-- Unassign / Clear Internal Examiner --';
+                                                    } else {
+                                                        this.batchExaminerKey = item.key;
+                                                        this.batchExaminerQuery = item.name + (item.email ? ' (' + item.email + ')' : '');
+                                                    }
+                                                    this.batchExaminerOpen = false;
+                                                },
+
+                                                clearBatchExaminerInput() {
+                                                    this.batchExaminerKey = '';
+                                                    this.batchExaminerQuery = '';
+                                                    this.batchExaminerOpen = true;
+                                                },
+
+                                                openRowPicker(rowId, event) {
+                                                    if (this.rowPickerRowId === rowId) {
+                                                        this.rowPickerRowId = null;
+                                                        return;
+                                                    }
+                                                    const rect = event.currentTarget.getBoundingClientRect();
+                                                    const popoverWidth = 320;
+                                                    const left = Math.max(12, Math.min(rect.left, window.innerWidth - popoverWidth - 12));
+                                                    const spaceBelow = window.innerHeight - rect.bottom;
+                                                    if (spaceBelow < 290 && rect.top > 290) {
+                                                        this.rowPickerStyle = 'left:' + left + 'px; bottom:' + (window.innerHeight - rect.top + 6) + 'px; width:' + popoverWidth + 'px;';
+                                                    } else {
+                                                        this.rowPickerStyle = 'left:' + left + 'px; top:' + (rect.bottom + 6) + 'px; width:' + popoverWidth + 'px;';
+                                                    }
+                                                    this.rowPickerQuery = '';
+                                                    this.rowPickerRowId = rowId;
+                                                    this.$nextTick(() => {
+                                                        document.getElementById('row-ex-search-{{ $template->id }}')?.focus();
+                                                    });
+                                                },
+
+                                                selectRowExaminer(item) {
+                                                    if (!this.rowPickerRowId) return;
+                                                    if (item === null) {
+                                                        this.rowExaminers[this.rowPickerRowId] = { key: '', name: '-- Unassigned --', email: '' };
+                                                    } else {
+                                                        this.rowExaminers[this.rowPickerRowId] = { key: item.key, name: item.name, email: item.email };
+                                                    }
+                                                    this.rowPickerRowId = null;
+                                                    this.rowPickerQuery = '';
+                                                },
 
                                                 notify(msg) {
                                                     this.toastMessage = msg;
@@ -846,14 +950,22 @@
                                                 },
 
                                                 applyBatchExaminer() {
-                                                    if (!this.batchExaminer) {
-                                                        alert('Please select an Internal Examiner to apply.');
+                                                    if (!this.batchExaminerKey) {
+                                                        alert('Please search and select an Internal Examiner to apply.');
                                                         return;
                                                     }
-                                                    const targetValue = this.batchExaminer === '__clear__' ? '' : this.batchExaminer;
+                                                    const isClearing = this.batchExaminerKey === '__clear__';
+                                                    const selected = isClearing
+                                                        ? { key: '', name: '-- Unassigned --', email: '' }
+                                                        : this.examinerPool.find(e => e.key === this.batchExaminerKey);
+                                                    if (!isClearing && !selected) {
+                                                        alert('Selected Internal Examiner is not available.');
+                                                        return;
+                                                    }
                                                     let count = 0;
                                                     const rows = (this.$refs.editScheduleModal || document).querySelectorAll('tr[data-sched-id]');
                                                     rows.forEach(row => {
+                                                        const rowId = row.getAttribute('data-sched-id');
                                                         const track = row.getAttribute('data-sched-track');
                                                         const name = row.getAttribute('data-sched-name') || '';
                                                         const matric = row.getAttribute('data-sched-matric') || '';
@@ -861,16 +973,16 @@
                                                         const matchesSearch = (!this.editSearch || name.toLowerCase().includes(this.editSearch.toLowerCase()) || matric.toLowerCase().includes(this.editSearch.toLowerCase()));
 
                                                         if (matchesTrack && matchesSearch) {
-                                                            const exSelect = row.querySelector('select[data-field=examiner]');
-                                                            if (exSelect && !exSelect.disabled) {
-                                                                exSelect.value = targetValue;
+                                                            const hiddenInput = row.querySelector('input[data-field=examiner]');
+                                                            if (hiddenInput && !hiddenInput.disabled && rowId) {
+                                                                this.rowExaminers[rowId] = { ...selected };
                                                                 count++;
                                                             }
                                                         }
                                                     });
-                                                    this.notify(targetValue === ''
+                                                    this.notify(isClearing
                                                         ? 'Cleared Internal Examiner for ' + count + ' student(s).'
-                                                        : 'Applied Internal Examiner to ' + count + ' student(s).');
+                                                        : 'Applied Internal Examiner (' + selected.name + ') to ' + count + ' student(s).');
                                                 }
                                             }" class="inline">
                                                 <button type="button" @click="editOpen = true"
@@ -895,23 +1007,8 @@
                                                 @endif
 
                                             <template x-teleport="body">
-                                                <div x-show="editOpen" x-cloak x-transition.opacity data-teleported-modal="{{ $template->id }}" class="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm" @keydown.escape.window="if(!swapSourceId) editOpen = false">
-                                                    <div x-ref="editScheduleModal" @click.outside="if(!swapSourceId) editOpen = false" class="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-100">
-                                                        @php
-                                                            $scheduleInternalExaminers = collect();
-                                                            $promotableSupervisors = collect();
-                                                            if ($template->slug === 'internal_defence') {
-                                                                $scheduleInternalExaminers = $internalExaminers->values();
-                                                                foreach ($scheduledMilestones as $esmItem) {
-                                                                    $assignedEx = $esmItem->thesis?->internalExaminer;
-                                                                    if ($assignedEx && !$scheduleInternalExaminers->contains('id', $assignedEx->id)) {
-                                                                        $scheduleInternalExaminers->push($assignedEx);
-                                                                    }
-                                                                }
-                                                                $existingExaminerUserIds = $scheduleInternalExaminers->pluck('user_id')->filter()->all();
-                                                                $promotableSupervisors = $supervisors->reject(fn($s) => in_array($s->user_id, $existingExaminerUserIds, true))->values();
-                                                            }
-                                                        @endphp
+                                                <div x-show="editOpen" x-cloak x-transition.opacity data-teleported-modal="{{ $template->id }}" class="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm" @keydown.escape.window="if(!swapSourceId && !rowPickerRowId) editOpen = false">
+                                                    <div x-ref="editScheduleModal" @click.outside="if(!swapSourceId && !rowPickerRowId) editOpen = false" class="bg-white rounded-3xl shadow-2xl w-full max-w-7xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-100">
                                                         <form data-milestone-ajax="{{ $template->id }}" action="{{ route('admin.milestone-templates.update-schedule', $template->id) }}" method="POST" class="flex flex-col min-h-0 flex-1">
                                                                 @csrf
 
@@ -1082,24 +1179,40 @@
                                                                             <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1.5 rounded-xl shrink-0">
                                                                                 Internal Examiner
                                                                             </span>
-                                                                            <select x-model="batchExaminer" class="flex-1 min-w-[240px] px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
-                                                                                <option value="">Select Internal Examiner to apply to visible candidates...</option>
-                                                                                <option value="__clear__">-- Unassign / Clear Internal Examiner --</option>
-                                                                                @if($scheduleInternalExaminers->isNotEmpty())
-                                                                                    <optgroup label="Internal Examiners">
-                                                                                        @foreach($scheduleInternalExaminers as $iex)
-                                                                                            <option value="iex:{{ $iex->id }}">{{ $iex->user->name ?? 'Examiner' }}{{ $iex->program?->code ? ' (' . $iex->program->code . ')' : '' }}</option>
-                                                                                        @endforeach
-                                                                                    </optgroup>
-                                                                                @endif
-                                                                                @if($promotableSupervisors->isNotEmpty())
-                                                                                    <optgroup label="Faculty / Supervisors (Auto-Promote)">
-                                                                                        @foreach($promotableSupervisors as $sup)
-                                                                                            <option value="sup:{{ $sup->id }}">{{ $sup->user->name ?? 'Faculty' }}{{ $sup->programs->first()?->code ? ' (' . $sup->programs->first()->code . ')' : '' }}</option>
-                                                                                        @endforeach
-                                                                                    </optgroup>
-                                                                                @endif
-                                                                            </select>
+                                                                            <div class="relative flex-1 min-w-[260px]" @click.outside="batchExaminerOpen = false">
+                                                                                <div class="relative">
+                                                                                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                                                    <input type="text"
+                                                                                        x-model="batchExaminerQuery"
+                                                                                        @focus="batchExaminerOpen = true"
+                                                                                        @input="batchExaminerKey = ''; batchExaminerOpen = true"
+                                                                                        placeholder="Search internal examiner by name or email..."
+                                                                                        class="w-full pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                                                                                    <button type="button" x-show="batchExaminerQuery || batchExaminerKey" x-cloak @click="clearBatchExaminerInput()"
+                                                                                        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-black" title="Clear search">✕</button>
+                                                                                </div>
+                                                                                <div x-show="batchExaminerOpen" x-cloak
+                                                                                    class="absolute left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white border border-slate-200 rounded-2xl shadow-xl z-40 divide-y divide-slate-100">
+                                                                                    <button type="button" @click="selectBatchExaminer(null)"
+                                                                                        class="w-full text-left px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center justify-between">
+                                                                                        <span>-- Unassign / Clear Internal Examiner --</span>
+                                                                                        <span x-show="batchExaminerKey === '__clear__'" class="text-rose-600 font-black">✓</span>
+                                                                                    </button>
+                                                                                    <template x-for="ex in filteredExaminers(batchExaminerQuery)" :key="ex.key">
+                                                                                        <button type="button" @click="selectBatchExaminer(ex)"
+                                                                                            class="w-full text-left px-3 py-2 hover:bg-indigo-50/70 transition flex items-center justify-between gap-2">
+                                                                                            <div class="min-w-0">
+                                                                                                <div class="font-bold text-slate-900 truncate" x-text="ex.name"></div>
+                                                                                                <div class="text-[10px] text-slate-500 truncate" x-text="ex.email"></div>
+                                                                                            </div>
+                                                                                            <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shrink-0 bg-indigo-50 text-indigo-700 border border-indigo-200" x-text="ex.role_badge"></span>
+                                                                                        </button>
+                                                                                    </template>
+                                                                                    <div x-show="filteredExaminers(batchExaminerQuery).length === 0" class="px-3 py-3 text-center text-[11px] text-slate-400 font-medium">
+                                                                                        No Internal Examiner matches "<span x-text="batchExaminerQuery"></span>"
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
                                                                             <button type="button" @click="applyBatchExaminer()" class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-sm transition-all shrink-0">
                                                                                 Apply Examiner to Visible
                                                                             </button>
@@ -1130,7 +1243,6 @@
                                                                                     $track = $esm->discipline_group ?? 'cybersecurity';
                                                                                     $dateVal = $esm->defence_date ? \Carbon\Carbon::parse($esm->defence_date)->format('Y-m-d') : '';
                                                                                     $timeVal = $esm->defence_time ? \Carbon\Carbon::parse($esm->defence_time)->format('H:i') : '';
-                                                                                    $currentExaminerKey = $esm->thesis?->internal_examiner_profile_id ? ('iex:' . $esm->thesis->internal_examiner_profile_id) : '';
                                                                                 @endphp
                                                                                 <tr id="sched-row-{{ $esm->id }}"
                                                                                     data-sched-id="{{ $esm->id }}"
@@ -1177,28 +1289,20 @@
                                                                                     </td>
                                                                                     @if($template->slug === 'internal_defence')
                                                                                         <td class="px-4 py-3">
-                                                                                            <select data-field="examiner" name="entries[{{ $esm->id }}][internal_examiner_key]" :disabled="rm"
-                                                                                                class="w-48 px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
-                                                                                                <option value="">-- Unassigned --</option>
-                                                                                                @if($scheduleInternalExaminers->isNotEmpty())
-                                                                                                    <optgroup label="Internal Examiners">
-                                                                                                        @foreach($scheduleInternalExaminers as $iex)
-                                                                                                            <option value="iex:{{ $iex->id }}" {{ $currentExaminerKey === ('iex:' . $iex->id) ? 'selected' : '' }}>
-                                                                                                                {{ $iex->user->name ?? 'Examiner' }}{{ $iex->program?->code ? ' (' . $iex->program->code . ')' : '' }}
-                                                                                                            </option>
-                                                                                                        @endforeach
-                                                                                                    </optgroup>
-                                                                                                @endif
-                                                                                                @if($promotableSupervisors->isNotEmpty())
-                                                                                                    <optgroup label="Faculty / Supervisors (Auto-Promote)">
-                                                                                                        @foreach($promotableSupervisors as $sup)
-                                                                                                            <option value="sup:{{ $sup->id }}">
-                                                                                                                {{ $sup->user->name ?? 'Faculty' }}{{ $sup->programs->first()?->code ? ' (' . $sup->programs->first()->code . ')' : '' }}
-                                                                                                            </option>
-                                                                                                        @endforeach
-                                                                                                    </optgroup>
-                                                                                                @endif
-                                                                                            </select>
+                                                                                            <input type="hidden" data-field="examiner" name="entries[{{ $esm->id }}][internal_examiner_key]" :value="rowExaminers['{{ $esm->id }}']?.key ?? ''" :disabled="rm">
+                                                                                            <button type="button" data-examiner-trigger :disabled="rm" @click.stop="openRowPicker('{{ $esm->id }}', $event)"
+                                                                                                :class="rowPickerRowId === '{{ $esm->id }}' ? 'ring-2 ring-indigo-500/30 border-indigo-500 bg-indigo-50/40' : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'"
+                                                                                                class="w-56 px-2.5 py-1.5 rounded-xl border text-left flex items-center justify-between gap-2 transition">
+                                                                                                <div class="min-w-0 flex-1">
+                                                                                                    <div class="text-xs font-semibold truncate"
+                                                                                                        :class="rowExaminers['{{ $esm->id }}']?.key ? 'text-slate-900' : 'text-slate-400'"
+                                                                                                        x-text="rowExaminers['{{ $esm->id }}']?.name ?? '-- Unassigned --'"></div>
+                                                                                                    <div class="text-[10px] text-slate-500 truncate"
+                                                                                                        x-show="rowExaminers['{{ $esm->id }}']?.email"
+                                                                                                        x-text="rowExaminers['{{ $esm->id }}']?.email"></div>
+                                                                                                </div>
+                                                                                                <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                                                                            </button>
                                                                                         </td>
                                                                                     @endif
                                                                                     <td class="px-6 py-3 text-center">
@@ -1246,8 +1350,8 @@
                                                                         <span class="text-slate-300">•</span>
                                                                         <span class="text-amber-700 font-semibold">Changes save in draft mode — no emails are sent to candidates or examiners until you click Approve Schedule.</span>
                                                                     </div>
-                                                                    <div class="flex gap-2 shrink-0">
-                                                                        <button type="button" @click="editOpen = false; cancelSwap();" class="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">Close</button>
+                                                                     <div class="flex gap-2 shrink-0">
+                                                                        <button type="button" @click="editOpen = false; rowPickerRowId = null; cancelSwap();" class="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">Close</button>
                                                                         <button type="submit" class="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-white bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-600/25 transition-all">Save Changes</button>
                                                                     </div>
                                                                 </div>
@@ -1255,6 +1359,49 @@
                                                         </div>
                                                     </div>
                                                 </template>
+
+                                                @if($template->slug === 'internal_defence')
+                                                    <template x-teleport="body">
+                                                        <div x-show="editOpen && rowPickerRowId !== null" x-cloak
+                                                            data-teleported-modal="{{ $template->id }}"
+                                                            :style="rowPickerStyle"
+                                                            @click.outside="if (!$event.target.closest('[data-examiner-trigger]')) rowPickerRowId = null"
+                                                            @keydown.escape.window="rowPickerRowId = null"
+                                                            class="fixed z-[130] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden text-xs">
+                                                            <div class="p-2.5 bg-slate-50 border-b border-slate-200">
+                                                                <div class="relative">
+                                                                    <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                                                    <input id="row-ex-search-{{ $template->id }}" type="text" x-model="rowPickerQuery"
+                                                                        placeholder="Search by name or email..."
+                                                                        class="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+                                                                    <button type="button" x-show="rowPickerQuery" x-cloak @click="rowPickerQuery = ''"
+                                                                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 font-black">✕</button>
+                                                                </div>
+                                                            </div>
+                                                            <div class="max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                                                <button type="button" @click="selectRowExaminer(null)"
+                                                                    class="w-full text-left px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center justify-between">
+                                                                    <span>-- Unassigned --</span>
+                                                                    <span x-show="rowPickerRowId && !(rowExaminers[rowPickerRowId]?.key)" class="text-rose-600 font-black">✓</span>
+                                                                </button>
+                                                                <template x-for="ex in filteredExaminers(rowPickerQuery)" :key="ex.key">
+                                                                    <button type="button" @click="selectRowExaminer(ex)"
+                                                                        class="w-full text-left px-3 py-2 hover:bg-indigo-50/70 transition flex items-center justify-between gap-2">
+                                                                        <div class="min-w-0 flex-1">
+                                                                            <div class="font-bold text-slate-900 truncate" x-text="ex.name"></div>
+                                                                            <div class="text-[10px] text-slate-500 truncate" x-text="ex.email"></div>
+                                                                            <div class="text-[9px] font-black uppercase tracking-wider text-indigo-600 mt-0.5" x-text="ex.role_badge"></div>
+                                                                        </div>
+                                                                        <span x-show="rowPickerRowId && rowExaminers[rowPickerRowId]?.key === ex.key" class="text-indigo-600 font-black shrink-0">✓</span>
+                                                                    </button>
+                                                                </template>
+                                                                <div x-show="filteredExaminers(rowPickerQuery).length === 0" class="px-3 py-4 text-center text-[11px] text-slate-400 font-medium">
+                                                                    No Internal Examiner matches "<span x-text="rowPickerQuery"></span>"
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </template>
+                                                @endif
                                             </div>
 
                                             {{-- Reschedule Day Button & Modal --}}

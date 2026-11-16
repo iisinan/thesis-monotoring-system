@@ -46,6 +46,7 @@ class MilestoneTemplateController extends Controller
             'templates' => $data['jumpTemplates'],
             'supervisors' => $data['supervisors'],
             'internalExaminers' => $data['internalExaminers'],
+            'internalExaminerUsers' => $data['internalExaminerUsers'],
             'isCoordinator' => $data['isCoordinator'],
             'cohorts' => $data['cohorts'],
             'programs' => $data['programs'],
@@ -180,13 +181,18 @@ class MilestoneTemplateController extends Controller
         if ($internalExaminers->isEmpty()) {
             $internalExaminers = \App\Models\InternalExaminerProfile::with(['user', 'program'])->get();
         }
+        $internalExaminerUsers = \App\Models\User::role('Internal Examiner')
+            ->where('is_active', true)
+            ->with(['roles:id,name', 'internalExaminerProfiles.program'])
+            ->orderBy('name')
+            ->get();
         $cohorts = \App\Models\Cohort::orderBy('name')->get();
         $programs = Program::orderBy('name')->get();
         $jumpTemplates = $templateId === null
             ? $templates
             : MilestoneTemplate::orderBy('order')->get(['id', 'name', 'slug', 'order']);
 
-        return compact('templates', 'jumpTemplates', 'supervisors', 'internalExaminers', 'isCoordinator', 'cohorts', 'programs', 'examinerUsersMap');
+        return compact('templates', 'jumpTemplates', 'supervisors', 'internalExaminers', 'internalExaminerUsers', 'isCoordinator', 'cohorts', 'programs', 'examinerUsersMap');
     }
 
     /**
@@ -828,39 +834,44 @@ class MilestoneTemplateController extends Controller
                 $hasExaminerInput = $isInternalDefence && $thesis && array_key_exists('internal_examiner_key', $entry);
                 $rawExKey = $hasExaminerInput ? trim((string) ($entry['internal_examiner_key'] ?? '')) : '';
                 $isClearingExaminer = $hasExaminerInput && $rawExKey === '';
-                $resolvedExProfile = null;
-                $resolvedExUser = null;
-
-                if ($hasExaminerInput && !$isClearingExaminer) {
-                    if (str_starts_with($rawExKey, 'iex:')) {
-                        $resolvedExProfile = \App\Models\InternalExaminerProfile::with('user')->find(substr($rawExKey, 4));
-                        $resolvedExUser = $resolvedExProfile?->user;
-                    } elseif (str_starts_with($rawExKey, 'sup:')) {
-                        $sup = \App\Models\SupervisorProfile::with(['user', 'programs'])->find(substr($rawExKey, 4));
-                        if ($sup && $sup->user) {
-                            $resolvedExProfile = \App\Models\InternalExaminerProfile::firstOrCreate(
-                                ['user_id' => $sup->user_id],
-                                [
-                                    'program_id' => $thesis->student?->program_id ?? $sup->programs->first()?->id,
-                                    'institution' => 'National Open University of Nigeria (NOUN)',
-                                    'qualification' => 'Faculty Internal Examiner',
-                                    'active' => true,
-                                ]
-                            );
-                            $resolvedExProfile->loadMissing('user');
-                            $resolvedExUser = $resolvedExProfile->user;
-                        }
-                    }
-                }
-
                 $oldExProfileId = $thesis?->internal_examiner_profile_id;
                 $oldExUserId = $thesis?->internalExaminer?->user_id;
+                $resolvedExProfile = null;
+                $resolvedExUser = null;
                 $examinerChanged = false;
+
                 if ($hasExaminerInput) {
                     if ($isClearingExaminer) {
                         $examinerChanged = !empty($oldExProfileId);
-                    } elseif ($resolvedExProfile && $resolvedExUser) {
-                        $examinerChanged = (string) ($oldExProfileId ?? '') !== (string) $resolvedExProfile->id;
+                    } elseif (str_starts_with($rawExKey, 'usr:')) {
+                        $candidateUser = \App\Models\User::find(substr($rawExKey, 4));
+                        if ($candidateUser && $candidateUser->hasRole('Internal Examiner')) {
+                            $resolvedExUser = $candidateUser;
+                            if ((string) ($oldExUserId ?? '') !== (string) $candidateUser->id) {
+                                $userProfiles = \App\Models\InternalExaminerProfile::where('user_id', $candidateUser->id)->get();
+                                $studentProgramId = $thesis->student?->program_id;
+                                $resolvedExProfile = $userProfiles->first(fn($p) => $p->active && $studentProgramId && $p->program_id === $studentProgramId)
+                                    ?? $userProfiles->first(fn($p) => $p->active)
+                                    ?? $userProfiles->first();
+                                if (!$resolvedExProfile) {
+                                    $resolvedExProfile = \App\Models\InternalExaminerProfile::create([
+                                        'user_id' => $candidateUser->id,
+                                        'program_id' => $studentProgramId,
+                                        'institution' => 'National Open University of Nigeria (NOUN)',
+                                        'qualification' => 'Faculty Internal Examiner',
+                                        'active' => true,
+                                    ]);
+                                }
+                                $examinerChanged = true;
+                            }
+                        }
+                    } elseif (str_starts_with($rawExKey, 'iex:')) {
+                        $candidateProfile = \App\Models\InternalExaminerProfile::with('user')->find(substr($rawExKey, 4));
+                        if ($candidateProfile && $candidateProfile->user && $candidateProfile->user->hasRole('Internal Examiner')) {
+                            $resolvedExProfile = $candidateProfile;
+                            $resolvedExUser = $candidateProfile->user;
+                            $examinerChanged = (string) ($oldExProfileId ?? '') !== (string) $resolvedExProfile->id;
+                        }
                     }
                 }
 

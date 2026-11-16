@@ -122,12 +122,52 @@ class InternalDefenceScheduleManagerTest extends TestCase
     }
 
     #[Test]
-    public function internal_defence_schedule_manager_renders_internal_examiner_controls_and_draft_notice(): void
+    public function internal_defence_schedule_manager_renders_searchable_internal_examiner_role_pool_only(): void
     {
-        $exUser = User::factory()->create(['name' => 'Prof. Ada Examiner', 'is_active' => true]);
+        // 1. Internal Examiner only (has profile)
+        $exUser = User::factory()->create([
+            'name' => 'Prof. Ada Examiner',
+            'email' => 'ada.examiner@noun.edu.ng',
+            'is_active' => true,
+        ]);
         $exUser->assignRole('Internal Examiner');
         $exProfile = InternalExaminerProfile::create([
             'user_id' => $exUser->id,
+            'program_id' => $this->program->id,
+            'institution' => 'NOUN',
+            'qualification' => 'PhD',
+            'active' => true,
+        ]);
+
+        // 2. Both Supervisor AND Internal Examiner (no profile yet)
+        $bothUser = User::factory()->create([
+            'name' => 'Dr. Dual Role',
+            'email' => 'dual.role@noun.edu.ng',
+            'is_active' => true,
+        ]);
+        $bothUser->assignRole(['Supervisor', 'Internal Examiner']);
+        SupervisorProfile::create([
+            'user_id' => $bothUser->id,
+            'department' => 'CS',
+            'specialization' => 'Cyber',
+            'max_students' => 10,
+        ]);
+
+        // 3. Supervisor ONLY (NOT Internal Examiner) -> must NOT appear in pool even if an old profile exists
+        $supOnlyUser = User::factory()->create([
+            'name' => 'Dr. Supervisor Only',
+            'email' => 'sup.only@noun.edu.ng',
+            'is_active' => true,
+        ]);
+        $supOnlyUser->assignRole('Supervisor');
+        SupervisorProfile::create([
+            'user_id' => $supOnlyUser->id,
+            'department' => 'CS',
+            'specialization' => 'AI',
+            'max_students' => 10,
+        ]);
+        InternalExaminerProfile::create([
+            'user_id' => $supOnlyUser->id,
             'program_id' => $this->program->id,
             'institution' => 'NOUN',
             'qualification' => 'PhD',
@@ -140,10 +180,25 @@ class InternalDefenceScheduleManagerTest extends TestCase
             ->get(route('admin.milestone-templates.panel', $this->internalTpl->id));
 
         $response->assertOk();
-        $response->assertSee('Internal Examiner');
+        $response->assertSee('Search internal examiner by name or email...');
+        $response->assertSee('Search by name or email...');
         $response->assertSee('Apply Examiner to Visible');
-        $response->assertSee('Prof. Ada Examiner');
         $response->assertSee('no emails are sent to candidates or examiners until you click Approve Schedule', false);
+
+        // Verify the Schedule Manager's examinerPool JSON includes ONLY Internal Examiner role users
+        $html = $response->getContent();
+        $this->assertSame(1, preg_match("/examinerPool:\s*JSON\.parse\('([^']+)'\)/", $html, $matches));
+        $decodedJson = json_decode('"' . $matches[1] . '"');
+        $pool = json_decode((string) $decodedJson, true);
+        $this->assertIsArray($pool);
+
+        $emails = array_column($pool, 'email');
+        $this->assertContains('ada.examiner@noun.edu.ng', $emails);
+        $this->assertContains('dual.role@noun.edu.ng', $emails);
+        $this->assertNotContains('sup.only@noun.edu.ng', $emails);
+
+        $dualEntry = collect($pool)->firstWhere('email', 'dual.role@noun.edu.ng');
+        $this->assertSame('Internal Examiner & Supervisor', $dualEntry['role_badge'] ?? null);
     }
 
     #[Test]
@@ -175,17 +230,23 @@ class InternalDefenceScheduleManagerTest extends TestCase
             'active' => true,
         ]);
 
-        $supUser = User::factory()->create(['name' => 'Dr. Promoted Faculty', 'is_active' => true]);
-        $supUser->assignRole('Supervisor');
-        $supProfile = SupervisorProfile::create([
-            'user_id' => $supUser->id,
+        // Both Supervisor and Internal Examiner (no InternalExaminerProfile yet)
+        $dualRoleUser = User::factory()->create(['name' => 'Dr. Dual Faculty', 'is_active' => true]);
+        $dualRoleUser->assignRole(['Supervisor', 'Internal Examiner']);
+        SupervisorProfile::create([
+            'user_id' => $dualRoleUser->id,
             'department' => 'Computer Science',
             'specialization' => 'AI',
             'max_students' => 10,
         ]);
 
+        // Supervisor ONLY (must be rejected if submitted)
+        $supOnlyUser = User::factory()->create(['name' => 'Dr. Non Examiner', 'is_active' => true]);
+        $supOnlyUser->assignRole('Supervisor');
+
         $candA = $this->createScheduledCandidate('A1', $oldExProfile);
         $candB = $this->createScheduledCandidate('B2', null);
+        $candC = $this->createScheduledCandidate('C3', null);
 
         $newDate = now()->addDays(14)->toDateString();
 
@@ -196,14 +257,21 @@ class InternalDefenceScheduleManagerTest extends TestCase
                         'defence_date' => $candA['milestone']->defence_date->format('Y-m-d'),
                         'defence_time' => '10:00',
                         'meeting_link' => 'https://zoom.us/j/123456789',
-                        'internal_examiner_key' => 'iex:' . $newExProfile->id,
+                        'internal_examiner_key' => 'usr:' . $newExUser->id,
                         'remove' => '0',
                     ],
                     $candB['milestone']->id => [
                         'defence_date' => $newDate,
                         'defence_time' => '11:30',
                         'meeting_link' => 'https://zoom.us/j/999888777',
-                        'internal_examiner_key' => 'sup:' . $supProfile->id,
+                        'internal_examiner_key' => 'usr:' . $dualRoleUser->id,
+                        'remove' => '0',
+                    ],
+                    $candC['milestone']->id => [
+                        'defence_date' => $candC['milestone']->defence_date->format('Y-m-d'),
+                        'defence_time' => '10:00',
+                        'meeting_link' => 'https://zoom.us/j/123456789',
+                        'internal_examiner_key' => 'usr:' . $supOnlyUser->id,
                         'remove' => '0',
                     ],
                 ],
@@ -237,14 +305,18 @@ class InternalDefenceScheduleManagerTest extends TestCase
             'role' => 'examiner',
         ]);
 
-        // Candidate B's faculty supervisor was promoted to Internal Examiner and slot updated
+        // Candidate B's dual-role user got an InternalExaminerProfile resolved/created and slot updated
         $candB['thesis']->refresh();
         $candB['milestone']->refresh();
-        $promotedExProfile = InternalExaminerProfile::where('user_id', $supUser->id)->first();
-        $this->assertNotNull($promotedExProfile);
-        $this->assertSame($promotedExProfile->id, $candB['thesis']->internal_examiner_profile_id);
+        $dualExProfile = InternalExaminerProfile::where('user_id', $dualRoleUser->id)->first();
+        $this->assertNotNull($dualExProfile);
+        $this->assertSame($dualExProfile->id, $candB['thesis']->internal_examiner_profile_id);
         $this->assertSame($newDate, $candB['milestone']->defence_date->format('Y-m-d'));
         $this->assertSame('https://zoom.us/j/999888777', $candB['milestone']->meeting_link);
+
+        // Candidate C: non-Internal Examiner supervisor was NOT assigned
+        $candC['thesis']->refresh();
+        $this->assertNull($candC['thesis']->internal_examiner_profile_id);
 
         // Now Admin clicks Approve Schedule -> notifications dispatch to candidates and examiners
         $approveRes = $this->actingAs($this->admin)
@@ -258,8 +330,9 @@ class InternalDefenceScheduleManagerTest extends TestCase
         Notification::assertSentTo($candA['studentUser'], EventScheduled::class);
         Notification::assertSentTo($candB['studentUser'], EventScheduled::class);
         Notification::assertSentTo($newExUser, ExaminerNominated::class);
-        Notification::assertSentTo($supUser, ExaminerNominated::class);
+        Notification::assertSentTo($dualRoleUser, ExaminerNominated::class);
         Notification::assertNotSentTo($oldExUser, ExaminerNominated::class);
+        Notification::assertNotSentTo($supOnlyUser, ExaminerNominated::class);
     }
 
     #[Test]
