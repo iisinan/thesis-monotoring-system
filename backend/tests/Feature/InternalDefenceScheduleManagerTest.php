@@ -408,4 +408,59 @@ class InternalDefenceScheduleManagerTest extends TestCase
         Mail::assertNothingSent();
         $this->assertFalse($this->internalTpl->fresh()->isScheduleApproved());
     }
+
+    #[Test]
+    public function schedule_manager_renders_quote_safe_swap_controls_and_persists_swapped_slots_without_sending_emails(): void
+    {
+        Notification::fake();
+        Mail::fake();
+
+        $candA = $this->createScheduledCandidate('A1');
+        $candB = $this->createScheduledCandidate('B2');
+        $candA['milestone']->thesis->student->user->update(['name' => "Candidate O'Brien \"One\""]);
+        $candB['milestone']->thesis->student->user->update(['name' => "Candidate N'Dour \"Two\""]);
+
+        $dateA = now()->addDays(5)->toDateString();
+        $dateB = now()->addDays(8)->toDateString();
+        $candA['milestone']->update(['defence_date' => $dateA, 'defence_time' => '10:00:00']);
+        $candB['milestone']->update(['defence_date' => $dateB, 'defence_time' => '11:30:00']);
+
+        $panelHtml = $this->actingAs($this->admin)
+            ->get(route('admin.milestone-templates.panel', $this->internalTpl->id))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('startSwapFromRow($el.closest(\'tr\'))', $panelHtml);
+        $this->assertStringContainsString('executeSwapFromRow($el.closest(\'tr\'))', $panelHtml);
+        $this->assertStringContainsString('data-sched-display-name="Candidate O&#039;Brien &quot;One&quot;"', $panelHtml);
+        $this->assertStringContainsString('data-row-name="candidate o&#039;brien &quot;one&quot;"', $panelHtml);
+        $this->assertStringNotContainsString("'candidate o'brien", $panelHtml);
+
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.milestone-templates.update-schedule', $this->internalTpl->id), [
+                'entries' => [
+                    $candA['milestone']->id => [
+                        'defence_date' => $dateB,
+                        'defence_time' => '11:30',
+                        'meeting_link' => 'https://zoom.us/j/123456789',
+                        'remove' => '0',
+                    ],
+                    $candB['milestone']->id => [
+                        'defence_date' => $dateA,
+                        'defence_time' => '10:00',
+                        'meeting_link' => 'https://zoom.us/j/123456789',
+                        'remove' => '0',
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->assertSame($dateB, $candA['milestone']->fresh()->defence_date->format('Y-m-d'));
+        $this->assertSame('11:30', \Carbon\Carbon::parse($candA['milestone']->fresh()->defence_time)->format('H:i'));
+        $this->assertSame($dateA, $candB['milestone']->fresh()->defence_date->format('Y-m-d'));
+        $this->assertSame('10:00', \Carbon\Carbon::parse($candB['milestone']->fresh()->defence_time)->format('H:i'));
+
+        Notification::assertNothingSent();
+        Mail::assertNothingSent();
+    }
 }

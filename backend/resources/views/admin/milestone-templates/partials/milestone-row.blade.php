@@ -808,12 +808,27 @@
                                                 },
 
                                                 startSwap(id, name, date, time, track) {
+                                                    this.rowPickerRowId = null;
                                                     this.swapSourceId = id;
                                                     this.swapSourceName = name;
                                                     this.swapSourceDate = date;
                                                     this.swapSourceTime = time;
                                                     this.swapSourceTrack = track;
                                                     this.notify('Selected ' + name + ' (' + date + ' ' + time + ') — Click [⇄ Swap Here] on any candidate below.');
+                                                },
+
+                                                startSwapFromRow(row) {
+                                                    if (!row) return;
+                                                    const id = row.getAttribute('data-sched-id');
+                                                    const name = row.getAttribute('data-sched-display-name') || 'Candidate';
+                                                    const track = row.getAttribute('data-sched-track') || '';
+                                                    const dateInput = row.querySelector('input[data-field=date]');
+                                                    const timeInput = row.querySelector('input[data-field=time]');
+                                                    if ((dateInput && dateInput.disabled) || (timeInput && timeInput.disabled)) {
+                                                        alert('Cannot swap a candidate marked for removal.');
+                                                        return;
+                                                    }
+                                                    this.startSwap(id, name, dateInput?.value || '', timeInput?.value || '', track);
                                                 },
 
                                                 cancelSwap() {
@@ -827,15 +842,28 @@
                                                 executeSwap(targetId, targetName) {
                                                     if (!this.swapSourceId || this.swapSourceId == targetId) return;
 
-                                                    const sourceRow = document.getElementById('sched-row-' + this.swapSourceId);
-                                                    const targetRow = document.getElementById('sched-row-' + targetId);
+                                                    const modalRoot = this.$refs.editScheduleModal || document;
+                                                    const allRows = Array.from(modalRoot.querySelectorAll('tr[data-sched-id]'));
+                                                    const sourceRow = allRows.find(r => r.getAttribute('data-sched-id') == this.swapSourceId)
+                                                        || document.getElementById('sched-row-' + this.swapSourceId);
+                                                    const targetRow = allRows.find(r => r.getAttribute('data-sched-id') == targetId)
+                                                        || document.getElementById('sched-row-' + targetId);
 
-                                                    if (!sourceRow || !targetRow) return;
+                                                    if (!sourceRow || !targetRow) {
+                                                        this.cancelSwap();
+                                                        return;
+                                                    }
 
                                                     const sourceDateInput = sourceRow.querySelector('input[data-field=date]');
                                                     const sourceTimeInput = sourceRow.querySelector('input[data-field=time]');
                                                     const targetDateInput = targetRow.querySelector('input[data-field=date]');
                                                     const targetTimeInput = targetRow.querySelector('input[data-field=time]');
+
+                                                    if ((sourceDateInput && sourceDateInput.disabled) || (targetDateInput && targetDateInput.disabled)) {
+                                                        alert('Cannot swap slots with a candidate marked for removal.');
+                                                        this.cancelSwap();
+                                                        return;
+                                                    }
 
                                                     if (sourceDateInput && targetDateInput && sourceTimeInput && targetTimeInput) {
                                                         const tempDate = sourceDateInput.value;
@@ -846,6 +874,11 @@
 
                                                         targetDateInput.value = tempDate;
                                                         targetTimeInput.value = tempTime;
+
+                                                        [sourceDateInput, sourceTimeInput, targetDateInput, targetTimeInput].forEach(inp => {
+                                                            inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                                            inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                                        });
 
                                                         sourceRow.classList.add('bg-emerald-50', 'ring-2', 'ring-emerald-400');
                                                         targetRow.classList.add('bg-emerald-50', 'ring-2', 'ring-emerald-400');
@@ -858,6 +891,13 @@
                                                     }
 
                                                     this.cancelSwap();
+                                                },
+
+                                                executeSwapFromRow(targetRow) {
+                                                    if (!targetRow) return;
+                                                    const targetId = targetRow.getAttribute('data-sched-id');
+                                                    const targetName = targetRow.getAttribute('data-sched-display-name') || 'Candidate';
+                                                    this.executeSwap(targetId, targetName);
                                                 },
 
                                                 applyBatchMeetingLink() {
@@ -1247,9 +1287,10 @@
                                                                                 <tr id="sched-row-{{ $esm->id }}"
                                                                                     data-sched-id="{{ $esm->id }}"
                                                                                     data-sched-track="{{ $track }}"
+                                                                                    data-sched-display-name="{{ $candidateName }}"
                                                                                     data-sched-name="{{ strtolower($candidateName) }}"
                                                                                     data-sched-matric="{{ strtolower($candidateMatric) }}"
-                                                                                    x-show="(editTrackFilter === 'all' || editTrackFilter === '{{ $track }}') && (!editSearch || '{{ strtolower(addslashes($candidateName)) }}'.includes(editSearch.toLowerCase()) || '{{ strtolower(addslashes($candidateMatric)) }}'.includes(editSearch.toLowerCase()))"
+                                                                                    x-show="(editTrackFilter === 'all' || editTrackFilter === '{{ $track }}') && (!editSearch || ($el.dataset.schedName || '').includes(editSearch.toLowerCase()) || ($el.dataset.schedMatric || '').includes(editSearch.toLowerCase()))"
                                                                                     x-data="{ rm: false }"
                                                                                     :class="{ 'bg-rose-50/70 opacity-60': rm, 'ring-2 ring-amber-400 bg-amber-50/50': swapSourceId == '{{ $esm->id }}' }"
                                                                                     class="transition-colors hover:bg-slate-50/60">
@@ -1308,30 +1349,30 @@
                                                                                     <td class="px-6 py-3 text-center">
                                                                                         <div class="flex items-center justify-center gap-1.5">
                                                                                             {{-- Swap Actions --}}
-                                                                                            <template x-if="swapSourceId == '{{ $esm->id }}'">
-                                                                                                <span class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg font-black text-[10px] uppercase border border-amber-300">
-                                                                                                    Selected
-                                                                                                </span>
-                                                                                            </template>
-                                                                                            <template x-if="swapSourceId && swapSourceId != '{{ $esm->id }}'">
-                                                                                                <button type="button" 
-                                                                                                    @click="executeSwap('{{ $esm->id }}', '{{ addslashes($candidateName) }}')"
-                                                                                                    class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-black text-[10px] uppercase tracking-wider transition shadow-sm animate-pulse-subtle">
-                                                                                                    ⇄ Swap Here
-                                                                                                </button>
-                                                                                            </template>
-                                                                                            <template x-if="!swapSourceId">
-                                                                                                <button type="button" 
-                                                                                                    @click="startSwap('{{ $esm->id }}', '{{ addslashes($candidateName) }}', $el.closest('tr').querySelector('input[data-field=date]').value, $el.closest('tr').querySelector('input[data-field=time]').value, '{{ $track }}')"
-                                                                                                    class="px-2.5 py-1 bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-800 rounded-lg border border-slate-200 hover:border-amber-300 text-[10px] font-black uppercase tracking-wider transition"
-                                                                                                    title="Swap slot with another student">
-                                                                                                    ⇄ Swap
-                                                                                                </button>
-                                                                                            </template>
+                                                                                            <span x-show="swapSourceId == '{{ $esm->id }}'" x-cloak
+                                                                                                class="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg font-black text-[10px] uppercase border border-amber-300">
+                                                                                                Selected
+                                                                                            </span>
+                                                                                            <button type="button"
+                                                                                                x-show="swapSourceId && swapSourceId != '{{ $esm->id }}'"
+                                                                                                x-cloak
+                                                                                                :disabled="rm"
+                                                                                                @click.stop="executeSwapFromRow($el.closest('tr'))"
+                                                                                                class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg font-black text-[10px] uppercase tracking-wider transition shadow-sm animate-pulse-subtle">
+                                                                                                ⇄ Swap Here
+                                                                                            </button>
+                                                                                            <button type="button"
+                                                                                                x-show="!swapSourceId"
+                                                                                                :disabled="rm"
+                                                                                                @click.stop="startSwapFromRow($el.closest('tr'))"
+                                                                                                class="px-2.5 py-1 bg-slate-100 hover:bg-amber-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 hover:text-amber-800 rounded-lg border border-slate-200 hover:border-amber-300 text-[10px] font-black uppercase tracking-wider transition"
+                                                                                                title="Swap slot with another student">
+                                                                                                ⇄ Swap
+                                                                                            </button>
 
                                                                                             {{-- Remove Action --}}
                                                                                             <input type="hidden" name="entries[{{ $esm->id }}][remove]" :value="rm ? 1 : 0">
-                                                                                            <button type="button" @click="rm = !rm"
+                                                                                            <button type="button" @click.stop="rm = !rm; if (rm && swapSourceId == '{{ $esm->id }}') cancelSwap();"
                                                                                                 :class="rm ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50'"
                                                                                                 class="px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase tracking-wider transition"
                                                                                                 x-text="rm ? 'Undo' : 'Remove'"></button>
@@ -2523,8 +2564,12 @@
                                                                 && $rowEventType !== null
                                                                 && (($event && $event->evaluations->count() > 0) || $workflow->hasBeenGraded($sm));
                                                         @endphp
-                                                        <tr data-milestone-id="{{ $sm->id }}" data-supervisor-approved="{{ $workflow->isSupervisorApproved($sm) ? '1' : '0' }}" class="hover:bg-slate-50/50 transition-colors" 
-                                                            x-show="(trackFilter === 'all' || trackFilter === '{{ $sm->discipline_group }}') && (degreeFilter === 'all' || degreeFilter === '{{ $rowDegreeType }}') && (cohortFilter === '' || cohortFilter == '{{ $cohortId }}') && (!search || '{{ strtolower($studentName) }}'.includes(search.toLowerCase()) || '{{ strtolower($matricNo) }}'.includes(search.toLowerCase()) || '{{ strtolower($studentEmail) }}'.includes(search.toLowerCase()))">
+                                                        <tr data-milestone-id="{{ $sm->id }}" data-supervisor-approved="{{ $workflow->isSupervisorApproved($sm) ? '1' : '0' }}"
+                                                            data-row-name="{{ strtolower($studentName) }}"
+                                                            data-row-matric="{{ strtolower($matricNo) }}"
+                                                            data-row-email="{{ strtolower($studentEmail) }}"
+                                                            class="hover:bg-slate-50/50 transition-colors" 
+                                                            x-show="(trackFilter === 'all' || trackFilter === '{{ $sm->discipline_group }}') && (degreeFilter === 'all' || degreeFilter === '{{ $rowDegreeType }}') && (cohortFilter === '' || cohortFilter == '{{ $cohortId }}') && (!search || ($el.dataset.rowName || '').includes(search.toLowerCase()) || ($el.dataset.rowMatric || '').includes(search.toLowerCase()) || ($el.dataset.rowEmail || '').includes(search.toLowerCase()))">
                                                             @if((!isset($isCoordinator) || !$isCoordinator) || $template->slug === 'internal_defence')
                                                             <td class="px-4 py-3">
                                                                 <div class="flex items-center gap-1.5">
