@@ -285,12 +285,13 @@
                 @if($isInternalDefence)
                     <tr>
                         <th style="width: 3%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};" class="text-center">#</th>
-                        <th style="width: 19%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Candidate &amp; Program</th>
-                        <th style="width: 24%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Thesis Title</th>
-                        <th style="width: 19%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Supervisors</th>
-                        <th style="width: 15%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Internal Examiner</th>
-                        <th style="width: 12%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Date &amp; Time</th>
-                        <th style="width: 8%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Room</th>
+                        <th style="width: 16%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Candidate &amp; Program</th>
+                        <th style="width: 20%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Thesis Title</th>
+                        <th style="width: 16%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Supervisors</th>
+                        <th style="width: 16%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Examiners</th>
+                        <th style="width: 12%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Internal Examiner</th>
+                        <th style="width: 10%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Date &amp; Time</th>
+                        <th style="width: 7%; background-color: {{ $grp['header_bg'] }}; border-color: {{ $grp['header_bg'] }};">Room</th>
                     </tr>
                 @else
                     <tr>
@@ -334,25 +335,31 @@
                                 ->all() ?? [];
 
                             $ieNames = collect();
+                            $ieUserIds = [];
                             if ($thesis?->internalExaminer?->user?->name) {
                                 $ieNames->push($thesis->internalExaminer->user->name);
+                                $ieUserIds[] = $thesis->internalExaminer->user_id;
                             }
                             if ($thesis?->examinerAssignments) {
                                 foreach ($thesis->examinerAssignments->where('type', 'internal_examiner') as $ea) {
                                     if ($ea->examiner?->name) {
                                         $ieNames->push($ea->examiner->name);
-                                    }
-                                }
-                            }
-                            $internalEvent = $thesis?->defenceEvents?->where('type', 'internal')->first();
-                            if ($internalEvent && $internalEvent->panelMembers) {
-                                foreach ($internalEvent->panelMembers->where('role', 'examiner') as $pm) {
-                                    if ($pm->user?->name && !in_array($pm->user_id, $supUserIds)) {
-                                        $ieNames->push($pm->user->name);
+                                        $ieUserIds[] = $ea->examiner_id;
                                     }
                                 }
                             }
                             $ieNames = $ieNames->unique()->values();
+
+                            $panelExaminerNames = collect();
+                            $internalEvent = $thesis?->defenceEvents?->where('type', 'internal')->first();
+                            if ($internalEvent && $internalEvent->panelMembers) {
+                                foreach ($internalEvent->panelMembers->where('role', 'examiner') as $pm) {
+                                    if ($pm->user?->name && !in_array($pm->user_id, $supUserIds) && !in_array($pm->user_id, $ieUserIds)) {
+                                        $panelExaminerNames->push($pm->user->name);
+                                    }
+                                }
+                            }
+                            $panelExaminerNames = $panelExaminerNames->unique()->values();
                         @endphp
                         <tr>
                             <td class="text-center">{{ $cIndex + 1 }}</td>
@@ -367,17 +374,24 @@
                             <td style="font-size: 9px; color: #0f172a; line-height: 1.3;">
                                 {{ $thesis?->title ?: 'Untitled Thesis' }}
                             </td>
-                            <td style="font-size: 9px; line-height: 1.35;">
+                            <td style="font-size: 8.5px; line-height: 1.35;">
                                 @forelse($activeSups as $sup)
                                     <div>
                                         <strong>{{ $sup['name'] }}</strong>
-                                        <span style="font-size: 8px; color: #64748b;">({{ $sup['is_primary'] ? 'Lead' : 'Co-Sup' }})</span>
+                                        <span style="font-size: 7.5px; color: #64748b;">({{ $sup['is_primary'] ? 'Lead' : 'Co-Sup' }})</span>
                                     </div>
                                 @empty
                                     <span style="color: #94a3b8; font-style: italic;">Unassigned</span>
                                 @endforelse
                             </td>
-                            <td style="font-size: 9px; line-height: 1.35;">
+                            <td style="font-size: 8.5px; line-height: 1.35;">
+                                @forelse($panelExaminerNames as $exName)
+                                    <div>{{ $exName }}</div>
+                                @empty
+                                    <span style="color: #94a3b8; font-style: italic;">—</span>
+                                @endforelse
+                            </td>
+                            <td style="font-size: 8.5px; line-height: 1.35;">
                                 @forelse($ieNames as $ieName)
                                     <div><strong>{{ $ieName }}</strong></div>
                                 @empty
@@ -420,7 +434,7 @@
                     @endif
                 @empty
                     <tr>
-                        <td colspan="{{ $isInternalDefence ? 7 : 8 }}" class="text-center" style="padding: 16px; color: #64748b; font-weight: 600;">
+                        <td colspan="8" class="text-center" style="padding: 16px; color: #64748b; font-weight: 600;">
                             No candidates currently scheduled under this group.
                         </td>
                     </tr>
