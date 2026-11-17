@@ -1920,8 +1920,8 @@ class MilestoneWorkflowService
 
     /**
      * Collect all user IDs who should automatically sit on an Internal Defence panel:
-     * all active thesis supervisors, all Program Coordinators, all Directors,
-     * plus any designated Internal Examiner on the thesis.
+     * Program Coordinators, Directors, and any designated Internal Examiner on the thesis.
+     * Supervisors of the thesis are explicitly excluded because supervisors do not grade their supervisees.
      */
     public function getInternalDefencePanelUserIds(ThesisProject $thesis): array
     {
@@ -1933,6 +1933,7 @@ class MilestoneWorkflowService
             ->get()
             ->pluck('supervisor.user_id')
             ->filter()
+            ->map(fn($id) => (string) $id)
             ->all();
 
         $leadershipUserIds = \App\Models\User::whereHas('roles', function ($q) {
@@ -1956,13 +1957,15 @@ class MilestoneWorkflowService
             ->all();
 
         return collect(array_merge(
-                $supervisorUserIds,
                 $leadershipUserIds,
                 $coordinatorProfileUserIds,
                 $designatedIds,
                 $assignmentIds
             ))
-            ->filter(fn($id) => !empty($id) && (string) $id !== (string) $studentUserId)
+            ->filter(fn($id) => !empty($id)
+                && (string) $id !== (string) $studentUserId
+                && !in_array((string) $id, $supervisorUserIds, true)
+            )
             ->unique()
             ->values()
             ->all();
@@ -1979,10 +1982,30 @@ class MilestoneWorkflowService
 
         $thesis = $event->relationLoaded('thesis')
             ? $event->thesis
-            : $event->thesis()->with(['student', 'internalExaminer'])->first();
+            : $event->thesis()->with(['student', 'internalExaminer', 'assignments.supervisor'])->first();
 
         if (!$thesis) {
             return;
+        }
+
+        // Remove any un-evaluated examiner records belonging to active supervisors on this thesis
+        $supervisorUserIds = $thesis->assignments()
+            ->where('status', 'active')
+            ->with('supervisor')
+            ->get()
+            ->pluck('supervisor.user_id')
+            ->filter()
+            ->all();
+
+        if (!empty($supervisorUserIds)) {
+            $evaluatedIds = $event->evaluations()->pluck('evaluator_id')->all();
+            $toRemove = array_diff($supervisorUserIds, $evaluatedIds);
+            if (!empty($toRemove)) {
+                \App\Models\PanelMember::where('defence_event_id', $event->id)
+                    ->where('role', 'examiner')
+                    ->whereIn('user_id', $toRemove)
+                    ->delete();
+            }
         }
 
         foreach ($this->getInternalDefencePanelUserIds($thesis) as $userId) {

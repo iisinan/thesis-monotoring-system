@@ -43,8 +43,39 @@ class DefenceEvent extends Model
     }
 
     /**
+     * Check whether the given user actively supervises this event's thesis.
+     */
+    public function isActiveSupervisorOfThesis($userId): bool
+    {
+        if (!$userId) {
+            return false;
+        }
+
+        $thesis = $this->relationLoaded('thesis')
+            ? $this->thesis
+            : $this->thesis()->with('assignments.supervisor')->first();
+
+        if (!$thesis) {
+            return false;
+        }
+
+        $assignments = $thesis->relationLoaded('assignments')
+            ? $thesis->assignments
+            : $thesis->assignments()->with('supervisor')->get();
+
+        foreach ($assignments as $assignment) {
+            if ($assignment->status === 'active' && (string) ($assignment->supervisor?->user_id ?? '') === (string) $userId) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Check if a user is an authorized evaluator for this event.
      * Evaluators include: Panel Members, assigned Internal Examiner, and assigned External Examiner.
+     * Supervisors never grade or evaluate their own supervisees' theses.
      */
     public function isAuthorizedEvaluator($userId)
     {
@@ -52,12 +83,18 @@ class DefenceEvent extends Model
             return false;
         }
 
+        $user = \App\Models\User::find($userId);
+
         // 0. Check if user is admin for presentation/defence milestones
         if (in_array($this->type, ['seminar', 'proposal', 'progress_report_1', 'progress_report_2', 'internal', 'external', 'viva'])) {
-            $user = \App\Models\User::find($userId);
             if ($user && $user->hasRole('Admin')) {
                 return true;
             }
+        }
+
+        // Supervisors do not grade/evaluate their own supervisees' theses
+        if ($this->isActiveSupervisorOfThesis($userId)) {
+            return false;
         }
 
         // 1. Check Panel Members

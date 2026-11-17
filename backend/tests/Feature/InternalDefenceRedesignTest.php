@@ -194,10 +194,16 @@ class InternalDefenceRedesignTest extends TestCase
 
         $panelUserIds = $event->panelMembers()->where('role', 'examiner')->pluck('user_id')->all();
 
-        // All active supervisors + all Coordinators + all Directors must be attached as examiners
-        foreach ([$supUser1, $supUser2, $coordA, $coordB, $director1, $director2] as $authorizedUser) {
+        // Coordinators + Directors (non-supervisors) must be attached as examiners
+        foreach ([$coordA, $coordB, $director1, $director2] as $authorizedUser) {
             $this->assertContains($authorizedUser->id, $panelUserIds, "{$authorizedUser->name} must be in panel_members");
             $this->assertTrue($event->isAuthorizedEvaluator($authorizedUser->id), "{$authorizedUser->name} must be authorized to evaluate");
+        }
+
+        // Candidate's own active supervisors MUST NOT grade their supervisee's thesis
+        foreach ([$supUser1, $supUser2] as $supUser) {
+            $this->assertNotContains($supUser->id, $panelUserIds, "{$supUser->name} must NOT be attached as an examiner for their own student");
+            $this->assertFalse($event->isAuthorizedEvaluator($supUser->id), "{$supUser->name} must NOT be authorized to grade their own student's thesis");
         }
 
         // Unrelated supervisor & candidate must NOT be panel examiners

@@ -469,4 +469,128 @@ class InternalDefenceScheduleManagerTest extends TestCase
         Notification::assertNothingSent();
         Mail::assertNothingSent();
     }
+
+    #[Test]
+    public function approve_schedule_sends_role_specific_emails_and_blocks_supervisors_from_grading(): void
+    {
+        Notification::fake();
+
+        // 1. Designated Internal Examiner
+        $internalExUser = User::factory()->create(['name' => 'Dr. Designated Internal', 'is_active' => true]);
+        $internalExUser->assignRole('Internal Examiner');
+        $internalExProfile = InternalExaminerProfile::create([
+            'user_id' => $internalExUser->id,
+            'program_id' => $this->program->id,
+            'institution' => 'NOUN',
+            'qualification' => 'PhD',
+            'active' => true,
+        ]);
+
+        // 2. Panel Examiner (NOT an Internal Examiner, NOT supervisor)
+        $panelExUser = User::factory()->create(['name' => 'Prof. Panel Examiner', 'is_active' => true]);
+        $panelExUser->assignRole('Program Coordinator');
+        \App\Models\CoordinatorProfile::create([
+            'user_id' => $panelExUser->id,
+            'program_id' => $this->program->id,
+            'active' => true,
+        ]);
+
+        $cand = $this->createScheduledCandidate('R1', $internalExProfile);
+
+        // 3. Active Supervisor of this candidate
+        $supUser = User::factory()->create(['name' => 'Prof. Thesis Supervisor', 'is_active' => true]);
+        $supUser->assignRole('Supervisor');
+        $supProf = SupervisorProfile::create(['user_id' => $supUser->id, 'rank' => 'Professor', 'active' => true]);
+        \App\Models\SupervisionAssignment::create([
+            'thesis_project_id' => $cand['thesis']->id,
+            'supervisor_profile_id' => $supProf->id,
+            'role' => 'primary',
+            'status' => 'active',
+        ]);
+
+        // Attach thesis PDF submission so panel examiner can read it
+        $sub = \App\Models\Submission::create([
+            'student_milestone_id' => $cand['milestone']->id,
+            'submitted_by' => $cand['studentUser']->id,
+            'type' => 'manuscript',
+            'file_url' => 'submissions/cand-r1.pdf',
+            'version' => 1,
+        ]);
+        \Illuminate\Support\Facades\Storage::disk(config('filesystems.default'))->put('submissions/cand-r1.pdf', '%PDF-1.4 dummy');
+
+        // Ensure panel examiner sits on DefenceEvent panel too
+        PanelMember::firstOrCreate([
+            'defence_event_id' => $cand['event']->id,
+            'user_id' => $panelExUser->id,
+            'role' => 'examiner',
+        ], ['invitation_status' => 'accepted']);
+
+        // Approve schedule
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.milestone-templates.approve-schedule', $this->internalTpl->id))
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        // 1) Student email: no examiner/supervisor info & states no PPT upload needed
+        Notification::assertSentTo($cand['studentUser'], EventScheduled::class, function (EventScheduled $notif) use ($cand) {
+            $rendered = (string) $notif->toMail($cand['studentUser'])->render();
+            $this->assertStringNotContainsString('Examiners & Supervisors', $rendered);
+            $this->assertStringContainsString('No PPT Upload Needed', $rendered);
+            return true;
+        });
+
+        // 2) Supervisor email: SupervisorDefenceScheduled ONLY (never ExaminerNominated), tells them their student schedule & no grading
+        Notification::assertSentTo(
+            $supUser,
+            \App\Notifications\SupervisorDefenceScheduled::class,
+            function (\App\Notifications\SupervisorDefenceScheduled $notif) use ($supUser, $cand) {
+                $rendered = (string) $notif->toMail($supUser)->render();
+                $this->assertStringContainsString($cand['studentUser']->name, $rendered);
+                $this->assertStringContainsString('do not grade or evaluate', $rendered);
+                return true;
+            }
+        );
+        Notification::assertNotSentTo($supUser, ExaminerNominated::class);
+
+        // 3) Designated Internal Examiner email: read/review, grade after presentation, AND receive post-defence corrections
+        Notification::assertSentTo($internalExUser, ExaminerNominated::class, function (ExaminerNominated $notif) use ($internalExUser, $cand) {
+            $rendered = (string) $notif->toMail($internalExUser)->render();
+            $this->assertSame('internal_examiner', $notif->examinerRole);
+            $this->assertStringContainsString('Internal Examiner', $rendered);
+            $this->assertStringContainsString($cand['studentUser']->name, $rendered);
+            $this->assertStringContainsString('Post-Defence Corrections', $rendered);
+            return true;
+        });
+
+        // 4) Non-internal Panel Examiner email: read submitted thesis + grade after presentation, NO post-defence correction approval instructions
+        Notification::assertSentTo($panelExUser, ExaminerNominated::class, function (ExaminerNominated $notif) use ($panelExUser, $cand) {
+            $rendered = (string) $notif->toMail($panelExUser)->render();
+            $this->assertSame('panel_examiner', $notif->examinerRole);
+            $this->assertStringContainsString('Read Submitted Thesis Ahead of Time', $rendered);
+            $this->assertStringContainsString('Attend &amp; Grade After Presentation', $rendered);
+            $this->assertStringNotContainsString('Post-Defence Corrections', $rendered);
+            $this->assertStringContainsString($cand['studentUser']->name, $rendered);
+            return true;
+        });
+
+        // 5) Supervisors MUST NOT be able to grade their supervisee's thesis
+        $this->actingAs($supUser)->get(route('evaluations.create', $cand['event']->id))->assertStatus(403);
+        $this->actingAs($supUser)->post(route('evaluations.store', $cand['event']->id), [
+            'verdict' => 'pass',
+            'comments' => 'Attempted supervisor grade',
+        ])->assertStatus(403);
+
+        // 6) Non-supervisor Panel Examiner CAN read the submitted thesis AND submit a grade
+        $this->actingAs($panelExUser)->get(route('submissions.view', $sub))->assertOk();
+        $this->actingAs($panelExUser)->post(route('evaluations.store', $cand['event']->id), [
+            'verdict' => 'pass',
+            'comments' => 'Solid research work.',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('evaluations', [
+            'defence_event_id' => $cand['event']->id,
+            'evaluator_id' => $panelExUser->id,
+            'recommendation' => 'pass',
+        ]);
+    }
 }

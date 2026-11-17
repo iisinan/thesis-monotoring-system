@@ -427,6 +427,7 @@ class UserManagementController extends Controller
                 'program_id' => 'required|exists:programs,id',
                 'level_id' => 'nullable|exists:levels,id',
                 'student_id_number' => ['required', 'string', Rule::unique('student_profiles')->ignore($user->studentProfile?->id), new \App\Rules\ValidMatricNumber],
+                'thesis_title' => 'nullable|string|max:255',
             ]);
         }
         
@@ -552,7 +553,7 @@ class UserManagementController extends Controller
             // 5. Student Profile Sync
             if (in_array('Student', $roles)) {
                 $finalLevelId = $this->resolveLevelId($validated['level_id'] ?? null, $validated['program_id']);
-                $user->studentProfile()->updateOrCreate(
+                $studentProfile = $user->studentProfile()->updateOrCreate(
                     ['user_id' => $user->id],
                     [
                         'cohort_id' => $validated['cohort_id'],
@@ -561,6 +562,23 @@ class UserManagementController extends Controller
                         'student_id_number' => $validated['student_id_number'],
                     ]
                 );
+
+                if ($request->filled('thesis_title')) {
+                    $newTitle = trim($validated['thesis_title']);
+                    if ($newTitle !== '') {
+                        if ($studentProfile->thesis) {
+                            $studentProfile->thesis->update(['title' => $newTitle]);
+                        } else {
+                            $thesis = $studentProfile->thesis()->create([
+                                'title' => $newTitle,
+                                'abstract' => 'Student has not yet submitted their project proposal details.',
+                                'status' => 'proposed',
+                            ]);
+                            $thesis->syncMilestones();
+                        }
+                    }
+                }
+                \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $user->id);
             }
 
             \Illuminate\Support\Facades\DB::commit();

@@ -82,6 +82,64 @@ class StudentController extends Controller
     }
 
     /**
+     * Administratively update a student's thesis title.
+     */
+    public function updateThesisTitle(Request $request, StudentProfile $student)
+    {
+        if (!auth()->user()->hasAnyRole(['Admin', 'Director'])) {
+            abort(403, 'Only Administrators can update a student\'s thesis title.');
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+        ]);
+
+        $newTitle = trim($validated['title']);
+        if ($newTitle === '') {
+            return back()->withErrors(['title' => 'The thesis title cannot be empty.'])->withInput();
+        }
+
+        $thesis = $student->thesis;
+        $oldTitle = $thesis?->title;
+
+        if (!$thesis) {
+            $thesis = \App\Models\ThesisProject::create([
+                'student_profile_id' => $student->id,
+                'title' => $newTitle,
+                'abstract' => 'Institutional description of research scope and objectives pending submission.',
+                'status' => 'active',
+                'start_date' => now(),
+            ]);
+            $thesis->syncMilestones();
+        } else {
+            $thesis->update(['title' => $newTitle]);
+        }
+
+        $studentName = $student->user?->name ?? $student->student_id_number ?? 'Candidate';
+
+        \App\Models\AuditLog::create([
+            'user_id' => auth()->id(),
+            'action' => 'admin_thesis_title_updated',
+            'entity_type' => \App\Models\ThesisProject::class,
+            'entity_id' => $thesis->id,
+            'old_values' => ['title' => $oldTitle],
+            'new_values' => [
+                'title' => $newTitle,
+                'student_id' => $student->id,
+                'student_name' => $studentName,
+            ],
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+        ]);
+
+        if ($student->user_id) {
+            \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $student->user_id);
+        }
+
+        return back()->with('success', "Thesis title updated for {$studentName}.");
+    }
+
+    /**
      * Administratively add a supervisor to the student's thesis.
      */
     public function addSupervisor(Request $request, StudentProfile $student)

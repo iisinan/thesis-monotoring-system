@@ -731,8 +731,26 @@ class MilestoneTemplateController extends Controller
             }
         }
 
+        // Exclude active supervisors of this thesis because supervisors do not grade their supervisees
+        $activeSupervisorUserIds = [];
+        if ($thesis) {
+            $assignments = $thesis->relationLoaded('assignments')
+                ? $thesis->assignments
+                : $thesis->assignments()->with('supervisor')->get();
+            $activeSupervisorUserIds = $assignments
+                ->where('status', 'active')
+                ->pluck('supervisor.user_id')
+                ->filter()
+                ->map(fn($id) => (string) $id)
+                ->all();
+        }
+
         return $examiners
-            ->filter(fn($u) => $u && $u->id !== $studentUserId && !empty($u->email))
+            ->filter(fn($u) => $u
+                && (string) $u->id !== (string) $studentUserId
+                && !in_array((string) $u->id, $activeSupervisorUserIds, true)
+                && !empty($u->email)
+            )
             ->unique('id')
             ->values();
     }
@@ -1564,10 +1582,14 @@ class MilestoneTemplateController extends Controller
                 'template',
                 'thesis.student.user',
                 'thesis.student.program',
+                'thesis.assignments.supervisor.user',
                 'thesis.internalExaminer.user',
                 'thesis.externalExaminer.user',
+                'thesis.examinerAssignments.examiner',
                 'thesis.defenceEvents.panelMembers.user',
             ])
+            ->orderBy('defence_date', 'asc')
+            ->orderBy('defence_time', 'asc')
             ->get()
             ->reject(fn($m) => $workflow->isPostDefencePhase($m))
             ->values();
@@ -1584,7 +1606,9 @@ class MilestoneTemplateController extends Controller
         \App\Models\MilestoneTemplate::clearPresentationCache();
 
         $studentNotified = 0;
-        $examinerAgg = [];
+        $supervisorAgg = [];
+        $internalExaminerAgg = [];
+        $panelExaminerAgg = [];
 
         foreach ($scheduledMilestones as $sm) {
             $thesis = $sm->thesis;
@@ -1610,7 +1634,16 @@ class MilestoneTemplateController extends Controller
                 ]);
             }
 
-            // Notify scheduled student
+            $slotInfo = [
+                'student_name' => $thesis->student?->user?->name ?? 'Candidate',
+                'matric' => $thesis->student?->student_id_number ?? 'N/A',
+                'thesis_title' => $thesis->title ?? 'Thesis Presentation',
+                'date' => $sm->defence_date ? \Carbon\Carbon::parse($sm->defence_date)->format('D, M j, Y') : 'TBD',
+                'time' => !empty($sm->defence_time) ? \Carbon\Carbon::parse($sm->defence_time)->format('g:i A') : 'TBD',
+                'meeting_link' => $sm->meeting_link ?: $event->location,
+            ];
+
+            // 1. Notify scheduled student
             $studentUser = $thesis->student?->user;
             if ($studentUser) {
                 \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUser->id);
@@ -1622,30 +1655,118 @@ class MilestoneTemplateController extends Controller
                 }
             }
 
-            // Aggregate examiners for notification
-            $examiners = $this->getExaminersForMilestone($sm, $template, $event);
+            // 2. Collect active supervisors of this candidate (schedule notice only — supervisors do not grade their supervisees)
+            $activeSupervisorUsers = $thesis->assignments
+                ->where('status', 'active')
+                ->map(fn($a) => $a->supervisor?->user)
+                ->filter(fn($u) => $u && (string) $u->id !== (string) ($studentUser?->id ?? '') && !empty($u->email))
+                ->unique('id')
+                ->values();
+
+            $activeSupervisorIds = $activeSupervisorUsers->pluck('id')->map(fn($id) => (string) $id)->all();
+
+            foreach ($activeSupervisorUsers as $supUser) {
+                $supKey = (string) $supUser->id;
+                if (!isset($supervisorAgg[$supKey])) {
+                    $supervisorAgg[$supKey] = [
+                        'user' => $supUser,
+                        'slots' => [],
+                    ];
+                }
+                $supervisorAgg[$supKey]['slots'][] = $slotInfo;
+            }
+
+            // 3. Collect designated Internal Examiner(s) for this thesis (excluding active supervisors & student)
+            $internalExaminerUsers = collect();
+            if ($thesis->internalExaminer && $thesis->internalExaminer->user) {
+                $internalExaminerUsers->push($thesis->internalExaminer->user);
+            }
+            foreach ($thesis->examinerAssignments->where('type', 'internal_examiner') as $exAssign) {
+                if ($exAssign->examiner) {
+                    $internalExaminerUsers->push($exAssign->examiner);
+                }
+            }
+            $internalExaminerUsers = $internalExaminerUsers
+                ->filter(fn($u) => $u
+                    && (string) $u->id !== (string) ($studentUser?->id ?? '')
+                    && !in_array((string) $u->id, $activeSupervisorIds, true)
+                    && !empty($u->email)
+                )
+                ->unique('id')
+                ->values();
+
+            $internalExaminerIds = $internalExaminerUsers->pluck('id')->map(fn($id) => (string) $id)->all();
+
+            foreach ($internalExaminerUsers as $ieUser) {
+                $ieKey = (string) $ieUser->id;
+                if (!isset($internalExaminerAgg[$ieKey])) {
+                    $internalExaminerAgg[$ieKey] = [
+                        'user' => $ieUser,
+                        'slots' => [],
+                    ];
+                }
+                $internalExaminerAgg[$ieKey]['slots'][] = $slotInfo;
+            }
+
+            // 4. Collect Panel / Non-Internal Examiners (excluding student, supervisors, and this thesis's internal examiner)
+            $examiners = $this->getExaminersForMilestone($sm, $template, $event)
+                ->reject(fn($ex) => in_array((string) $ex->id, $internalExaminerIds, true)
+                    || in_array((string) $ex->id, $activeSupervisorIds, true)
+                );
+
             $discGroup = $template->slug === 'seminar_as_a_course' ? $sm->discipline_group : null;
             foreach ($examiners as $ex) {
                 $aggKey = $ex->id . ($discGroup ? '_' . $discGroup : '');
-                if (!isset($examinerAgg[$aggKey])) {
-                    $examinerAgg[$aggKey] = [
+                if (!isset($panelExaminerAgg[$aggKey])) {
+                    $panelExaminerAgg[$aggKey] = [
                         'user' => $ex,
-                        'count' => 0,
                         'group' => $discGroup,
+                        'slots' => [],
                     ];
                 }
-                $examinerAgg[$aggKey]['count']++;
+                $panelExaminerAgg[$aggKey]['slots'][] = $slotInfo;
+            }
+        }
+
+        $supervisorNotified = 0;
+        foreach ($supervisorAgg as $entry) {
+            try {
+                $entry['user']->notify(new \App\Notifications\SupervisorDefenceScheduled(
+                    $template,
+                    $entry['slots']
+                ));
+                $supervisorNotified++;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("approveSchedule supervisor notify failed: " . $e->getMessage());
             }
         }
 
         $examinerNotified = 0;
-        foreach ($examinerAgg as $entry) {
+        foreach ($internalExaminerAgg as $entry) {
             try {
                 $entry['user']->notify(new \App\Notifications\ExaminerNominated(
                     $template,
                     null,
-                    $entry['count'],
-                    $entry['group']
+                    count($entry['slots']),
+                    null,
+                    'internal_examiner',
+                    $entry['slots']
+                ));
+                $examinerNotified++;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("approveSchedule internal examiner notify failed: " . $e->getMessage());
+            }
+        }
+
+        foreach ($panelExaminerAgg as $entry) {
+            try {
+                $entry['user']->notify(new \App\Notifications\ExaminerNominated(
+                    $template,
+                    null,
+                    count($entry['slots']),
+                    $entry['group'],
+                    'panel_examiner',
+                    $entry['slots']
                 ));
                 $examinerNotified++;
             } catch (\Throwable $e) {
@@ -1653,7 +1774,7 @@ class MilestoneTemplateController extends Controller
             }
         }
 
-        $msg = "Schedule approved! Email notifications sent to {$studentNotified} candidate(s) and {$examinerNotified} examiner(s).";
+        $msg = "Schedule approved! Email notifications sent to {$studentNotified} candidate(s), {$supervisorNotified} supervisor(s), and {$examinerNotified} examiner(s).";
         return $this->respondMilestoneAction($request, $template, 'success', $msg);
     }
 

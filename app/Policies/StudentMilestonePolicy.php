@@ -48,6 +48,28 @@ class StudentMilestonePolicy
             }
         }
 
+        // Appointed panel examiners can read submitted manuscripts ahead of grading
+        if ($milestone->thesis) {
+            $eventType = $milestone->template?->defence_type ?? match($milestone->template?->slug) {
+                'seminar_as_a_course' => 'seminar',
+                'proposal_defence' => 'proposal',
+                'progress_report_1' => 'progress_report_1',
+                'progress_report_2' => 'progress_report_2',
+                'internal_defence' => 'internal',
+                'viva' => 'external',
+                default => null,
+            };
+
+            $hasPanelAccess = $milestone->thesis->defenceEvents()
+                ->when($eventType, fn($q) => $q->where('type', $eventType))
+                ->whereHas('panelMembers', fn($pq) => $pq->where('user_id', $user->id))
+                ->exists();
+
+            if ($hasPanelAccess) {
+                return true;
+            }
+        }
+
         // Student can view their own milestones, BUT only if they are approved OR the current ongoing one
         if ($user->hasRole('Student')) {
             if ($milestone->thesis->student_profile_id !== $user->studentProfile?->id) {
