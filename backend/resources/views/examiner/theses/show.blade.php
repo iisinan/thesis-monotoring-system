@@ -246,7 +246,7 @@ class="space-y-6">
                                                         type: '{{ $subType }}'
                                                     })"
                                                     class="px-3.5 py-2 text-[10px] font-black uppercase tracking-wider text-white bg-slate-900 rounded-xl hover:bg-black transition-colors cursor-pointer">
-                                                    Open in Modal
+                                                    View Thesis
                                                 </button>
                                                 <a href="{{ route('submissions.view', [$submission->id, 'download' => 1]) }}"
                                                    class="px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors">

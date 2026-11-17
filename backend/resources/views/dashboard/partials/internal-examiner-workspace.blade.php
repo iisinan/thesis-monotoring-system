@@ -349,7 +349,7 @@ class="space-y-8">
                                     type: '{{ $cPreviewType }}'
                                 })"
                                 class="px-3 py-1.5 bg-white text-slate-900 hover:bg-purple-100 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer">
-                                Open Modal
+                                View Thesis
                             </button>
                             <a href="{{ route('submissions.view', [$cSub, 'download' => 1]) }}"
                                class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all">
@@ -650,7 +650,7 @@ class="space-y-8">
                                                     type: '{{ $postType }}'
                                                 })"
                                                 class="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider shadow-xs transition-all cursor-pointer">
-                                                Open in Modal
+                                                View Thesis
                                             </button>
                                             <a href="{{ route('submissions.view', [$postSub, 'download' => 1]) }}"
                                                class="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-purple-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
@@ -727,7 +727,7 @@ class="space-y-8">
                                                 type: '{{ $dispType }}'
                                             })"
                                             class="px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer">
-                                            Open in Modal
+                                            View Thesis
                                         </button>
                                         <a href="{{ route('submissions.view', [$displaySub, 'download' => 1]) }}"
                                            class="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">

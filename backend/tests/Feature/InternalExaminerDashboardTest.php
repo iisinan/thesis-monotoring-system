@@ -360,7 +360,7 @@ class InternalExaminerDashboardTest extends TestCase
         $showResp = $this->actingAs($ctx['examinerUser'])->get(route('examiner.theses.show', $ctx['thesis']->id));
         $showResp->assertOk();
         $showResp->assertSee('Updated note after reading conclusion.');
-        $showResp->assertSee('Open in Modal');
+        $showResp->assertSee('View Thesis');
         $showResp->assertSee(route('submissions.view', [$ctx['preSubmission'], 'download' => 1]), false);
 
         $this->actingAs($ctx['examinerUser'])->delete(route('examiner.reviews.destroy', $review))
