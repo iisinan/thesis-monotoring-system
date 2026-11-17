@@ -70,6 +70,11 @@ class StudentMilestonePolicy
             }
         }
 
+        // Faculty attending or evaluating an active scheduled presentation can view presented documents
+        if ($user->hasAnyRole(['Supervisor', 'Internal Examiner', 'External Examiner']) && !empty($milestone->defence_date) && $milestone->status !== 'approved') {
+            return true;
+        }
+
         // Student can view their own milestones, BUT only if they are approved OR the current ongoing one
         if ($user->hasRole('Student')) {
             if ($milestone->thesis->student_profile_id !== $user->studentProfile?->id) {

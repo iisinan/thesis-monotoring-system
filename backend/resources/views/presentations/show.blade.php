@@ -658,12 +658,15 @@
                                 {{-- Primary Row: View Doc on left, Score & Join Room on right --}}
                                 <div class="flex items-center justify-between gap-2">
                                     <div>
-                                        @if($latestSub && $latestSub->file_url)
+                                        @if($latestSub && $latestSub->file_url && Auth::user()->can('view', $pres))
+                                            @php
+                                                $todayDocIsPdf = str_ends_with(strtolower($latestSub->file_url), '.pdf') || str_contains(strtolower($latestSub->file_meta['mime_type'] ?? ''), 'pdf');
+                                            @endphp
                                             <button type="button"
                                                 @click.prevent="$dispatch('open-document-preview', {
                                                     url: '{{ route('submissions.view', $latestSub) }}',
-                                                    title: '{{ addslashes($studentName) }} - {{ addslashes($template->name) }}',
-                                                    type: '{{ str_ends_with(strtolower($latestSub->file_url), '.pdf') ? 'pdf' : 'other' }}'
+                                                    title: {{ \Illuminate\Support\Js::from($studentName . ' - ' . $template->name) }},
+                                                    type: '{{ $todayDocIsPdf ? 'pdf' : 'other' }}'
                                                 })"
                                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200/80 hover:border-slate-900 text-xs font-bold transition-all shadow-2xs group/btn active:scale-95">
                                                 <svg class="w-3.5 h-3.5 text-slate-500 group-hover/btn:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -674,7 +677,7 @@
                                             </button>
                                         @else
                                             <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-200/60 uppercase tracking-wider">
-                                                <span>No Doc</span>
+                                                <span>{{ ($latestSub && $latestSub->file_url) ? 'Protected' : 'No Doc' }}</span>
                                             </span>
                                         @endif
                                     </div>
@@ -914,19 +917,22 @@
                                 {{-- Primary Row: Doc on left, Score & Zoom on right --}}
                                 <div class="flex items-center justify-between gap-2">
                                     <div>
-                                        @if($latestSub && $latestSub->file_url)
+                                        @if($latestSub && $latestSub->file_url && Auth::user()->can('view', $sm))
+                                            @php
+                                                $mobDocIsPdf = str_ends_with(strtolower($latestSub->file_url), '.pdf') || str_contains(strtolower($latestSub->file_meta['mime_type'] ?? ''), 'pdf');
+                                            @endphp
                                             <button type="button" 
                                                 @click.prevent="$dispatch('open-document-preview', { 
                                                     url: '{{ route('submissions.view', $latestSub) }}', 
-                                                    title: '{{ addslashes($studentName) }} - {{ addslashes($template->name) }}',
-                                                    type: '{{ str_ends_with(strtolower($latestSub->file_url), '.pdf') ? 'pdf' : 'other' }}'
+                                                    title: {{ \Illuminate\Support\Js::from($studentName . ' - ' . $template->name) }},
+                                                    type: '{{ $mobDocIsPdf ? 'pdf' : 'other' }}'
                                                 })"
                                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200 text-xs font-bold transition-all shadow-2xs active:scale-95">
                                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                                                 <span>Doc</span>
                                             </button>
                                         @else
-                                            <span class="inline-flex items-center px-2 py-1 rounded-lg text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-200/60 uppercase tracking-wider">No Doc</span>
+                                            <span class="inline-flex items-center px-2 py-1 rounded-lg text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-200/60 uppercase tracking-wider">{{ ($latestSub && $latestSub->file_url) ? 'Protected' : 'No Doc' }}</span>
                                         @endif
                                     </div>
 
@@ -1267,12 +1273,15 @@
                                         </div>
                                     </td>
                                     <td class="px-5 py-4 align-middle text-center whitespace-nowrap">
-                                        @if($latestSub && $latestSub->file_url)
+                                        @if($latestSub && $latestSub->file_url && Auth::user()->can('view', $sm))
+                                            @php
+                                                $tableDocIsPdf = str_ends_with(strtolower($latestSub->file_url), '.pdf') || str_contains(strtolower($latestSub->file_meta['mime_type'] ?? ''), 'pdf');
+                                            @endphp
                                             <button type="button" 
                                                 @click.prevent="$dispatch('open-document-preview', { 
                                                     url: '{{ route('submissions.view', $latestSub) }}', 
-                                                    title: '{{ addslashes($studentName) }} - {{ addslashes($template->name) }}',
-                                                    type: '{{ str_ends_with(strtolower($latestSub->file_url), '.pdf') ? 'pdf' : 'other' }}'
+                                                    title: {{ \Illuminate\Support\Js::from($studentName . ' - ' . $template->name) }},
+                                                    type: '{{ $tableDocIsPdf ? 'pdf' : 'other' }}'
                                                 })"
                                                 class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-900 text-slate-700 hover:text-white border border-slate-200/80 hover:border-slate-900 text-xs font-bold transition-all shadow-2xs group/btn active:scale-95">
                                                 <svg class="w-3.5 h-3.5 text-slate-500 group-hover/btn:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1284,7 +1293,7 @@
                                         @else
                                             <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 border border-slate-200/60 text-slate-400 text-[10px] font-bold uppercase tracking-wider">
                                                 <svg class="w-3 h-3 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                                <span>No Doc</span>
+                                                <span>{{ ($latestSub && $latestSub->file_url) ? 'Protected' : 'No Doc' }}</span>
                                             </span>
                                         @endif
                                     </td>

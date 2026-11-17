@@ -474,4 +474,129 @@ class InternalExaminerDashboardTest extends TestCase
         $studentDash->assertOk();
         $studentDash->assertDontSee('Scheduled Presentations');
     }
+
+    #[Test]
+    public function pending_evaluation_only_appears_after_presentation_ends_and_internal_examiner_has_not_graded(): void
+    {
+        $ctx = $this->setupInternalExaminerScenario(false);
+        $directorUser = User::factory()->create(['name' => 'Prof. Director Panelist', 'is_active' => true]);
+        $directorUser->assignRole('Director');
+
+        // 1. Scheduled in the future -> must NOT appear in Pending Oral Defence Evaluations
+        $ctx['internalDefMilestone']->update([
+            'defence_date' => now()->addDays(6)->toDateString(),
+            'defence_time' => '10:00:00',
+        ]);
+        $event = \App\Models\DefenceEvent::create([
+            'thesis_project_id' => $ctx['thesis']->id,
+            'type' => 'internal',
+            'schedule_start' => now()->addDays(6)->setTime(10, 0),
+            'schedule_end' => now()->addDays(6)->setTime(11, 0),
+            'outcome' => 'pending',
+        ]);
+        \App\Models\PanelMember::create([
+            'defence_event_id' => $event->id,
+            'user_id' => $ctx['examinerUser']->id,
+            'role' => 'examiner',
+            'invitation_status' => 'accepted',
+        ]);
+        \App\Models\PanelMember::create([
+            'defence_event_id' => $event->id,
+            'user_id' => $directorUser->id,
+            'role' => 'examiner',
+            'invitation_status' => 'accepted',
+        ]);
+
+        $this->actingAs($ctx['examinerUser'])->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Pending Oral Defence Evaluations');
+        $this->actingAs($ctx['examinerUser'])->get(route('examiner.theses.index'))
+            ->assertOk()
+            ->assertDontSee('Pending Oral Defence Evaluations');
+        $this->actingAs($directorUser)->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Pending Oral / Internal Defence Evaluations');
+
+        // 2. Presentation scheduled today and still in progress -> must NOT appear
+        $ctx['internalDefMilestone']->update([
+            'defence_date' => now()->toDateString(),
+            'defence_time' => now()->subMinutes(10)->format('H:i:s'),
+        ]);
+        $event->update([
+            'schedule_start' => now()->subMinutes(10),
+            'schedule_end' => now()->addMinutes(20),
+        ]);
+
+        $this->actingAs($ctx['examinerUser'])->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Pending Oral Defence Evaluations');
+
+        // 3. Presentation has ended and Internal Examiner has NOT graded -> MUST appear
+        $ctx['internalDefMilestone']->update([
+            'defence_date' => now()->subDay()->toDateString(),
+            'defence_time' => '10:00:00',
+        ]);
+        $event->update([
+            'schedule_start' => now()->subDay()->setTime(10, 0),
+            'schedule_end' => now()->subDay()->setTime(11, 0),
+        ]);
+
+        $this->actingAs($ctx['examinerUser'])->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Pending Oral Defence Evaluations')
+            ->assertSee('Amina Candidate')
+            ->assertSee('Grade Oral Defence');
+        $this->actingAs($ctx['examinerUser'])->get(route('examiner.theses.index'))
+            ->assertOk()
+            ->assertSee('Pending Oral Defence Evaluations')
+            ->assertSee('Amina Candidate');
+        $this->actingAs($directorUser)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Pending Oral / Internal Defence Evaluations')
+            ->assertSee('Amina Candidate');
+
+        // 4. Once Internal Examiner grades the student -> disappears from Pending Evaluations
+        \App\Models\Evaluation::create([
+            'defence_event_id' => $event->id,
+            'evaluator_id' => $ctx['examinerUser']->id,
+            'score' => ['verdict' => 'pass', 'total' => 100],
+            'recommendation' => 'pass',
+            'comments' => 'Strong oral defence.',
+            'submitted_at' => now(),
+        ]);
+
+        $this->actingAs($ctx['examinerUser'])->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Pending Oral Defence Evaluations')
+            ->assertSee('Submitted Evaluation Records');
+        $this->actingAs($directorUser)->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Pending Oral / Internal Defence Evaluations');
+    }
+
+    #[Test]
+    public function faculty_viewing_scheduled_presentation_can_open_any_scheduled_candidates_doc_without_403(): void
+    {
+        $ctx = $this->setupInternalExaminerScenario(false);
+
+        $ctx['internalDefMilestone']->update([
+            'defence_date' => now()->addDays(3)->toDateString(),
+            'defence_time' => '10:00',
+        ]);
+
+        // Unassigned faculty member (Supervisor / Internal Examiner on another thesis)
+        $otherFaculty = User::factory()->create(['is_active' => true]);
+        $otherFaculty->assignRole(['Supervisor', 'Internal Examiner']);
+
+        $this->actingAs($otherFaculty)
+            ->get(route('submissions.view', $ctx['preSubmission']))
+            ->assertOk();
+
+        // Another student still gets 403 on someone else's scheduled presentation doc
+        $otherStudent = User::factory()->create(['is_active' => true]);
+        $otherStudent->assignRole('Student');
+        $this->actingAs($otherStudent)
+            ->get(route('submissions.view', $ctx['preSubmission']))
+            ->assertForbidden();
+    }
 }
