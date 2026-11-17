@@ -97,19 +97,52 @@
 
                 $isStudentViewer = auth()->id() === $milestone->thesis?->student?->user_id;
                 $isAdminViewer = auth()->user()?->hasRole('Admin') ?? false;
-                $isSupervisorViewer = !$isStudentViewer && !$isAdminViewer && (auth()->user()?->hasRole('Supervisor') || $isAssignedSupervisorDetails);
+                $isSupervisorViewer = !$isStudentViewer && !$isAdminViewer && (
+                    $isAssignedSupervisorDetails ||
+                    (auth()->user()?->hasRole('Supervisor') && !auth()->user()?->hasAnyRole(['Program Coordinator', 'Director', 'Internal Examiner', 'External Examiner']))
+                );
 
-                $showTopSupReviewCard = !$isPostDefenceStage && ($isSupervisorViewer || ($milestone->submissions->isNotEmpty() && ($isAssignedSupervisorDetails || $isAdminViewer)));
+                $milestoneSlug = $milestone->template?->slug;
+                $isSeminarPhase = ($milestoneSlug === 'seminar_as_a_course');
+                $showTopSupReviewCard = !$isPostDefenceStage && !$isSeminarPhase && ($isSupervisorViewer || ($milestone->submissions->isNotEmpty() && ($isAssignedSupervisorDetails || $isAdminViewer)));
                 $canActTopSupReview = $showTopSupReviewCard && $milestone->status !== 'approved' && $milestone->submissions->isNotEmpty() && (
                     $mySupReviewDetails ? in_array($mySupReviewDetails['status'], ['pending', 'pending_re_review']) : !$isUploadAccepted
                 );
-                $primaryReviewSub = $isPostDefenceStage
+
+                $latestDocReviewSub = $isPostDefenceStage
                     ? $latestManuscript
-                    : ($milestone->submissions->whereIn('type', ['manuscript', 'file', 'ppt'])->sortByDesc('id')->first() ?? $milestone->submissions->sortByDesc('id')->first());
+                    : ($milestone->submissions->whereIn('type', ['manuscript', 'file'])->sortByDesc('id')->first()
+                        ?? $milestone->submissions->whereNotIn('type', ['publication', 'plagiarism_report', 'ppt'])->sortByDesc('id')->first());
+                $latestPptReviewSub = !$isPostDefenceStage
+                    ? $milestone->submissions->where('type', 'ppt')->sortByDesc('id')->first()
+                    : null;
+                $primaryReviewSub = $latestDocReviewSub ?? $latestPptReviewSub ?? $milestone->submissions->sortByDesc('id')->first();
+                $showSecondaryPptRow = $latestPptReviewSub && $primaryReviewSub && $latestPptReviewSub->id !== $primaryReviewSub->id;
                 $attachedPubSubs = $milestone->submissions->where('type', 'publication')->sortByDesc('id')->values();
+
+                $primaryDocBadgeLabel = match($milestoneSlug) {
+                    'proposal_defence' => ($primaryReviewSub?->type === 'ppt' ? 'Latest Proposal Slides' : 'Latest Proposal Document'),
+                    'progress_report_1', 'progress_report_2' => ($primaryReviewSub?->type === 'ppt' ? 'Latest Progress Slides' : 'Latest Progress Report'),
+                    default => ($primaryReviewSub?->type === 'ppt' ? 'Latest Presentation Slides' : 'Latest Thesis Manuscript'),
+                };
+                $primaryOpenBtnLabel = match($milestoneSlug) {
+                    'proposal_defence' => ($primaryReviewSub?->type === 'ppt' ? 'Open Slides PDF' : 'Open Proposal PDF'),
+                    'progress_report_1', 'progress_report_2' => ($primaryReviewSub?->type === 'ppt' ? 'Open Slides PDF' : 'Open Report PDF'),
+                    default => ($primaryReviewSub?->type === 'ppt' ? 'Open Slides PDF' : 'Open Thesis PDF'),
+                };
+                $approveBtnLabel = match($milestoneSlug) {
+                    'proposal_defence' => '✓ Approve Proposal',
+                    'progress_report_1', 'progress_report_2' => '✓ Approve Report',
+                    default => '✓ Approve Thesis',
+                };
+                $actionHeaderBadge = match($milestoneSlug) {
+                    'proposal_defence' => ($canActTopSupReview ? 'Action Needed: Review & Approve Proposal' : ($isUploadAccepted ? 'Proposal Approved for Defence' : 'Proposal Review')),
+                    'progress_report_1', 'progress_report_2' => ($canActTopSupReview ? 'Action Needed: Review & Approve Progress Report' : ($isUploadAccepted ? 'Progress Report Approved' : 'Progress Report Review')),
+                    default => ($canActTopSupReview ? 'Action Needed: Review & Approve Thesis' : ($isUploadAccepted ? 'Thesis Approved for Defence' : 'Thesis Review')),
+                };
             @endphp
 
-            {{-- Clean, Focused Supervisor Review & Approval Card --}}
+            {{-- Clean, Focused Supervisor Review & Approval Card (Shared across all approval milestones) --}}
             @if($showTopSupReviewCard)
                 <div class="overflow-hidden rounded-[2rem] bg-white border {{ $canActTopSupReview ? 'border-amber-300 shadow-amber-100/60' : 'border-slate-200' }} shadow-xl relative mb-6"
                      x-data="{ editingSupDecision: {{ $canActTopSupReview ? 'true' : 'false' }}, remarks: {{ \Illuminate\Support\Js::from($mySupReviewDetails['remarks'] ?? '') }} }">
@@ -120,7 +153,7 @@
                                 <div class="flex flex-wrap items-center gap-2 mb-1.5">
                                     <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full {{ $canActTopSupReview ? 'bg-amber-100 text-amber-800 border border-amber-200' : ($isUploadAccepted ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-slate-100 text-slate-700') }} text-[10px] font-black uppercase tracking-wider">
                                         <span class="w-1.5 h-1.5 rounded-full {{ $canActTopSupReview ? 'bg-amber-500 animate-pulse' : ($isUploadAccepted ? 'bg-emerald-600' : 'bg-slate-400') }}"></span>
-                                        {{ $canActTopSupReview ? 'Action Needed: Review & Approve Thesis' : ($isUploadAccepted ? 'Thesis Approved for Defence' : 'Thesis Review') }}
+                                        {{ $actionHeaderBadge }}
                                     </span>
                                 </div>
                                 <h3 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
@@ -135,8 +168,11 @@
                             </div>
                         </div>
 
-                        {{-- 2. Latest Thesis Document (Only the current active manuscript, no duplicate old versions) --}}
+                        {{-- 2. Latest Thesis / Milestone Document (Opens in Modal, hides duplicate older drafts) --}}
                         @if($primaryReviewSub)
+                            @php
+                                $primaryPreviewType = (empty($primaryReviewSub->file_url) || str_ends_with(strtolower($primaryReviewSub->file_url), '.pdf') || str_contains(strtolower($primaryReviewSub->file_meta['mime_type'] ?? ''), 'pdf')) ? 'pdf' : 'document';
+                            @endphp
                             <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div class="flex items-start gap-3.5 min-w-0">
                                     <div class="w-11 h-11 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
@@ -145,7 +181,7 @@
                                     <div class="min-w-0">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
-                                                Latest Thesis Manuscript
+                                                {{ $primaryDocBadgeLabel }}
                                             </span>
                                             @if(!empty($primaryReviewSub->plagiarism_data['similarity_score']))
                                                 @php $simScore = $primaryReviewSub->plagiarism_data['similarity_score']; @endphp
@@ -155,7 +191,7 @@
                                             @endif
                                         </div>
                                         <p class="text-sm font-bold text-slate-900 truncate mt-1" title="{{ $primaryReviewSub->file_meta['original_name'] ?? 'Thesis Manuscript.pdf' }}">
-                                            {{ $primaryReviewSub->file_meta['original_name'] ?? ('Thesis Manuscript v.0' . $primaryReviewSub->version . '.pdf') }}
+                                            {{ $primaryReviewSub->file_meta['original_name'] ?? ('Document v.0' . $primaryReviewSub->version . '.pdf') }}
                                         </p>
                                         <p class="text-xs text-slate-500 mt-0.5">
                                             Uploaded {{ $primaryReviewSub->created_at?->format('M d, Y \a\t g:i A') }}
@@ -163,13 +199,44 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <a href="{{ route('submissions.view', $primaryReviewSub) }}" target="_blank"
+                                    <button type="button"
+                                        @click.prevent="$dispatch('open-document-preview', {
+                                            url: '{{ route('submissions.view', $primaryReviewSub) }}',
+                                            title: {{ \Illuminate\Support\Js::from($primaryReviewSub->file_meta['original_name'] ?? ($primaryDocBadgeLabel . ' - ' . ($milestone->thesis?->student?->user?->name ?? 'Candidate'))) }},
+                                            type: '{{ $primaryPreviewType }}'
+                                        })"
                                         class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                        <span>Open Thesis PDF</span>
-                                    </a>
+                                        <span>{{ $primaryOpenBtnLabel }}</span>
+                                    </button>
                                 </div>
                             </div>
+
+                            @if($showSecondaryPptRow)
+                                @php
+                                    $pptPreviewType = (empty($latestPptReviewSub->file_url) || str_ends_with(strtolower($latestPptReviewSub->file_url), '.pdf') || str_contains(strtolower($latestPptReviewSub->file_meta['mime_type'] ?? ''), 'pdf')) ? 'pdf' : 'document';
+                                @endphp
+                                <div class="p-4 bg-amber-50/40 rounded-2xl border border-amber-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <span class="text-[10px] font-black uppercase tracking-wider text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-200">
+                                            Latest Presentation Slides
+                                        </span>
+                                        <p class="text-xs font-bold text-slate-900 truncate mt-1">
+                                            {{ $latestPptReviewSub->file_meta['original_name'] ?? ('Presentation Slides v.0' . $latestPptReviewSub->version . '.pdf') }}
+                                        </p>
+                                    </div>
+                                    <button type="button"
+                                        @click.prevent="$dispatch('open-document-preview', {
+                                            url: '{{ route('submissions.view', $latestPptReviewSub) }}',
+                                            title: {{ \Illuminate\Support\Js::from($latestPptReviewSub->file_meta['original_name'] ?? 'Presentation Slides') }},
+                                            type: '{{ $pptPreviewType }}'
+                                        })"
+                                        class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-bold transition-colors shrink-0 cursor-pointer">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                        <span>Open Slides PDF</span>
+                                    </button>
+                                </div>
+                            @endif
 
                             @if($attachedPubsCount = $attachedPubSubs->count())
                                 <div class="space-y-2">
@@ -182,17 +249,23 @@
                                                     <p class="text-[10px] text-slate-500 font-mono">DOI: {{ $pubSub->doi }}</p>
                                                 @endif
                                             </div>
-                                            <a href="{{ route('submissions.view', $pubSub) }}" target="_blank" class="px-3 py-1.5 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[11px] font-bold shrink-0">
+                                            <button type="button"
+                                                @click.prevent="$dispatch('open-document-preview', {
+                                                    url: '{{ route('submissions.view', $pubSub) }}',
+                                                    title: {{ \Illuminate\Support\Js::from($pubSub->publication_title ?: ($pubSub->file_meta['original_name'] ?? 'Publication.pdf')) }},
+                                                    type: 'pdf'
+                                                })"
+                                                class="px-3 py-1.5 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer">
                                                 View Paper
-                                            </a>
+                                            </button>
                                         </div>
                                     @endforeach
                                 </div>
                             @endif
                         @else
                             <div class="p-6 bg-slate-50 rounded-2xl border border-slate-200/80 text-center">
-                                <p class="text-sm font-bold text-slate-700">No Thesis Uploaded Yet</p>
-                                <p class="text-xs text-slate-500 mt-1">The candidate has not uploaded their thesis manuscript for this stage yet.</p>
+                                <p class="text-sm font-bold text-slate-700">No Upload Submitted Yet</p>
+                                <p class="text-xs text-slate-500 mt-1">The candidate has not uploaded their document for this milestone yet.</p>
                             </div>
                         @endif
 
@@ -228,11 +301,11 @@
                                 <div x-show="!editingSupDecision" class="p-4 rounded-2xl {{ ($mySupReviewDetails['status'] ?? '') === 'rejected' ? 'bg-rose-50 border border-rose-200 text-rose-900' : 'bg-emerald-50 border border-emerald-200 text-emerald-900' }} flex items-center justify-between gap-4">
                                     <div class="text-xs font-bold">
                                         @if(($mySupReviewDetails['status'] ?? '') === 'approved')
-                                            ✓ You have approved this thesis submission.
+                                            ✓ You have approved this submission.
                                         @elseif(($mySupReviewDetails['status'] ?? '') === 'rejected')
-                                            ✕ You requested revisions on this thesis submission.
+                                            ✕ You requested revisions on this submission.
                                         @else
-                                            ✓ Thesis approval recorded.
+                                            ✓ Submission approval recorded.
                                         @endif
                                     </div>
                                     <button type="button" @click="editingSupDecision = true" class="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-[11px] font-bold shrink-0 cursor-pointer">
@@ -264,7 +337,7 @@
                                     <button type="submit"
                                         formaction="{{ route('milestones.accept_upload', $milestone) }}"
                                         class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer shadow-md shadow-emerald-600/20">
-                                        ✓ Approve Thesis
+                                        {{ $approveBtnLabel }}
                                     </button>
                                 </div>
                             </form>
@@ -326,9 +399,15 @@
                                             @csrf
                                             <div class="flex items-center justify-between gap-2">
                                                 <span class="text-[10px] font-black uppercase tracking-widest text-indigo-900">⚖️ Internal Examiner Clearance Action</span>
-                                                <a href="{{ route('submissions.view', $latestManuscript) }}" target="_blank" class="text-[11px] font-bold text-indigo-600 hover:underline">
-                                                    Download Corrected Manuscript (v.0{{ $latestManuscript->version }}) &rarr;
-                                                </a>
+                                                <button type="button"
+                                                    @click.prevent="$dispatch('open-document-preview', {
+                                                        url: '{{ route('submissions.view', $latestManuscript) }}',
+                                                        title: {{ \Illuminate\Support\Js::from($latestManuscript->file_meta['original_name'] ?? ('Corrected Manuscript v.0' . $latestManuscript->version)) }},
+                                                        type: 'pdf'
+                                                    })"
+                                                    class="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer">
+                                                    Open Corrected Manuscript (v.0{{ $latestManuscript->version }}) &rarr;
+                                                </button>
                                             </div>
                                             <textarea name="remarks" x-model="remarks" rows="2" class="w-full text-xs rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 p-2.5 shadow-sm resize-none bg-slate-50 focus:bg-white placeholder:text-slate-400" placeholder="Enter verification remarks on the candidate's post-defence corrections..." required></textarea>
                                             <div class="flex flex-wrap gap-2">
@@ -602,7 +681,7 @@
                             <h3 class="text-lg font-bold text-slate-900 tracking-tight mb-2">Schedule Expired</h3>
                             <p class="text-sm font-medium text-slate-500 max-w-md leading-relaxed mb-6">The presentation date has passed. Please contact the administrator to reschedule.</p>
                         </div>
-                    @elseif($milestone->template->submission_requires_approval && !$milestone->is_submission_unlocked)
+                    @elseif($milestone->template->submission_requires_approval && !$milestone->is_submission_unlocked && (!$isSupervisorViewer || auth()->user()->can('unlock', $milestone)))
                         <!-- Locked State -->
                         <div class="overflow-hidden rounded-[2.5rem] bg-white border border-slate-100 shadow-xl shadow-slate-200/40 p-10 flex flex-col items-center justify-center text-center">
                             <div class="w-16 h-16 bg-slate-100 text-slate-500 rounded-2xl flex items-center justify-center mb-6">
@@ -1396,7 +1475,7 @@
             @can('review', $milestone)
                 @php
                     $isPresentationGatedDetail = in_array($milestone->template?->slug, ['seminar_as_a_course', 'proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence']) || $isInternalDefence;
-                    $showBottomEvaluationCard = !$isPresentationGatedDetail && $milestone->status !== 'approved' && !$isUploadAccepted;
+                    $showBottomEvaluationCard = !$isPresentationGatedDetail && !$isSupervisorViewer && $milestone->status !== 'approved' && (!$isUploadAccepted || $isAdminViewer);
                 @endphp
                 @if($showBottomEvaluationCard)
                     <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-8 mt-6">

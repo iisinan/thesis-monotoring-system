@@ -17,12 +17,7 @@
             ? $submissions->sortByDesc('created_at')->first()
             : null;
         $hasUpload = !is_null($latestSub);
-        $fileUrl = '';
-        if ($latestSub && !empty($latestSub->file_url)) {
-            $fileUrl = str_starts_with($latestSub->file_url, 'http')
-                ? $latestSub->file_url
-                : \Illuminate\Support\Facades\Storage::url($latestSub->file_url);
-        }
+        $fileUrl = $latestSub ? route('submissions.view', $latestSub) : '';
 
         $assignments = $thesis && $thesis->relationLoaded('assignments') ? $thesis->assignments : ($thesis?->assignments ?? collect());
         $activeAssignments = $assignments instanceof \Illuminate\Support\Collection
@@ -388,9 +383,9 @@
                                         </p>
                                     @endif
                                 </div>
-                                @if($hasUpload)
+                                @if($hasUpload && $latestSub)
                                     <button type="button" 
-                                            @click="openPreview('{{ $student->thesis && $student->thesis->milestones ? (optional($student->thesis->milestones->firstWhere(fn($m) => ($m->template?->slug === 'supervisors_assigned' || $m->template?->order == 2)))->submissions?->sortByDesc('created_at')->first()?->file_url ? (str_starts_with(optional($student->thesis->milestones->firstWhere(fn($m) => ($m->template?->slug === 'supervisors_assigned' || $m->template?->order == 2)))->submissions?->sortByDesc('created_at')->first()->file_url, 'http') ? optional($student->thesis->milestones->firstWhere(fn($m) => ($m->template?->slug === 'supervisors_assigned' || $m->template?->order == 2)))->submissions?->sortByDesc('created_at')->first()->file_url : \Illuminate\Support\Facades\Storage::url(optional($student->thesis->milestones->firstWhere(fn($m) => ($m->template?->slug === 'supervisors_assigned' || $m->template?->order == 2)))->submissions?->sortByDesc('created_at')->first()->file_url)) : '' }}', 'Tentative Proposal - {{ addslashes($student->user?->name ?? 'Student') }}')" 
+                                            @click="openPreview('{{ route('submissions.view', $latestSub) }}', {{ \Illuminate\Support\Js::from('Tentative Proposal - ' . ($student->user?->name ?? 'Student')) }})" 
                                             class="px-2.5 py-1 bg-white border border-emerald-300 text-emerald-800 text-[10px] font-bold rounded-lg shadow-xs hover:bg-emerald-50 shrink-0">
                                         Preview
                                     </button>

@@ -64,8 +64,29 @@
     @if($pendingSupMilestoneOnThesis)
         @php
             $pendingSubs = $pendingSupMilestoneOnThesis->submissions->sortByDesc('id');
-            $latestPendingDoc = $pendingSubs->whereIn('type', ['manuscript', 'file', 'ppt'])->first() ?? $pendingSubs->first();
+            $latestPendingDoc = $pendingSubs->whereIn('type', ['manuscript', 'file'])->first()
+                ?? $pendingSubs->whereNotIn('type', ['publication', 'plagiarism_report', 'ppt'])->first()
+                ?? $pendingSubs->where('type', 'ppt')->first()
+                ?? $pendingSubs->first();
+            $latestPendingPpt = $pendingSubs->where('type', 'ppt')->first();
+            $showPendingPpt = $latestPendingPpt && $latestPendingDoc && $latestPendingPpt->id !== $latestPendingDoc->id;
             $pendingPubs = $pendingSubs->where('type', 'publication')->values();
+            $pendingSlug = $pendingSupMilestoneOnThesis->template?->slug;
+            $pendingOpenLabel = match($pendingSlug) {
+                'proposal_defence' => ($latestPendingDoc?->type === 'ppt' ? 'Open Slides PDF' : 'Open Proposal PDF'),
+                'progress_report_1', 'progress_report_2' => ($latestPendingDoc?->type === 'ppt' ? 'Open Slides PDF' : 'Open Report PDF'),
+                default => ($latestPendingDoc?->type === 'ppt' ? 'Open Slides PDF' : 'Open Thesis PDF'),
+            };
+            $pendingDocBadge = match($pendingSlug) {
+                'proposal_defence' => ($latestPendingDoc?->type === 'ppt' ? 'Latest Proposal Slides' : 'Latest Proposal Document'),
+                'progress_report_1', 'progress_report_2' => ($latestPendingDoc?->type === 'ppt' ? 'Latest Progress Slides' : 'Latest Progress Report'),
+                default => ($latestPendingDoc?->type === 'ppt' ? 'Latest Presentation Slides' : 'Latest Thesis Manuscript'),
+            };
+            $pendingApproveBtn = match($pendingSlug) {
+                'proposal_defence' => '✓ Approve Proposal',
+                'progress_report_1', 'progress_report_2' => '✓ Approve Report',
+                default => '✓ Approve Thesis',
+            };
         @endphp
         <div class="rounded-3xl bg-white border border-amber-300 p-6 shadow-md space-y-5">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -76,26 +97,78 @@
                     <div>
                         <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-wider mb-1">{{ 'Action Needed: Review & Approve Thesis' }}</span>
                         <h3 class="text-base sm:text-lg font-black text-slate-900">{{ $thesis->student->user->name }} — {{ $pendingSupMilestoneOnThesis->template->name }}</h3>
-                        <p class="text-xs font-medium text-slate-600 mt-0.5">Open the candidate's latest uploaded thesis manuscript below and approve or request revision.</p>
+                        <p class="text-xs font-medium text-slate-600 mt-0.5">Open the candidate's latest uploaded document below and approve or request revision.</p>
                     </div>
                 </div>
             </div>
 
             @if($latestPendingDoc)
+                @php
+                    $pendingPreviewType = (empty($latestPendingDoc->file_url) || str_ends_with(strtolower($latestPendingDoc->file_url), '.pdf') || str_contains(strtolower($latestPendingDoc->file_meta['mime_type'] ?? ''), 'pdf')) ? 'pdf' : 'document';
+                @endphp
                 <div class="bg-slate-50 rounded-2xl border border-slate-200/80 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2">
-                            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase tracking-wider">Latest Thesis Manuscript</span>
+                            <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase tracking-wider">{{ $pendingDocBadge }}</span>
                         </div>
-                        <p class="text-sm font-bold text-slate-900 truncate mt-1">{{ $latestPendingDoc->file_meta['original_name'] ?? ('Thesis Manuscript v.0' . $latestPendingDoc->version . '.pdf') }}</p>
+                        <p class="text-sm font-bold text-slate-900 truncate mt-1">{{ $latestPendingDoc->file_meta['original_name'] ?? ('Document v.0' . $latestPendingDoc->version . '.pdf') }}</p>
                         <p class="text-xs text-slate-500 mt-0.5">Uploaded {{ $latestPendingDoc->created_at?->format('M d, Y \a\t g:i A') }}</p>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                        <a href="{{ route('submissions.view', $latestPendingDoc) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm">
+                        <button type="button"
+                            @click.prevent="$dispatch('open-document-preview', {
+                                url: '{{ route('submissions.view', $latestPendingDoc) }}',
+                                title: {{ \Illuminate\Support\Js::from($latestPendingDoc->file_meta['original_name'] ?? ($pendingDocBadge . ' - ' . ($thesis->student?->user?->name ?? 'Candidate'))) }},
+                                type: '{{ $pendingPreviewType }}'
+                            })"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors shadow-sm cursor-pointer">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                            <span>Open Thesis PDF</span>
-                        </a>
+                            <span>{{ $pendingOpenLabel }}</span>
+                        </button>
                     </div>
+                </div>
+            @endif
+
+            @if($showPendingPpt)
+                <div class="bg-amber-50/40 rounded-2xl border border-amber-200/70 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-wider">Latest Presentation Slides</span>
+                        <p class="text-xs font-bold text-slate-900 truncate mt-1">{{ $latestPendingPpt->file_meta['original_name'] ?? ('Presentation Slides v.0' . $latestPendingPpt->version . '.pdf') }}</p>
+                    </div>
+                    <button type="button"
+                        @click.prevent="$dispatch('open-document-preview', {
+                            url: '{{ route('submissions.view', $latestPendingPpt) }}',
+                            title: {{ \Illuminate\Support\Js::from($latestPendingPpt->file_meta['original_name'] ?? 'Presentation Slides') }},
+                            type: 'pdf'
+                        })"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-white hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-bold transition-colors shrink-0 cursor-pointer">
+                        <span>Open Slides PDF</span>
+                    </button>
+                </div>
+            @endif
+
+            @if($pendingPubs->isNotEmpty())
+                <div class="space-y-2">
+                    <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Attached Research Publication(s) ({{ $pendingPubs->count() }})</p>
+                    @foreach($pendingPubs as $pubSub)
+                        <div class="p-3 bg-purple-50/50 rounded-xl border border-purple-100 flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold text-slate-800 truncate">{{ $pubSub->publication_title ?: ($pubSub->file_meta['original_name'] ?? 'Publication.pdf') }}</p>
+                                @if($pubSub->doi)
+                                    <p class="text-[10px] text-slate-500 font-mono">DOI: {{ $pubSub->doi }}</p>
+                                @endif
+                            </div>
+                            <button type="button"
+                                @click.prevent="$dispatch('open-document-preview', {
+                                    url: '{{ route('submissions.view', $pubSub) }}',
+                                    title: {{ \Illuminate\Support\Js::from($pubSub->publication_title ?: ($pubSub->file_meta['original_name'] ?? 'Publication.pdf')) }},
+                                    type: 'pdf'
+                                })"
+                                class="px-3 py-1.5 bg-white hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer">
+                                View Paper
+                            </button>
+                        </div>
+                    @endforeach
                 </div>
             @endif
 
@@ -118,7 +191,7 @@
                     <button type="submit"
                         formaction="{{ route('milestones.accept_upload', $pendingSupMilestoneOnThesis) }}"
                         class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer">
-                        ✓ Approve Thesis
+                        {{ $pendingApproveBtn }}
                     </button>
                 </div>
             </form>
@@ -169,9 +242,15 @@
                                 @endphp
                                 @if($latestMSub)
                                     <div class="flex flex-wrap gap-1.5">
-                                        <a href="{{ route('submissions.view', $latestMSub) }}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold transition-colors">
+                                        <button type="button"
+                                            @click.prevent="$dispatch('open-document-preview', {
+                                                url: '{{ route('submissions.view', $latestMSub) }}',
+                                                title: {{ \Illuminate\Support\Js::from($latestMSub->file_meta['original_name'] ?? 'Thesis PDF') }},
+                                                type: 'pdf'
+                                            })"
+                                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold transition-colors cursor-pointer">
                                             <span>{{ \Illuminate\Support\Str::limit($latestMSub->file_meta['original_name'] ?? 'Thesis PDF', 28) }}</span>
-                                        </a>
+                                        </button>
                                     </div>
                                 @endif
                             @endif
@@ -222,9 +301,15 @@
                                                 @endphp
                                                 @if($latestRowSub)
                                                     <div class="flex flex-wrap items-center gap-1.5 mt-1">
-                                                        <a href="{{ route('submissions.view', $latestRowSub) }}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold transition-colors">
+                                                        <button type="button"
+                                                            @click.prevent="$dispatch('open-document-preview', {
+                                                                url: '{{ route('submissions.view', $latestRowSub) }}',
+                                                                title: {{ \Illuminate\Support\Js::from($latestRowSub->file_meta['original_name'] ?? 'Thesis PDF') }},
+                                                                type: 'pdf'
+                                                            })"
+                                                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold transition-colors cursor-pointer">
                                                             <span>{{ \Illuminate\Support\Str::limit($latestRowSub->file_meta['original_name'] ?? 'Thesis PDF', 30) }}</span>
-                                                        </a>
+                                                        </button>
                                                     </div>
                                                 @endif
                                             @endif

@@ -443,4 +443,69 @@ class SupervisorsAssignedMilestoneTest extends TestCase
         $workflow = app(\App\Services\MilestoneWorkflowService::class);
         $this->assertFalse($workflow->hasBeenGraded($supMilestone->fresh(['template', 'thesis.defenceEvents.evaluations'])));
     }
+
+    #[Test]
+    public function coordinator_can_view_assigned_supervisors_index_page_even_with_multiple_roles_and_uploads(): void
+    {
+        Notification::fake();
+
+        [$studentUser, $student, $thesis, $supMilestone] = $this->createStudentAtSupervisorsAssigned(
+            $this->phdLevel,
+            'Candidate On M2',
+            'NOU268889990'
+        );
+
+        \App\Models\Submission::create([
+            'student_milestone_id' => $supMilestone->id,
+            'submitted_by' => $studentUser->id,
+            'type' => 'manuscript',
+            'file_url' => 'submissions/tentative-proposal.pdf',
+            'version' => 1,
+        ]);
+
+        // Also create a student with null level and no submissions
+        $noLevelUser = User::factory()->create(['name' => 'No Level Candidate', 'is_active' => true]);
+        $noLevelUser->assignRole('Student');
+        $noLevelStudent = $noLevelUser->studentProfile()->create([
+            'program_id' => $this->program->id,
+            'cohort_id' => $this->cohort->id,
+            'level_id' => null,
+            'student_id_number' => 'NOU260000111',
+            'enrollment_status' => 'active',
+        ]);
+        $t2 = ThesisProject::create([
+            'student_profile_id' => $noLevelStudent->id,
+            'title' => 'No Level Thesis',
+            'status' => 'draft',
+            'started_at' => now(),
+        ]);
+        $t2->syncMilestones();
+
+        $admin = User::factory()->create(['name' => 'Admin Viewer', 'is_active' => true]);
+        $admin->assignRole('Admin');
+
+        $coordinator = User::factory()->create([
+            'name' => 'Prof Ishaq Oyefolahan',
+            'email' => 'oyefolahan@noun.edu.ng',
+            'is_active' => true,
+        ]);
+        $coordinator->assignRole(['Internal Examiner', 'Supervisor', 'Program Coordinator']);
+        CoordinatorProfile::create([
+            'user_id' => $coordinator->id,
+            'program_id' => $this->program->id,
+            'active' => true,
+        ]);
+        SupervisorProfile::create(['user_id' => $coordinator->id, 'rank' => 'Professor']);
+
+        $res = $this->actingAs($coordinator)
+            ->withSession([
+                'impersonate_admin_id' => $admin->id,
+                'impersonate_admin_name' => $admin->name,
+            ])
+            ->get(route('coordinator.assigned-supervisors.index'));
+
+        $res->assertOk();
+        $res->assertSee('Candidate On M2');
+        $res->assertSee('No Level Candidate');
+    }
 }

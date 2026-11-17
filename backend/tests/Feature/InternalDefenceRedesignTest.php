@@ -365,10 +365,11 @@ class InternalDefenceRedesignTest extends TestCase
         $res = $this->actingAs($supUser)->followingRedirects()->get(route('milestones.show', $milestone));
         $res->assertOk();
 
-        // Shows candidate name, latest manuscript only, and single clear action card
+        // Shows candidate name, latest manuscript only, and opens PDF in modal
         $res->assertSee('Action Needed: Review & Approve Thesis');
         $res->assertSee('DDSACA_Current_ACETEL.pdf');
         $res->assertSee('Open Thesis PDF');
+        $res->assertSee('open-document-preview', false);
         $res->assertDontSee('100_data_BCOS_first2.pdf');
 
         // Does NOT clutter supervisor view with 6-step progression grid, submission history, or student banners
@@ -381,6 +382,52 @@ class InternalDefenceRedesignTest extends TestCase
         $thesisRes->assertOk();
         $thesisRes->assertSee('Action Needed: Review & Approve Thesis');
         $thesisRes->assertSee('DDSACA_Current_ACETEL.pdf');
+        $thesisRes->assertSee('open-document-preview', false);
         $thesisRes->assertDontSee('100_data_BCOS_first2.pdf');
+    }
+
+    #[Test]
+    public function supervisor_sees_simplified_modal_approval_ui_across_all_approval_milestones(): void
+    {
+        [$studentUser, , $thesis] = $this->createCandidateAtInternalDefence($this->progA, 'AllStages');
+
+        $supUser = User::factory()->create(['name' => 'Prof. Multi Stage', 'is_active' => true]);
+        $supUser->assignRole('Supervisor');
+        $supProf = SupervisorProfile::create(['user_id' => $supUser->id, 'active' => true]);
+
+        SupervisionAssignment::create([
+            'thesis_project_id' => $thesis->id,
+            'supervisor_profile_id' => $supProf->id,
+            'role' => 'primary',
+            'status' => 'active',
+        ]);
+
+        foreach (['proposal_defence', 'progress_report_1', 'progress_report_2', 'viva'] as $slug) {
+            $tpl = MilestoneTemplate::where('slug', $slug)->firstOrFail();
+            $m = StudentMilestone::updateOrCreate([
+                'thesis_project_id' => $thesis->id,
+                'milestone_template_id' => $tpl->id,
+            ], [
+                'status' => 'submitted',
+                'approvals' => [],
+            ]);
+
+            \App\Models\Submission::create([
+                'student_milestone_id' => $m->id,
+                'submitted_by' => $studentUser->id,
+                'type' => 'manuscript',
+                'file_url' => "submissions/{$slug}_latest.pdf",
+                'file_meta' => ['original_name' => "{$slug}_document.pdf"],
+                'version' => 1,
+            ]);
+
+            $res = $this->actingAs($supUser)->followingRedirects()->get(route('milestones.show', $m));
+            $res->assertOk();
+            $res->assertSee("{$slug}_document.pdf");
+            $res->assertSee('open-document-preview', false);
+            $res->assertDontSee('Milestone Progression Requirements');
+            $res->assertDontSee('Submission History');
+            $res->assertDontSee('Scholarly Evaluation');
+        }
     }
 }

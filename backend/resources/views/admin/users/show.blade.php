@@ -170,6 +170,10 @@
                                 <span class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-md text-[9px] font-black uppercase tracking-wider">External Examiner</span>
                             </div>
                         @endforeach
+                    </div>
+                </div>
+            @endif
+
             @if($user->hasRole('Director'))
                 <div class="space-y-4">
                     <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest">Center Directorship & Institutional Governance</h4>

@@ -382,7 +382,13 @@ class="space-y-8 animate-in">
                                     @if($latestReviewSub)
                                         <div class="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 text-[10px]">
                                             <span class="font-bold text-slate-600 truncate">{{ (is_array($latestReviewSub->file_meta) ? ($latestReviewSub->file_meta['original_name'] ?? null) : null) ?? ('Submission v.0' . $latestReviewSub->version) }}</span>
-                                            <a href="{{ route('submissions.view', $latestReviewSub) }}" target="_blank" class="font-black text-indigo-600 hover:text-indigo-800 shrink-0 uppercase tracking-wider">View File &rarr;</a>
+                                            <button type="button"
+                                                @click.prevent="$dispatch('open-document-preview', {
+                                                    url: '{{ route('submissions.view', $latestReviewSub) }}',
+                                                    title: {{ \Illuminate\Support\Js::from((is_array($latestReviewSub->file_meta) ? ($latestReviewSub->file_meta['original_name'] ?? null) : null) ?? ('Submission v.0' . $latestReviewSub->version)) }},
+                                                    type: 'pdf'
+                                                })"
+                                                class="font-black text-indigo-600 hover:text-indigo-800 shrink-0 uppercase tracking-wider cursor-pointer">View File &rarr;</button>
                                         </div>
                                     @endif
                                     <div class="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -827,7 +833,13 @@ class="space-y-8 animate-in">
                         @if($latestTabReviewSub)
                             <div class="mt-3 flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-100 text-[10px]">
                                 <span class="font-bold text-slate-600 truncate">{{ (is_array($latestTabReviewSub->file_meta) ? ($latestTabReviewSub->file_meta['original_name'] ?? null) : null) ?? ('Submission v.0' . $latestTabReviewSub->version) }}</span>
-                                <a href="{{ route('submissions.view', $latestTabReviewSub) }}" target="_blank" class="font-black text-indigo-600 hover:text-indigo-800 shrink-0 uppercase tracking-wider">View File &rarr;</a>
+                                <button type="button"
+                                    @click.prevent="$dispatch('open-document-preview', {
+                                        url: '{{ route('submissions.view', $latestTabReviewSub) }}',
+                                        title: {{ \Illuminate\Support\Js::from((is_array($latestTabReviewSub->file_meta) ? ($latestTabReviewSub->file_meta['original_name'] ?? null) : null) ?? ('Submission v.0' . $latestTabReviewSub->version)) }},
+                                        type: 'pdf'
+                                    })"
+                                    class="font-black text-indigo-600 hover:text-indigo-800 shrink-0 uppercase tracking-wider cursor-pointer">View File &rarr;</button>
                             </div>
                         @endif
                         <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
@@ -1041,9 +1053,15 @@ class="space-y-8 animate-in">
                                 </div>
 
                                 @if(!empty($student->latest_upload_submission))
-                                    <a href="{{ route('submissions.view', $student->latest_upload_submission) }}" target="_blank" class="flex items-center justify-center px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-xs" title="View Candidate Upload">
+                                    <button type="button"
+                                        @click.prevent="$dispatch('open-document-preview', {
+                                            url: '{{ route('submissions.view', $student->latest_upload_submission) }}',
+                                            title: {{ \Illuminate\Support\Js::from($student->user?->name ?? 'Candidate Submission') }},
+                                            type: 'pdf'
+                                        })"
+                                        class="flex items-center justify-center px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-xs cursor-pointer" title="View Candidate Upload">
                                         View Upload
-                                    </a>
+                                    </button>
                                 @endif
 
                                 @if($student->has_pending_review && !empty($student->pending_review_milestone_id))

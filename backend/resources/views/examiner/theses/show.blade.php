@@ -62,11 +62,17 @@
                     @endif
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <a href="{{ Storage::url($postDefenceSub->file_url) }}" target="_blank" class="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
-                        Download Corrected Thesis
-                    </a>
-                    <a href="{{ route('submissions.view', $postDefenceSub->id) }}" class="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
-                        View Details
+                    <button type="button"
+                        @click.prevent="$dispatch('open-document-preview', {
+                            url: '{{ route('submissions.view', $postDefenceSub->id) }}',
+                            title: {{ \Illuminate\Support\Js::from($postDefenceSub->file_meta['original_name'] ?? 'Corrected Thesis Document') }},
+                            type: 'pdf'
+                        })"
+                        class="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs">
+                        Open Thesis PDF
+                    </button>
+                    <a href="{{ route('submissions.view', $postDefenceSub->id) }}" download class="px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
+                        Download
                     </a>
                 </div>
             </div>

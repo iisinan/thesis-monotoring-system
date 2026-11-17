@@ -91,9 +91,15 @@
                                     <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
                                     <span class="text-[9px] font-black text-amber-700 uppercase tracking-widest">Awaiting Your Approval: {{ $pendingMilestoneForSup->template?->name }}</span>
                                     @if($latestUploadForSup)
-                                        <a href="{{ route('submissions.view', $latestUploadForSup) }}" target="_blank" class="px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase tracking-wider transition-colors">
+                                        <button type="button"
+                                            @click.prevent="$dispatch('open-document-preview', {
+                                                url: '{{ route('submissions.view', $latestUploadForSup) }}',
+                                                title: {{ \Illuminate\Support\Js::from($latestUploadForSup->file_meta['original_name'] ?? ('Submission v.0' . $latestUploadForSup->version)) }},
+                                                type: 'pdf'
+                                            })"
+                                            class="px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase tracking-wider transition-colors cursor-pointer">
                                             View Upload (v.0{{ $latestUploadForSup->version }}) &rarr;
-                                        </a>
+                                        </button>
                                     @endif
                                 </div>
                                 @endif

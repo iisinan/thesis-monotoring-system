@@ -47,13 +47,15 @@ class AssignedSupervisorController extends Controller
                 }
             ]);
 
+        $likeOp = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
         // Filters
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('student_id_number', 'ilike', "%{$search}%")
-                  ->orWhereHas('user', fn($u) => $u->where('name', 'ilike', "%{$search}%"))
-                  ->orWhereHas('thesis', fn($t) => $t->where('title', 'ilike', "%{$search}%"));
+            $query->where(function ($q) use ($search, $likeOp) {
+                $q->where('student_id_number', $likeOp, "%{$search}%")
+                  ->orWhereHas('user', fn($u) => $u->where('name', $likeOp, "%{$search}%"))
+                  ->orWhereHas('thesis', fn($t) => $t->where('title', $likeOp, "%{$search}%"));
             });
         }
 
@@ -67,12 +69,12 @@ class AssignedSupervisorController extends Controller
 
         if ($request->filled('batch')) {
             $batch = trim($request->batch);
-            $query->where(function($q) use ($batch) {
+            $query->where(function($q) use ($batch, $likeOp) {
                 $q->where('student_id_number', 'like', "_____{$batch}%")
-                  ->orWhereHas('cohort', function($c) use ($batch) {
-                      $c->where('name', 'ilike', "%Batch {$batch}%")
-                        ->orWhere('name', 'ilike', "%Batch-{$batch}%")
-                        ->orWhere('code', 'ilike', "%-B{$batch}%");
+                  ->orWhereHas('cohort', function($c) use ($batch, $likeOp) {
+                      $c->where('name', $likeOp, "%Batch {$batch}%")
+                        ->orWhere('name', $likeOp, "%Batch-{$batch}%")
+                        ->orWhere('code', $likeOp, "%-B{$batch}%");
                   });
             });
         }
