@@ -545,11 +545,7 @@ class DashboardController extends Controller
         // 5. VIVA / ORAL DEFENCE EVALUATIONS (Applicable to Examiners & Panelists)
         $workflowService = app(\App\Services\MilestoneWorkflowService::class);
         $data['pending_evaluations'] = $this->getPendingPanelEvaluations($user, $workflowService);
-        $data['completed_evaluations'] = \App\Models\Evaluation::where('evaluator_id', $user->id)
-            ->with(['defenceEvent.thesis.student.user'])
-            ->latest('submitted_at')
-            ->take(10)
-            ->get();
+        $data['completed_evaluations'] = \App\Models\Evaluation::submittedRecordsForUser($user, 10, $workflowService);
 
         // 6. UPCOMING ACADEMIC DEFENCES (Unified timeline across active portfolios)
         $upcomingDefences = collect();
@@ -681,11 +677,7 @@ class DashboardController extends Controller
         $workflowService = app(\App\Services\MilestoneWorkflowService::class);
         $data['pending_evaluations'] = \App\Models\DefenceEvent::pendingEvaluationsForUser($user, $workflowService);
 
-        $data['completed_evaluations'] = \App\Models\Evaluation::where('evaluator_id', $user->id)
-            ->with(['defenceEvent.thesis.student.user'])
-            ->latest('submitted_at')
-            ->take(10)
-            ->get();
+        $data['completed_evaluations'] = \App\Models\Evaluation::submittedRecordsForUser($user, 10, $workflowService);
 
         $unreadCounts = $this->getUnreadMessagesCount($user);
         $data['stats'] = [

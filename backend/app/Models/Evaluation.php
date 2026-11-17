@@ -44,4 +44,46 @@ class Evaluation extends Model
     {
         return $this->score['verdict'] ?? $this->recommendation;
     }
+
+    /**
+     * Load submitted evaluation records for the dashboard, excluding Seminar as a Course
+     * evaluations once that seminar presentation has ended.
+     */
+    public static function submittedRecordsForUser(
+        \App\Models\User $user,
+        int $limit = 10,
+        ?\App\Services\MilestoneWorkflowService $workflowService = null
+    ): \Illuminate\Support\Collection {
+        $workflowService = $workflowService ?? app(\App\Services\MilestoneWorkflowService::class);
+
+        return static::where('evaluator_id', $user->id)
+            ->whereNotNull('submitted_at')
+            ->with(['defenceEvent.thesis.student.user', 'defenceEvent.thesis.milestones.template'])
+            ->latest('submitted_at')
+            ->get()
+            ->reject(function (self $eval) use ($workflowService) {
+                $event = $eval->defenceEvent;
+                if (!$event) {
+                    return false;
+                }
+
+                if (in_array($event->type, ['seminar', 'first_seminar', 'second_seminar'], true)) {
+                    $milestone = $event->matchingMilestone($workflowService);
+                    $outcomeConcluded = !empty($event->outcome) && $event->outcome !== 'pending';
+                    $milestoneConcluded = $milestone && (
+                        $milestone->status === 'approved'
+                        || $milestone->status === 'revision_required'
+                        || empty($milestone->defence_date)
+                    );
+
+                    return $outcomeConcluded
+                        || $milestoneConcluded
+                        || $event->hasPresentationEnded($milestone);
+                }
+
+                return false;
+            })
+            ->take($limit)
+            ->values();
+    }
 }

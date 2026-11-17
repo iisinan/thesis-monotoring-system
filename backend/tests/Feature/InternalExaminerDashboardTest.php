@@ -599,4 +599,68 @@ class InternalExaminerDashboardTest extends TestCase
             ->get(route('submissions.view', $ctx['preSubmission']))
             ->assertForbidden();
     }
+
+    #[Test]
+    public function ended_seminar_course_evaluations_are_hidden_from_submitted_evaluation_records(): void
+    {
+        $ctx = $this->setupInternalExaminerScenario(false);
+        $ctx['examinerUser']->assignRole('Supervisor');
+
+        $seminarMilestone = $ctx['thesis']->milestones()
+            ->whereHas('template', fn($q) => $q->where('slug', 'seminar_as_a_course'))
+            ->firstOrFail();
+
+        // 1. Ended Seminar as a Course (past date + approved) -> must NOT clutter Submitted Evaluation Records
+        $seminarMilestone->update([
+            'status' => 'approved',
+            'defence_date' => now()->subDays(4)->toDateString(),
+            'defence_time' => '10:00:00',
+        ]);
+        $endedSeminarEvent = \App\Models\DefenceEvent::create([
+            'thesis_project_id' => $ctx['thesis']->id,
+            'type' => 'seminar',
+            'schedule_start' => now()->subDays(4)->setTime(10, 0),
+            'schedule_end' => now()->subDays(4)->setTime(11, 0),
+            'outcome' => 'pass',
+        ]);
+        \App\Models\Evaluation::create([
+            'defence_event_id' => $endedSeminarEvent->id,
+            'evaluator_id' => $ctx['examinerUser']->id,
+            'score' => ['total' => 78],
+            'recommendation' => 'pass',
+            'submitted_at' => now()->subDays(4),
+        ]);
+
+        $this->actingAs($ctx['examinerUser'])->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Submitted Evaluation Records');
+        $this->actingAs($ctx['examinerUser'])->get(route('examiner.theses.index'))
+            ->assertOk()
+            ->assertDontSee('Submitted Evaluation Records');
+
+        // 2. Non-seminar Internal Defence evaluation STILL appears in Submitted Evaluation Records
+        $internalEvent = \App\Models\DefenceEvent::create([
+            'thesis_project_id' => $ctx['thesis']->id,
+            'type' => 'internal',
+            'schedule_start' => now()->subDay()->setTime(10, 0),
+            'schedule_end' => now()->subDay()->setTime(11, 0),
+            'outcome' => 'pending',
+        ]);
+        \App\Models\Evaluation::create([
+            'defence_event_id' => $internalEvent->id,
+            'evaluator_id' => $ctx['examinerUser']->id,
+            'score' => ['verdict' => 'pass', 'total' => 100],
+            'recommendation' => 'pass',
+            'submitted_at' => now()->subHour(),
+        ]);
+
+        $this->actingAs($ctx['examinerUser'])->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Submitted Evaluation Records')
+            ->assertSee('Internal');
+        $this->actingAs($ctx['examinerUser'])->get(route('examiner.theses.index'))
+            ->assertOk()
+            ->assertSee('Submitted Evaluation Records')
+            ->assertSee('1 Completed');
+    }
 }

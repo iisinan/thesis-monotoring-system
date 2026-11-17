@@ -59,11 +59,7 @@ class ThesisController extends Controller
 
         $pending_evaluations = DefenceEvent::pendingEvaluationsForUser($user, $workflowService);
 
-        $completed_evaluations = Evaluation::where('evaluator_id', $user->id)
-            ->with(['defenceEvent.thesis.student.user'])
-            ->latest('submitted_at')
-            ->take(10)
-            ->get();
+        $completed_evaluations = Evaluation::submittedRecordsForUser($user, 10, $workflowService);
 
         return view('examiner.theses.index', compact(
             'theses',
