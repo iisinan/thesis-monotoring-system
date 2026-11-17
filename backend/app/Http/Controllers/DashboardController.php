@@ -679,30 +679,7 @@ class DashboardController extends Controller
 
         // Fetch pending defence evaluations
         $workflowService = app(\App\Services\MilestoneWorkflowService::class);
-        $data['pending_evaluations'] = \App\Models\DefenceEvent::where(function($q) {
-                $q->whereNull('outcome')->orWhere('outcome', 'pending');
-            })->whereHas('panelMembers', function($q) use ($user) {
-                $q->where('user_id', $user->id);
-            })->whereDoesntHave('evaluations', function($q) use ($user) {
-                $q->where('evaluator_id', $user->id);
-            })->with(['thesis.student.user', 'thesis.milestones.template'])
-            ->get()
-            ->filter(function ($event) use ($workflowService, $user) {
-                if ($event->isActiveSupervisorOfThesis($user->id)) {
-                    return false;
-                }
-                $milestones = $event->thesis?->milestones ?? collect();
-                if (in_array($event->type, ['internal', 'internal_defence'])) {
-                    $m = $milestones->first(fn($sm) => $workflowService->isInternalDefence($sm));
-                    return $m && !empty($m->defence_date) && $m->status !== 'approved' && !$workflowService->isPostDefencePhase($m);
-                }
-                if (in_array($event->type, ['external', 'external_defence', 'viva'])) {
-                    $m = $milestones->first(fn($sm) => $sm->template?->slug === 'viva' || (int) ($sm->template?->order ?? 0) === 7);
-                    return $m && !empty($m->defence_date) && $m->status !== 'approved';
-                }
-                return !empty($event->schedule_start);
-            })
-            ->values();
+        $data['pending_evaluations'] = \App\Models\DefenceEvent::pendingEvaluationsForUser($user, $workflowService);
 
         $data['completed_evaluations'] = \App\Models\Evaluation::where('evaluator_id', $user->id)
             ->with(['defenceEvent.thesis.student.user'])
@@ -828,34 +805,7 @@ class DashboardController extends Controller
         $workflowService = $workflowService ?? app(\App\Services\MilestoneWorkflowService::class);
 
         try {
-            return \App\Models\DefenceEvent::whereNotIn('type', ['seminar', 'proposal', 'progress_report_1', 'progress_report_2'])
-                ->where(function ($q) {
-                    $q->whereNull('outcome')->orWhere('outcome', 'pending');
-                })
-                ->whereHas('panelMembers', function ($q) use ($user) {
-                    $q->where('user_id', $user->id);
-                })
-                ->whereDoesntHave('evaluations', function ($q) use ($user) {
-                    $q->where('evaluator_id', $user->id);
-                })
-                ->with(['thesis.student.user', 'thesis.milestones.template'])
-                ->get()
-                ->filter(function ($event) use ($workflowService, $user) {
-                    if ($event->isActiveSupervisorOfThesis($user->id)) {
-                        return false;
-                    }
-                    $milestones = $event->thesis?->milestones ?? collect();
-                    if (in_array($event->type, ['internal', 'internal_defence'])) {
-                        $m = $milestones->first(fn($sm) => $workflowService->isInternalDefence($sm));
-                        return $m && !empty($m->defence_date) && $m->status !== 'approved' && !$workflowService->isPostDefencePhase($m);
-                    }
-                    if (in_array($event->type, ['external', 'external_defence', 'viva'])) {
-                        $m = $milestones->first(fn($sm) => $sm->template?->slug === 'viva' || (int) ($sm->template?->order ?? 0) === 7);
-                        return $m && !empty($m->defence_date) && $m->status !== 'approved';
-                    }
-                    return !empty($event->schedule_start);
-                })
-                ->values();
+            return \App\Models\DefenceEvent::pendingEvaluationsForUser($user, $workflowService);
         } catch (\Throwable $e) {
             \Log::warning('Pending evaluations query failed: ' . $e->getMessage());
             error_log('[PENDING_EVALUATIONS_WARN] ' . $e->getMessage());

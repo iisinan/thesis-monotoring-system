@@ -57,15 +57,7 @@ class ThesisController extends Controller
                 ->values()
             : collect();
 
-        $pending_evaluations = DefenceEvent::where(function ($q) {
-                $q->whereNull('outcome')->orWhere('outcome', 'pending');
-            })
-            ->whereHas('panelMembers', fn($q) => $q->where('user_id', $user->id))
-            ->whereDoesntHave('evaluations', fn($q) => $q->where('evaluator_id', $user->id))
-            ->with(['thesis.student.user', 'thesis.milestones.template'])
-            ->get()
-            ->filter(fn($event) => !$event->isActiveSupervisorOfThesis($user->id))
-            ->values();
+        $pending_evaluations = DefenceEvent::pendingEvaluationsForUser($user, $workflowService);
 
         $completed_evaluations = Evaluation::where('evaluator_id', $user->id)
             ->with(['defenceEvent.thesis.student.user'])

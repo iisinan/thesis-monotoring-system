@@ -218,7 +218,18 @@ class InternalDefenceRedesignTest extends TestCase
         $this->assertFalse($workflow->isAssignedInternalExaminer($milestone->fresh(), $coordA));
         $this->assertFalse($workflow->isAssignedInternalExaminer($milestone->fresh(), $director1));
 
-        // Director dashboard shows pending internal defence evaluation cleanly
+        // Before presentation has ended, Director dashboard must NOT show pending evaluation
+        $dirDashBefore = $this->actingAs($director1)->get(route('dashboard'));
+        $dirDashBefore->assertOk();
+        $dirDashBefore->assertDontSee('Evaluate Candidate');
+
+        // Once the scheduled presentation has ended and Internal Examiner has not graded, Director sees pending evaluation
+        $milestone->update(['defence_date' => now()->subDay()->toDateString()]);
+        $event->update([
+            'schedule_start' => now()->subDay()->setTime(10, 0),
+            'schedule_end' => now()->subDay()->setTime(11, 0),
+        ]);
+
         $dirDash = $this->actingAs($director1)->get(route('dashboard'));
         $dirDash->assertOk();
         $dirDash->assertSee('Candidate Alpha');

@@ -267,7 +267,7 @@ class="space-y-8">
             <p class="text-xs font-bold text-slate-400 uppercase tracking-wider">Defences to Grade</p>
             <div class="flex items-baseline gap-2 mt-1">
                 <span class="text-3xl font-black text-slate-800">{{ $pending_evaluations->count() }}</span>
-                <span class="text-xs font-bold text-blue-600">Scheduled</span>
+                <span class="text-xs font-bold text-blue-600">Pending</span>
             </div>
             <p class="text-[10px] font-semibold text-slate-400 mt-2">{{ $completed_evaluations->count() }} submitted {{ Str::plural('evaluation', $completed_evaluations->count()) }}</p>
         </div>
