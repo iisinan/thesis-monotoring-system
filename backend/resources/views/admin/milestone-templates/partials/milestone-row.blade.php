@@ -1280,6 +1280,10 @@
                                                                                 @php
                                                                                     $candidateName = $esm->thesis?->student?->user?->name ?? 'Candidate';
                                                                                     $candidateMatric = $esm->thesis?->student?->student_id_number ?? ($esm->thesis?->student?->matric_number ?? 'N/A');
+                                                                                    $rawCandidateDegree = $esm->thesis?->student?->level?->name
+                                                                                        ?? $esm->thesis?->student?->program?->degree_type
+                                                                                        ?? ($esm->thesis?->student?->program?->name ?? '');
+                                                                                    $candidateDegree = (str_contains(strtolower($rawCandidateDegree), 'phd') || str_contains(strtolower($rawCandidateDegree), 'doctor')) ? 'PhD' : 'MSc';
                                                                                     $track = $esm->discipline_group ?? 'cybersecurity';
                                                                                     $dateVal = $esm->defence_date ? \Carbon\Carbon::parse($esm->defence_date)->format('Y-m-d') : '';
                                                                                     $timeVal = $esm->defence_time ? \Carbon\Carbon::parse($esm->defence_time)->format('H:i') : '';
@@ -1290,7 +1294,8 @@
                                                                                     data-sched-display-name="{{ $candidateName }}"
                                                                                     data-sched-name="{{ strtolower($candidateName) }}"
                                                                                     data-sched-matric="{{ strtolower($candidateMatric) }}"
-                                                                                    x-show="(editTrackFilter === 'all' || editTrackFilter === '{{ $track }}') && (!editSearch || ($el.dataset.schedName || '').includes(editSearch.toLowerCase()) || ($el.dataset.schedMatric || '').includes(editSearch.toLowerCase()))"
+                                                                                    data-sched-degree="{{ strtolower($candidateDegree) }}"
+                                                                                    x-show="(editTrackFilter === 'all' || editTrackFilter === '{{ $track }}') && (!editSearch || ($el.dataset.schedName || '').includes(editSearch.toLowerCase()) || ($el.dataset.schedMatric || '').includes(editSearch.toLowerCase()) || ($el.dataset.schedDegree || '').includes(editSearch.toLowerCase()))"
                                                                                     x-data="{ rm: false }"
                                                                                     :class="{ 'bg-rose-50/70 opacity-60': rm, 'ring-2 ring-amber-400 bg-amber-50/50': swapSourceId == '{{ $esm->id }}' }"
                                                                                     class="transition-colors hover:bg-slate-50/60">
@@ -1305,7 +1310,12 @@
                                                                                             </span>
                                                                                             <div>
                                                                                                 <div class="font-bold text-slate-900 leading-tight">{{ $candidateName }}</div>
-                                                                                                <div class="text-[10px] text-slate-500 font-semibold">{{ $candidateMatric }}</div>
+                                                                                                <div class="text-[10px] text-slate-500 font-semibold flex items-center gap-1.5 mt-0.5">
+                                                                                                    <span>{{ $candidateMatric }}</span>
+                                                                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black {{ $candidateDegree === 'PhD' ? 'bg-purple-100 text-purple-700 border border-purple-200' : 'bg-blue-100 text-blue-700 border border-blue-200' }}">
+                                                                                                        {{ $candidateDegree }}
+                                                                                                    </span>
+                                                                                                </div>
                                                                                             </div>
                                                                                         </div>
                                                                                     </td>

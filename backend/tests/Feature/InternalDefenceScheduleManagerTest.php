@@ -417,6 +417,8 @@ class InternalDefenceScheduleManagerTest extends TestCase
 
         $candA = $this->createScheduledCandidate('A1');
         $candB = $this->createScheduledCandidate('B2');
+        $mscLevel = Level::firstOrCreate(['name' => 'MSc']);
+        $candB['milestone']->thesis->student->update(['level_id' => $mscLevel->id]);
         $candA['milestone']->thesis->student->user->update(['name' => "Candidate O'Brien \"One\""]);
         $candB['milestone']->thesis->student->user->update(['name' => "Candidate N'Dour \"Two\""]);
 
@@ -433,6 +435,10 @@ class InternalDefenceScheduleManagerTest extends TestCase
         $this->assertStringContainsString('startSwapFromRow($el.closest(\'tr\'))', $panelHtml);
         $this->assertStringContainsString('executeSwapFromRow($el.closest(\'tr\'))', $panelHtml);
         $this->assertStringContainsString('data-sched-display-name="Candidate O&#039;Brien &quot;One&quot;"', $panelHtml);
+        $this->assertStringContainsString('data-sched-degree="phd"', $panelHtml);
+        $this->assertStringContainsString('data-sched-degree="msc"', $panelHtml);
+        $this->assertMatchesRegularExpression('/id="sched-row-' . preg_quote((string) $candA['milestone']->id, '/') . '"(?:.(?!<\/tr>))*?>\s*PhD\s*<\/span>/s', $panelHtml);
+        $this->assertMatchesRegularExpression('/id="sched-row-' . preg_quote((string) $candB['milestone']->id, '/') . '"(?:.(?!<\/tr>))*?>\s*MSc\s*<\/span>/s', $panelHtml);
         $this->assertStringContainsString('data-row-name="candidate o&#039;brien &quot;one&quot;"', $panelHtml);
         $this->assertStringNotContainsString("'candidate o'brien", $panelHtml);
 
