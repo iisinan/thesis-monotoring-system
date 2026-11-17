@@ -343,6 +343,40 @@
                 </div>
             </x-card>
         </div>
+
+        @php
+            $sharedExaminerReviews = ($thesis->examinerReviews ?? collect())->where('is_shared_with_student', true);
+        @endphp
+        @if($sharedExaminerReviews->isNotEmpty())
+        <div class="col-span-1 md:col-span-3">
+            <x-card title="Internal Examiner Feedback">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    @foreach($sharedExaminerReviews as $exRev)
+                        <div class="p-5 rounded-2xl bg-purple-50/50 border border-purple-200 space-y-2.5">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-0.5 rounded-lg bg-purple-600 text-white text-[10px] font-black uppercase tracking-wider">{{ $exRev->recommendation_label }}</span>
+                                    <span class="text-xs font-bold text-slate-700">{{ $exRev->examiner?->name ?? 'Internal Examiner' }}</span>
+                                </div>
+                                <span class="text-[11px] font-medium text-slate-400">{{ $exRev->shared_at?->format('M d, Y') ?? $exRev->updated_at?->format('M d, Y') }}</span>
+                            </div>
+                            @if($exRev->submission)
+                                <p class="text-[11px] font-semibold text-purple-800">Document: {{ $exRev->submission->file_meta['original_name'] ?? ('Submission v' . $exRev->submission->version) }}</p>
+                            @endif
+                            <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">{{ $exRev->content }}</p>
+                            @if($exRev->attachment_path)
+                                <div class="pt-2 border-t border-purple-200/70 flex items-center justify-between gap-2 text-xs">
+                                    <span class="font-bold text-slate-700 truncate">📎 {{ $exRev->attachment_name ?: 'Examiner Attachment' }}</span>
+                                    <a href="{{ route('examiner.reviews.attachment', [$exRev, 'download' => 1]) }}" class="px-2.5 py-1 rounded-lg bg-purple-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-purple-700 shrink-0">Download</a>
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </x-card>
+        </div>
+        @endif
+
         <!-- System Events & defense -->
         <div class="col-span-1 md:col-span-3">
             <x-card title="Defense Events">

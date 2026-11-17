@@ -1542,6 +1542,52 @@
                 </div>
                 @endif
             @endcan
+
+            @php
+                $sharedMilestoneExaminerReviews = ($milestone->thesis?->examinerReviews ?? collect())
+                    ->where('is_shared_with_student', true)
+                    ->filter(fn($r) => empty($r->student_milestone_id) || (string) $r->student_milestone_id === (string) $milestone->id || $isInternalDefence);
+            @endphp
+            @if($sharedMilestoneExaminerReviews->isNotEmpty())
+                <div class="bg-white rounded-[2.5rem] border border-purple-200 shadow-sm p-6 sm:p-8 space-y-4">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-black shadow-sm">⚖️</div>
+                            <div>
+                                <h3 class="text-base font-black text-slate-900">Internal Examiner Feedback</h3>
+                                <p class="text-xs text-slate-500 font-medium">Review comments shared directly by your assigned examiner.</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-black uppercase">
+                            {{ $sharedMilestoneExaminerReviews->count() }} {{ Str::plural('Note', $sharedMilestoneExaminerReviews->count()) }}
+                        </span>
+                    </div>
+
+                    <div class="space-y-3">
+                        @foreach($sharedMilestoneExaminerReviews as $exRev)
+                            <div class="p-4 rounded-2xl bg-purple-50/50 border border-purple-200/80 space-y-2">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span class="px-2.5 py-0.5 rounded-lg bg-purple-600 text-white text-[10px] font-black uppercase tracking-wider">{{ $exRev->recommendation_label }}</span>
+                                        <span class="text-xs font-bold text-slate-800">{{ $exRev->examiner?->name ?? 'Internal Examiner' }}</span>
+                                    </div>
+                                    <span class="text-[11px] font-medium text-slate-400">{{ $exRev->shared_at?->format('M d, Y') ?? $exRev->updated_at?->format('M d, Y') }}</span>
+                                </div>
+                                @if($exRev->submission)
+                                    <p class="text-[11px] font-semibold text-purple-800">Document: {{ $exRev->submission->file_meta['original_name'] ?? ('Submission v' . $exRev->submission->version) }}</p>
+                                @endif
+                                <p class="text-xs text-slate-700 whitespace-pre-line leading-relaxed">{{ $exRev->content }}</p>
+                                @if($exRev->attachment_path)
+                                    <div class="pt-2 border-t border-purple-200/70 flex items-center justify-between gap-2 text-xs">
+                                        <span class="font-bold text-slate-700 truncate">📎 {{ $exRev->attachment_name ?: 'Examiner Attachment' }}</span>
+                                        <a href="{{ route('examiner.reviews.attachment', [$exRev, 'download' => 1]) }}" class="px-3 py-1 rounded-lg bg-purple-600 text-white text-[10px] font-black uppercase tracking-wider hover:bg-purple-700 shrink-0">Download</a>
+                                    </div>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
 
         <!-- Sidebar Info -->

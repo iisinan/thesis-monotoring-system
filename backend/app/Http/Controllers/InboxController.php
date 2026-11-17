@@ -497,6 +497,20 @@ class InboxController extends Controller
                     ->where('active', '=', true)
                     ->pluck('user_id');
                 $recipientIds = $recipientIds->merge($coordUserIds);
+
+                // Assigned Internal & External Examiners
+                if ($student->thesis) {
+                    $student->thesis->loadMissing(['internalExaminer', 'externalExaminer', 'examinerAssignments']);
+                    if ($student->thesis->internalExaminer?->user_id) {
+                        $recipientIds->push($student->thesis->internalExaminer->user_id);
+                    }
+                    if ($student->thesis->externalExaminer?->user_id) {
+                        $recipientIds->push($student->thesis->externalExaminer->user_id);
+                    }
+                    $recipientIds = $recipientIds->merge(
+                        $student->thesis->examinerAssignments->pluck('examiner_id')->filter()
+                    );
+                }
             }
 
             // Admin users
@@ -526,6 +540,38 @@ class InboxController extends Controller
             }
 
             // Admin users
+            $adminIds = User::role(['Admin'])->pluck('id');
+            $recipientIds = $recipientIds->merge($adminIds);
+        }
+
+        // Internal & External Examiners: assigned students, coordinators for those programs, admins
+        if ($user->hasAnyRole(['Internal Examiner', 'External Examiner']) || $user->internalExaminerProfiles()->exists() || $user->externalExaminerProfiles()->exists()) {
+            $internalProfileIds = $user->internalExaminerProfiles()->pluck('id')->toArray();
+            $externalProfileIds = $user->externalExaminerProfiles()->pluck('id')->toArray();
+
+            $examinerTheses = \App\Models\ThesisProject::where(function ($q) use ($internalProfileIds, $externalProfileIds, $user) {
+                    if (!empty($internalProfileIds)) {
+                        $q->orWhereIn('internal_examiner_profile_id', $internalProfileIds);
+                    }
+                    if (!empty($externalProfileIds)) {
+                        $q->orWhereIn('external_examiner_profile_id', $externalProfileIds);
+                    }
+                    $q->orWhereHas('examinerAssignments', fn($eq) => $eq->where('examiner_id', $user->id));
+                })
+                ->with('student')
+                ->get();
+
+            $studentUserIds = $examinerTheses->pluck('student.user_id')->filter();
+            $recipientIds = $recipientIds->merge($studentUserIds);
+
+            $programIds = $examinerTheses->pluck('student.program_id')->filter()->unique();
+            if ($programIds->isNotEmpty()) {
+                $coordUserIds = \App\Models\CoordinatorProfile::whereIn('program_id', $programIds)
+                    ->where('active', '=', true)
+                    ->pluck('user_id');
+                $recipientIds = $recipientIds->merge($coordUserIds);
+            }
+
             $adminIds = User::role(['Admin'])->pluck('id');
             $recipientIds = $recipientIds->merge($adminIds);
         }

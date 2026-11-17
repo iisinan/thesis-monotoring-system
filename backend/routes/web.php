@@ -188,6 +188,14 @@ Route::get('/run-migrations', function () {
         Route::get('/examiner/theses/{id}', [\App\Http\Controllers\Examiner\ThesisController::class, 'show'])->name('examiner.theses.show');
     });
 
+    // Examiner Review Notes & Direct Student Messaging (controller-authorized for assigned examiners / admin)
+    Route::post('/examiner/theses/{thesis}/reviews', [\App\Http\Controllers\Examiner\ReviewController::class, 'store'])->name('examiner.reviews.store');
+    Route::patch('/examiner/reviews/{review}', [\App\Http\Controllers\Examiner\ReviewController::class, 'update'])->name('examiner.reviews.update');
+    Route::post('/examiner/reviews/{review}/share', [\App\Http\Controllers\Examiner\ReviewController::class, 'share'])->name('examiner.reviews.share');
+    Route::get('/examiner/reviews/{review}/attachment', [\App\Http\Controllers\Examiner\ReviewController::class, 'downloadAttachment'])->name('examiner.reviews.attachment');
+    Route::delete('/examiner/reviews/{review}', [\App\Http\Controllers\Examiner\ReviewController::class, 'destroy'])->name('examiner.reviews.destroy');
+    Route::post('/examiner/theses/{thesis}/message', [\App\Http\Controllers\Examiner\ReviewController::class, 'messageStudent'])->name('examiner.theses.message');
+
     Route::post('/users/{user}/reset-password', [App\Http\Controllers\UserController::class, 'resetPassword'])->name('users.reset_password');
     
     // Profile

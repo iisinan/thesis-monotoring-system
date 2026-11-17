@@ -145,6 +145,11 @@ class ThesisProject extends Model
         return $this->hasMany(ActionItem::class);
     }
 
+    public function examinerReviews()
+    {
+        return $this->hasMany(ExaminerReview::class)->latest();
+    }
+
     /**
      * Scope for theses that have reached Final Library Archival (Milestone 13 - Approved).
      */

@@ -55,7 +55,7 @@ class MilestoneController extends Controller
         if ($thesis) {
             try {
                 app(\App\Services\MilestoneWorkflowService::class)->tryAutoAdvanceSupervisorsAssigned($thesis);
-                $thesis->load(['student.user', 'assignments.supervisor.user', 'internalExaminer.user']);
+                $thesis->load(['student.user', 'assignments.supervisor.user', 'internalExaminer.user', 'examinerReviews' => fn($q) => $q->sharedWithStudent()->with(['examiner', 'submission'])]);
                 
                 $milestones = $thesis->milestones()
                     ->with(['template', 'submissions.submittedBy', 'submissions.feedback', 'submissions.feedbacks', 'messages.sender', 'unlockedBy'])
@@ -1592,10 +1592,11 @@ class MilestoneController extends Controller
 
         $filename = $submission->file_meta['original_name'] ?? basename($fileUrl) ?? 'artifact';
         $mimeType = $submission->file_meta['mime_type'] ?? Storage::disk($foundDisk)->mimeType($fileUrl) ?? 'application/octet-stream';
+        $disposition = request()->boolean('download') ? 'attachment' : 'inline';
 
         return Storage::disk($foundDisk)->response($fileUrl, $filename, [
             'Content-Type' => $mimeType,
-            'Content-Disposition' => 'inline; filename="' . str_replace('"', '\"', $filename) . '"',
+            'Content-Disposition' => $disposition . '; filename="' . str_replace('"', '\"', $filename) . '"',
         ]);
     }
 

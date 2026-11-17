@@ -57,6 +57,10 @@ class ThesisController extends Controller
         }
 
         $thesis->update($validated);
+        $thesis->loadMissing('student');
+        if ($thesis->student?->user_id) {
+            \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $thesis->student->user_id);
+        }
 
         return redirect()->back()->with('success', 'Thesis updated successfully.');
     }
@@ -69,7 +73,7 @@ class ThesisController extends Controller
         $this->authorize('view', $thesis);
         
 
-        $thesis->load(['student.user', 'milestones.template', 'milestones.submissions.submittedBy', 'milestones.submissions.feedbacks', 'messages.sender', 'supervisors.supervisor.user', 'defenceEvents.panelMembers', 'actionItems']);
+        $thesis->load(['student.user', 'milestones.template', 'milestones.submissions.submittedBy', 'milestones.submissions.feedbacks', 'messages.sender', 'supervisors.supervisor.user', 'defenceEvents.panelMembers', 'actionItems', 'examinerReviews' => fn($q) => $q->sharedWithStudent()->with(['examiner', 'submission'])]);
         
         // Institutional Isolation: Restrict supervisor pool to student's matching program context
         $allSupervisors = SupervisorProfile::with('user')

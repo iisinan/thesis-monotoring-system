@@ -450,7 +450,19 @@ class DashboardController extends Controller
                         }
                         $q->{$method}('examinerAssignments', fn($eq) => $eq->where('examiner_id', $user->id)->where('type', 'internal_examiner'));
                     })
-                    ->with(['student.user', 'student.program', 'student.level', 'currentMilestone.template', 'milestones.template'])
+                    ->with([
+                        'student.user',
+                        'student.program',
+                        'student.level',
+                        'student.cohort',
+                        'currentMilestone.template',
+                        'milestones.template',
+                        'milestones.submissions' => fn($sq) => $sq->latest(),
+                        'milestones.submissions.feedbacks.creator',
+                        'assignments' => fn($aq) => $aq->where('status', 'active')->with('supervisor.user'),
+                        'defenceEvents.evaluations',
+                        'examinerReviews' => fn($rq) => $rq->where('examiner_id', $user->id)->latest(),
+                    ])
                     ->latest()
                     ->get();
 
@@ -490,7 +502,19 @@ class DashboardController extends Controller
             try {
                 $externalProfileIds = $user->externalExaminerProfiles()->pluck('id')->toArray();
                 $externalTheses = \App\Models\ThesisProject::whereIn('external_examiner_profile_id', $externalProfileIds)
-                    ->with(['student.user', 'student.program', 'student.level', 'currentMilestone.template', 'milestones.template'])
+                    ->with([
+                        'student.user',
+                        'student.program',
+                        'student.level',
+                        'student.cohort',
+                        'currentMilestone.template',
+                        'milestones.template',
+                        'milestones.submissions' => fn($sq) => $sq->latest(),
+                        'milestones.submissions.feedbacks.creator',
+                        'assignments' => fn($aq) => $aq->where('status', 'active')->with('supervisor.user'),
+                        'defenceEvents.evaluations',
+                        'examinerReviews' => fn($rq) => $rq->where('examiner_id', $user->id)->latest(),
+                    ])
                     ->latest()
                     ->get();
 
@@ -521,6 +545,11 @@ class DashboardController extends Controller
         // 5. VIVA / ORAL DEFENCE EVALUATIONS (Applicable to Examiners & Panelists)
         $workflowService = app(\App\Services\MilestoneWorkflowService::class);
         $data['pending_evaluations'] = $this->getPendingPanelEvaluations($user, $workflowService);
+        $data['completed_evaluations'] = \App\Models\Evaluation::where('evaluator_id', $user->id)
+            ->with(['defenceEvent.thesis.student.user'])
+            ->latest('submitted_at')
+            ->take(10)
+            ->get();
 
         // 6. UPCOMING ACADEMIC DEFENCES (Unified timeline across active portfolios)
         $upcomingDefences = collect();
@@ -608,7 +637,19 @@ class DashboardController extends Controller
                     }
                     $q->orWhereHas('examinerAssignments', fn($sq) => $sq->where('examiner_id', $user->id)->where('type', 'internal_examiner'));
                 })
-                ->with('student.user')
+                ->with([
+                    'student.user',
+                    'student.program',
+                    'student.level',
+                    'student.cohort',
+                    'currentMilestone.template',
+                    'milestones.template',
+                    'milestones.submissions' => fn($sq) => $sq->latest(),
+                    'milestones.submissions.feedbacks.creator',
+                    'assignments' => fn($aq) => $aq->where('status', 'active')->with('supervisor.user'),
+                    'defenceEvents.evaluations',
+                    'examinerReviews' => fn($rq) => $rq->where('examiner_id', $user->id)->latest(),
+                ])
                 ->get();
             $thesisColumn = 'internal_examiner_profile_id';
         }
@@ -646,7 +687,10 @@ class DashboardController extends Controller
                 $q->where('evaluator_id', $user->id);
             })->with(['thesis.student.user', 'thesis.milestones.template'])
             ->get()
-            ->filter(function ($event) use ($workflowService) {
+            ->filter(function ($event) use ($workflowService, $user) {
+                if ($event->isActiveSupervisorOfThesis($user->id)) {
+                    return false;
+                }
                 $milestones = $event->thesis?->milestones ?? collect();
                 if (in_array($event->type, ['internal', 'internal_defence'])) {
                     $m = $milestones->first(fn($sm) => $workflowService->isInternalDefence($sm));
@@ -659,6 +703,12 @@ class DashboardController extends Controller
                 return !empty($event->schedule_start);
             })
             ->values();
+
+        $data['completed_evaluations'] = \App\Models\Evaluation::where('evaluator_id', $user->id)
+            ->with(['defenceEvent.thesis.student.user'])
+            ->latest('submitted_at')
+            ->take(10)
+            ->get();
 
         $unreadCounts = $this->getUnreadMessagesCount($user);
         $data['stats'] = [
@@ -706,7 +756,7 @@ class DashboardController extends Controller
                 })
                 ->values();
 
-            $unreadCounts = $this->getUnreadMessagesCount($user);
+        $unreadCounts = $this->getUnreadMessagesCount($user);
             $data['stats'] = [
                 'my_students' => StudentProfile::forCoordinator($user)->where('enrollment_status', 'active')->count(),
                 'active_supervisors' => SupervisorProfile::whereHas('programs', function($q) use ($coordinatorProfile) {
@@ -790,7 +840,10 @@ class DashboardController extends Controller
                 })
                 ->with(['thesis.student.user', 'thesis.milestones.template'])
                 ->get()
-                ->filter(function ($event) use ($workflowService) {
+                ->filter(function ($event) use ($workflowService, $user) {
+                    if ($event->isActiveSupervisorOfThesis($user->id)) {
+                        return false;
+                    }
                     $milestones = $event->thesis?->milestones ?? collect();
                     if (in_array($event->type, ['internal', 'internal_defence'])) {
                         $m = $milestones->first(fn($sm) => $workflowService->isInternalDefence($sm));
