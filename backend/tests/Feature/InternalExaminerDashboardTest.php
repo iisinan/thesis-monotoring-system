@@ -445,4 +445,33 @@ class InternalExaminerDashboardTest extends TestCase
         ]);
         Notification::assertSentTo($ctx['studentUser'], NewInboxMessage::class);
     }
+
+    #[Test]
+    public function supervisor_and_internal_examiner_see_scheduled_presentation_tab_on_sidebar_even_in_draft(): void
+    {
+        $ctx = $this->setupInternalExaminerScenario(false);
+        $ctx['examinerUser']->assignRole('Supervisor');
+
+        $template = $ctx['internalDefMilestone']->template;
+        $template->update(['metadata' => ['schedule_approved' => false]]);
+
+        $ctx['internalDefMilestone']->update([
+            'defence_date' => now()->addDays(2)->toDateString(),
+            'defence_time' => '10:00',
+        ]);
+
+        // Faculty (Supervisor + Internal Examiner) sees the Presentation tab in the sidebar & can open it
+        $dashResp = $this->actingAs($ctx['examinerUser'])->get(route('dashboard'));
+        $dashResp->assertOk();
+        $dashResp->assertSee('Scheduled Presentations');
+        $dashResp->assertSee($template->presentation_title);
+
+        $presResp = $this->actingAs($ctx['examinerUser'])->get(route('presentations.show', $template));
+        $presResp->assertOk();
+
+        // Student still does not see unapproved draft presentations until Admin approves the schedule
+        $studentDash = $this->actingAs($ctx['studentUser'])->get(route('dashboard'));
+        $studentDash->assertOk();
+        $studentDash->assertDontSee('Scheduled Presentations');
+    }
 }

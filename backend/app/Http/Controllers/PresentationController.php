@@ -12,7 +12,7 @@ class PresentationController extends Controller
     public function show(Request $request, MilestoneTemplate $template)
     {
         $authUser = auth()->user();
-        if ($authUser && !$authUser->hasAnyRole(['Admin', 'Program Coordinator']) && !$template->isScheduleApproved()) {
+        if ($authUser && !$authUser->hasAnyRole(['Admin', 'Director', 'Program Coordinator', 'Supervisor', 'Internal Examiner', 'External Examiner']) && !$template->isScheduleApproved()) {
             return redirect()->route('dashboard')->with('info', 'This presentation schedule is currently in draft and awaiting Administrative approval.');
         }
 
