@@ -585,13 +585,14 @@
     {{-- ========================================================================= --}}
     {{-- SUPERVISOR ALLOCATION MODAL                                               --}}
     {{-- ========================================================================= --}}
+    <template x-teleport="body">
     <div x-show="showAssignModal" 
          x-cloak 
          class="fixed inset-0 z-50 overflow-y-auto" 
          aria-labelledby="modal-title" 
          role="dialog" 
          aria-modal="true">
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="flex min-h-full items-center justify-center p-4 text-center">
             {{-- Backdrop --}}
             <div x-show="showAssignModal" 
                  x-transition:enter="ease-out duration-300" 
@@ -603,8 +604,6 @@
                  class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
                  @click="showAssignModal = false"></div>
 
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
             {{-- Modal Panel --}}
             <div x-show="showAssignModal" 
                  x-transition:enter="ease-out duration-300" 
@@ -613,16 +612,18 @@
                  x-transition:leave="ease-in duration-200" 
                  x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
                  x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                 class="inline-block align-bottom bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all my-4 sm:my-8 sm:align-middle w-full max-w-lg sm:max-w-2xl border border-slate-100 relative z-10">
+                 style="max-height: 90vh;"
+                 class="relative z-10 flex flex-col bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all my-auto w-full max-w-lg sm:max-w-2xl border border-slate-100">
                 
                 <template x-if="activeStudent">
                     <form :action="`/coordinator/assigned-supervisors/${activeStudent.id}/assign`" 
                           method="POST" 
+                          class="flex flex-col flex-1 min-h-0 overflow-hidden"
                           @submit="formSubmitting = true">
                         @csrf
 
                         {{-- Modal Header --}}
-                        <div class="px-4 sm:px-8 pt-5 sm:pt-8 pb-4 sm:pb-6 border-b border-slate-100 flex items-start justify-between bg-slate-50/50">
+                        <div class="px-4 sm:px-8 pt-5 sm:pt-8 pb-4 sm:pb-6 border-b border-slate-100 flex items-start justify-between bg-slate-50/50 shrink-0">
                             <div class="flex items-center gap-3 sm:gap-4">
                                 <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-500 text-white flex items-center justify-center font-black text-base sm:text-lg shadow-md shadow-indigo-500/20 shrink-0">
                                     <span x-text="activeStudent.name.charAt(0)"></span>
@@ -645,7 +646,7 @@
                         </div>
 
                         {{-- Modal Body --}}
-                        <div class="px-4 sm:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 max-h-[72vh] overflow-y-auto custom-scrollbar">
+                        <div class="px-4 sm:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 flex-1 min-h-0 overflow-y-auto custom-scrollbar">
 
                             {{-- ========================================================= --}}
                             {{-- 1. TENTATIVE PROPOSAL SUBMISSION STATUS                   --}}
@@ -820,7 +821,7 @@
                         </div>
 
                         {{-- Modal Footer --}}
-                        <div class="px-4 sm:px-8 py-4 sm:py-5 border-t border-slate-100 bg-slate-50/50 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
+                        <div class="px-4 sm:px-8 py-4 sm:py-5 border-t border-slate-100 bg-slate-50/50 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 sm:gap-0 shrink-0">
                             <button type="button" 
                                     @click="showAssignModal = false" 
                                     class="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 transition-colors text-center justify-center">
@@ -840,25 +841,25 @@
             </div>
         </div>
     </div>
+    </template>
 
     {{-- ========================================================================= --}}
     {{-- PROPOSAL PDF PREVIEW MODAL                                                --}}
     {{-- ========================================================================= --}}
+    <template x-teleport="body">
     <div x-show="showPreviewModal" 
          x-cloak 
          class="fixed inset-0 z-50 overflow-y-auto" 
          aria-labelledby="preview-title" 
          role="dialog" 
          aria-modal="true">
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="flex min-h-full items-center justify-center p-4 text-center">
             <div x-show="showPreviewModal" 
                  class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm transition-opacity" 
                  @click="showPreviewModal = false"></div>
 
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-
             <div x-show="showPreviewModal" 
-                 class="inline-block align-bottom bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all my-4 sm:my-8 sm:align-middle w-full sm:max-w-5xl border border-slate-100 relative z-10">
+                 class="relative z-10 w-full sm:max-w-5xl bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all my-auto border border-slate-100">
                 <div class="px-4 sm:px-8 py-4 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
                     <div class="flex items-center gap-3 min-w-0">
                         <div class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold shrink-0">
@@ -884,24 +885,24 @@
             </div>
         </div>
     </div>
+    </template>
 
     {{-- ========================================================================= --}}
     {{-- SEND DIRECT INBOX MESSAGE MODAL                                           --}}
     {{-- ========================================================================= --}}
+    <template x-teleport="body">
     <div x-show="showMessageModal" 
          x-cloak 
          class="fixed inset-0 z-50 overflow-y-auto" 
          role="dialog" 
          aria-modal="true">
-        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div class="flex min-h-full items-center justify-center p-4 text-center">
             <div x-show="showMessageModal" 
                  class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
                  @click="showMessageModal = false"></div>
 
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-
             <div x-show="showMessageModal" 
-                 class="inline-block align-bottom bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all my-4 sm:my-8 sm:align-middle w-full sm:max-w-lg border border-slate-100 relative z-10">
+                 class="relative z-10 w-full sm:max-w-lg bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all my-auto border border-slate-100">
                 <form action="{{ route('inbox.store') }}" method="POST">
                     @csrf
                     <input type="hidden" name="to[]" :value="messageRecipientUserId">
@@ -945,5 +946,6 @@
             </div>
         </div>
     </div>
+    </template>
 </div>
 @endsection
