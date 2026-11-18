@@ -161,4 +161,94 @@ class AdminStudentTitleEditTest extends TestCase
         $response->assertSee('Edit Title');
         $response->assertSee(route('admin.students.update-thesis-title', $student), false);
     }
+
+    #[Test]
+    public function admin_can_view_student_phone_number_on_user_edit_page(): void
+    {
+        [$studentUser, $student] = $this->createStudent(true);
+        $student->update(['phone_number' => '+234 801 234 5678']);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('Admin');
+
+        $response = $this->actingAs($admin)->get(route('admin.users.edit', $studentUser));
+
+        $response->assertOk();
+        $response->assertSee('Phone Number');
+        $response->assertSee('name="phone_number"', false);
+        $response->assertSee('+234 801 234 5678');
+    }
+
+    #[Test]
+    public function admin_can_update_student_phone_number_via_user_edit_page(): void
+    {
+        [$studentUser, $student, $thesis, $program, $cohort, $level] = $this->createStudent(true);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('Admin');
+
+        $response = $this->actingAs($admin)->put(route('admin.users.update', $studentUser), [
+            'name' => $studentUser->name,
+            'email' => $studentUser->email,
+            'roles' => ['Student'],
+            'cohort_id' => $cohort->id,
+            'program_id' => $program->id,
+            'level_id' => $level->id,
+            'student_id_number' => $student->student_id_number,
+            'phone_number' => '+234 809 999 8888',
+            'thesis_title' => 'Updated Title With Phone Number',
+            'is_active' => '1',
+        ]);
+
+        $response->assertRedirect(route('admin.users.index'));
+        $this->assertDatabaseHas('student_profiles', [
+            'id' => $student->id,
+            'phone_number' => '+234 809 999 8888',
+        ]);
+    }
+
+    #[Test]
+    public function admin_can_view_student_phone_number_on_user_show_page(): void
+    {
+        [$studentUser, $student] = $this->createStudent(true);
+        $student->update(['phone_number' => '+234 801 234 5678']);
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('Admin');
+
+        $response = $this->actingAs($admin)->get(route('admin.users.show', $studentUser));
+
+        $response->assertOk();
+        $response->assertSee('Phone Number');
+        $response->assertSee('+234 801 234 5678');
+    }
+
+    #[Test]
+    public function admin_can_create_student_with_phone_number_via_user_create_page(): void
+    {
+        $program = Program::first();
+        $cohort = Cohort::first();
+        $level = Level::first();
+
+        $admin = User::factory()->create(['is_active' => true]);
+        $admin->assignRole('Admin');
+
+        $response = $this->actingAs($admin)->post(route('admin.users.store'), [
+            'name' => 'New Student Candidate',
+            'email' => 'newstudent@example.com',
+            'roles' => ['Student'],
+            'cohort_id' => $cohort->id,
+            'program_id' => $program->id,
+            'level_id' => $level->id,
+            'student_id_number' => 'ACE25100099',
+            'phone_number' => '+234 802 333 4444',
+            'is_active' => '1',
+        ]);
+
+        $response->assertRedirect(route('admin.users.index'));
+        $this->assertDatabaseHas('student_profiles', [
+            'student_id_number' => 'ACE25100099',
+            'phone_number' => '+234 802 333 4444',
+        ]);
+    }
 }

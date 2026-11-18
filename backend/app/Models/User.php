@@ -60,6 +60,11 @@ class User extends Authenticatable
         return $this->hasOne(StudentProfile::class);
     }
 
+    public function getPhoneNumberAttribute()
+    {
+        return $this->studentProfile?->phone_number;
+    }
+
     public function supervisorProfile()
     {
         return $this->hasOne(SupervisorProfile::class);

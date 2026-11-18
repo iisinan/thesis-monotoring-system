@@ -85,6 +85,10 @@
                                 <p class="text-base font-bold text-slate-800">{{ $user->studentProfile->student_id_number }}</p>
                             </div>
                             <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Phone Number</p>
+                                <p class="text-base font-bold text-slate-800">{{ $user->studentProfile->phone_number ?? 'N/A' }}</p>
+                            </div>
+                            <div>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Program</p>
                                 <p class="text-sm font-medium text-slate-800">{{ $user->studentProfile->program->name ?? 'N/A' }}</p>
                             </div>

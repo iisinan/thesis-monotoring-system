@@ -405,6 +405,14 @@
                                 @error('level_id') <p class="text-red-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
                             </div>
 
+                            <div class="col-span-6 sm:col-span-3">
+                                <label for="phone_number" class="block text-sm font-semibold text-black mb-1">Phone Number</label>
+                                <input type="text" name="phone_number" id="phone_number" 
+                                    class="focus:ring-acetel-500 focus:border-acetel-500 block w-full shadow-sm sm:text-sm border-slate-300 rounded-xl px-4 py-2.5 transition-colors" 
+                                    value="{{ old('phone_number', $user->studentProfile?->phone_number) }}" placeholder="e.g. +234 801 234 5678">
+                                @error('phone_number') <p class="text-red-500 text-xs mt-1.5 font-medium">{{ $message }}</p> @enderror
+                            </div>
+
                             <div class="col-span-6">
                                 <label for="thesis_title" class="block text-sm font-semibold text-black mb-1">Thesis Title</label>
                                 <input type="text" name="thesis_title" id="thesis_title" maxlength="255"
