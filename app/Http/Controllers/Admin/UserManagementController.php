@@ -166,6 +166,7 @@ class UserManagementController extends Controller
                 'program_id' => 'required|exists:programs,id',
                 'level_id' => 'nullable|exists:levels,id',
                 'student_id_number' => ['required', 'string', 'unique:student_profiles,student_id_number', new \App\Rules\ValidMatricNumber],
+                'phone_number' => 'nullable|string|max:30',
             ]);
         }
         
@@ -289,6 +290,7 @@ class UserManagementController extends Controller
                     'program_id' => $validated['program_id'],
                     'level_id' => $finalLevelId,
                     'student_id_number' => $validated['student_id_number'],
+                    'phone_number' => $validated['phone_number'] ?? null,
                     'enrollment_status' => 'active',
                     'current_semester' => 1,
                 ]);
@@ -427,6 +429,7 @@ class UserManagementController extends Controller
                 'program_id' => 'required|exists:programs,id',
                 'level_id' => 'nullable|exists:levels,id',
                 'student_id_number' => ['required', 'string', Rule::unique('student_profiles')->ignore($user->studentProfile?->id), new \App\Rules\ValidMatricNumber],
+                'phone_number' => 'nullable|string|max:30',
                 'thesis_title' => 'nullable|string|max:255',
             ]);
         }
@@ -560,6 +563,7 @@ class UserManagementController extends Controller
                         'program_id' => $validated['program_id'],
                         'level_id' => $finalLevelId,
                         'student_id_number' => $validated['student_id_number'],
+                        'phone_number' => $validated['phone_number'] ?? null,
                     ]
                 );
 

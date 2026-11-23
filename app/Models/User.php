@@ -52,12 +52,18 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'must_change_password' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
     public function studentProfile()
     {
         return $this->hasOne(StudentProfile::class);
+    }
+
+    public function getPhoneNumberAttribute()
+    {
+        return $this->studentProfile?->phone_number;
     }
 
     public function supervisorProfile()
