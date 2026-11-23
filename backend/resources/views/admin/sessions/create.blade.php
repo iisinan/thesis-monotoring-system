@@ -12,7 +12,7 @@
                 <input type="text" name="name" placeholder="e.g. 2025/2026" class="w-full border-gray-300 rounded-md shadow-sm focus:border-acetel-500 focus:ring focus:ring-acetel-200" required>
             </div>
 
-            <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 <div>
                     <label class="block text-sm font-medium text-black mb-2">Start Date</label>
                     <input type="date" name="start_date" class="w-full border-gray-300 rounded-md shadow-sm focus:border-acetel-500 focus:ring focus:ring-acetel-200" required>

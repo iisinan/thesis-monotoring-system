@@ -661,8 +661,8 @@
                     </div>
                 </div>
 
-                <div class="mt-8 pt-6 border-t border-slate-100 flex justify-between items-center">
-                    <div class="flex gap-2">
+                <div class="mt-8 pt-6 border-t border-slate-100 flex flex-wrap justify-between items-center gap-3">
+                    <div class="flex flex-wrap gap-2">
                         @if(auth()->id() !== $user->id)
                             <button type="button" 
                                 data-confirm="Warning: Are you sure you want to permanently delete this user? All their associated academic records and roles will be removed."

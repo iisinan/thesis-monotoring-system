@@ -6,7 +6,7 @@
 <div x-data="{ activeRole: localStorage.getItem('activeDashboardRole') || '{{ Auth::user()->getRoleNames()->first() ?? 'Student' }}' }" x-init="$watch('activeRole', val => { localStorage.setItem('activeDashboardRole', val); window.dispatchEvent(new CustomEvent('role-changed', {detail: val})); })" @@role-changed.window="activeRole = $event.detail" class="space-y-8">
 
     {{-- Welcome Banner --}}
-    <div class="relative overflow-hidden rounded-2xl p-8" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); box-shadow: 0 8px 32px rgba(22,163,74,0.25);">
+    <div class="relative overflow-hidden rounded-2xl p-5 sm:p-8" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); box-shadow: 0 8px 32px rgba(22,163,74,0.25);">
         <!-- Decorative circles -->
         <div class="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mt-20 -mr-20 pointer-events-none"></div>
         <div class="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -mb-16 -ml-16 pointer-events-none"></div>
@@ -162,8 +162,8 @@
     @endhasrole
 
     {{-- Info Card --}}
-    <div class="bg-white border border-green-100 rounded-2xl p-8 shadow-sm">
-        <div class="flex items-start gap-5">
+    <div class="bg-white border border-green-100 rounded-2xl p-5 sm:p-8 shadow-sm">
+        <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
             <div class="w-14 h-14 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-center text-green-600 shrink-0">
                 <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
             </div>

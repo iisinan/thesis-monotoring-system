@@ -674,7 +674,7 @@
             @if(in_array($milestone->status, ['not_started', 'in_progress', 'revision_required', 'submitted', 'in_review']))
                 @if($milestone->template->requires_submission)
                     @if($hasDefenceDateAllowed && $isDateExpired && !$isInternalDefence)
-                        <div class="overflow-hidden rounded-[2.5rem] bg-white border border-slate-100 shadow-xl shadow-slate-200/40 p-10 flex flex-col items-center justify-center text-center">
+                        <div class="overflow-hidden rounded-2xl sm:rounded-[2.5rem] bg-white border border-slate-100 shadow-xl shadow-slate-200/40 p-5 sm:p-10 flex flex-col items-center justify-center text-center">
                             <div class="w-16 h-16 bg-slate-100 text-slate-500 rounded-2xl flex items-center justify-center mb-6">
                                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             </div>
@@ -683,7 +683,7 @@
                         </div>
                     @elseif($milestone->template->submission_requires_approval && !$milestone->is_submission_unlocked && (!$isSupervisorViewer || auth()->user()->can('unlock', $milestone)))
                         <!-- Locked State -->
-                        <div class="overflow-hidden rounded-[2.5rem] bg-white border border-slate-100 shadow-xl shadow-slate-200/40 p-10 flex flex-col items-center justify-center text-center">
+                        <div class="overflow-hidden rounded-2xl sm:rounded-[2.5rem] bg-white border border-slate-100 shadow-xl shadow-slate-200/40 p-5 sm:p-10 flex flex-col items-center justify-center text-center">
                             <div class="w-16 h-16 bg-slate-100 text-slate-500 rounded-2xl flex items-center justify-center mb-6">
                                 <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
                             </div>
@@ -731,7 +731,7 @@
                             @endcan
                         </div>
                     @elseif(auth()->user()->hasRole('Student'))
-                        <div id="artifact-upload-section" x-show="showUploadForm" x-transition class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-8">
+                        <div id="artifact-upload-section" x-show="showUploadForm" x-transition class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-5 sm:p-8">
                             <div class="flex items-center justify-between mb-6">
                                 <h3 class="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
                                     <div class="w-1 h-6 bg-emerald-500 rounded-full"></div>
@@ -1241,7 +1241,7 @@
                         </div>
                     @endif
                 @else
-                    <div class="bg-white border border-slate-100 shadow-xl shadow-slate-200/40 p-10 rounded-[2.5rem] flex flex-col items-center justify-center text-center">
+                    <div class="bg-white border border-slate-100 shadow-xl shadow-slate-200/40 p-5 sm:p-10 rounded-2xl sm:rounded-[2.5rem] flex flex-col items-center justify-center text-center">
                         <div class="w-12 h-12 bg-slate-50 border border-slate-200 text-slate-400 rounded-xl flex items-center justify-center mb-4">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
 
@@ -1257,7 +1257,7 @@
                     </div>
                 @endif
             @elseif($milestone->status === 'submitted' && !$isSupervisorViewer)
-                <div class="rounded-[2.5rem] bg-emerald-50 border border-emerald-100 shadow-xl shadow-slate-200/40 p-10 flex flex-col items-center justify-center text-center">
+                <div class="rounded-2xl sm:rounded-[2.5rem] bg-emerald-50 border border-emerald-100 shadow-xl shadow-slate-200/40 p-5 sm:p-10 flex flex-col items-center justify-center text-center">
                     <div class="w-14 h-14 bg-white border border-emerald-200 text-emerald-600 rounded-2xl flex items-center justify-center mb-4 shadow-xl shadow-slate-200/40 animate-pulse">
                         <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </div>
@@ -1265,11 +1265,11 @@
                     <p class="text-sm font-medium text-emerald-800 max-w-sm">Your submission has been securely transmitted and is currently under review by your committee.</p>
                 </div>
             @elseif($milestone->status === 'approved')
-                <div class="rounded-[2.5rem] bg-emerald-50 border border-emerald-100 shadow-xl shadow-slate-200/40 p-8 flex items-center gap-6">
-                    <div class="w-14 h-14 bg-white border border-emerald-200 text-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-xl shadow-slate-200/40">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <div class="rounded-2xl sm:rounded-[2.5rem] bg-emerald-50 border border-emerald-100 shadow-xl shadow-slate-200/40 p-5 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                    <div class="w-12 h-12 sm:w-14 sm:h-14 bg-white border border-emerald-200 text-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-xl shadow-slate-200/40">
+                        <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <h3 class="text-lg font-bold text-slate-900 tracking-tight mb-1">Clearance Approved</h3>
                         <p class="text-sm font-medium text-emerald-800">This milestone has been thoroughly reviewed and successfully approved. You may proceed to the next phase.</p>
                     </div>
@@ -1278,7 +1278,7 @@
 
             {{-- Submission History (Shown to Students and Admins; hidden for Supervisors who use the focused Thesis Review card above) --}}
             @if($milestone->submissions->count() > 0 && !$isSupervisorViewer)
-                <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-8 mt-6">
+                <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-5 sm:p-8 mt-6">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                         <h3 class="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
                             <div class="w-1 h-6 bg-emerald-500 rounded-full"></div>
@@ -1478,7 +1478,7 @@
                     $showBottomEvaluationCard = !$isPresentationGatedDetail && !$isSupervisorViewer && $milestone->status !== 'approved' && (!$isUploadAccepted || $isAdminViewer);
                 @endphp
                 @if($showBottomEvaluationCard)
-                    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-8 mt-6">
+                    <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 p-5 sm:p-8 mt-6">
                         <div class="flex items-center justify-between mb-6">
                             <h3 class="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
                                 <div class="w-1 h-6 bg-indigo-500 rounded-full"></div>
@@ -1814,19 +1814,19 @@
     <!-- Alpine JS Modal for Messaging -->
     <template x-teleport="body">
     <div x-show="showStudentMessageModal" class="fixed z-50 inset-0 overflow-y-auto" style="display: none;" x-cloak>
-        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="flex items-center justify-center min-h-dvh px-3 sm:px-4 pt-4 pb-10 text-center sm:block sm:p-0">
             <div x-show="showStudentMessageModal" 
                  @click.self="setTimeout(() => { showStudentMessageModal = false }, 50)"
                  x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" 
                  x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" 
                  class="fixed inset-0 transition-opacity bg-slate-900/40 backdrop-blur-sm cursor-pointer" aria-hidden="true"></div>
 
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-dvh" aria-hidden="true">&#8203;</span>
             
             <div x-show="showStudentMessageModal" 
                  x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
                  x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                 class="inline-block align-bottom bg-white rounded-3xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-xl transform transition-all my-6 sm:my-8 sm:align-middle w-full sm:max-w-xl border border-slate-100 relative z-10">
+                 class="inline-block align-bottom bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-xl transform transition-all my-4 sm:my-8 sm:align-middle w-full sm:max-w-xl border border-slate-100 relative z-10 max-h-[90dvh] overflow-y-auto">
                  
                 <form action="{{ route('messages.store') }}" method="POST">
                     @csrf

@@ -11,9 +11,9 @@
         cursor: pointer;
     }
 </style>
-<div class="min-h-screen flex items-center justify-center bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans" x-data="registrationWizard()">
+<div class="min-h-dvh flex items-center justify-center bg-slate-50 py-6 sm:py-12 px-3 sm:px-6 lg:px-8 font-sans pb-safe" x-data="registrationWizard()">
     
-    <div class="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 relative overflow-hidden">
+    <div class="max-w-md w-full bg-white rounded-2xl sm:rounded-3xl shadow-xl p-5 sm:p-8 relative overflow-hidden">
         
         <!-- Main Header (Shows on Steps 2 and 3) -->
         <div x-show="step > 1" x-cloak class="text-center mb-8">
@@ -98,7 +98,7 @@
                     </div>
 
                     <!-- Password Grid -->
-                    <div class="grid grid-cols-2 gap-4" x-data="{ showP: false, showC: false }">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" x-data="{ showP: false, showC: false }">
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1.5">Password</label>
                             <div class="relative">
@@ -151,7 +151,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-bold text-slate-700 mb-1.5">Phone Number</label>
                             <input type="text" name="phone_number" required placeholder="+234..." maxlength="20"
@@ -214,7 +214,7 @@
                 </div>
 
                 <!-- Main Questionnaire Box -->
-                <div x-show="!showingSubStep && !showingSubStepNo" class="bg-[#f2fdf7] border border-green-100 rounded-3xl p-8 relative overflow-hidden">
+                <div x-show="!showingSubStep && !showingSubStepNo" class="bg-[#f2fdf7] border border-green-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 relative overflow-hidden">
                     
                     
                     <!-- Error Banner (Global) -->
@@ -232,9 +232,9 @@
                         </div>
                     </div>
 
-                    <h3 class="text-2xl font-bold text-slate-900 leading-tight mb-8 text-center px-4" x-html="getCurrentQuestionHtml()"></h3>
+                    <h3 class="text-xl sm:text-2xl font-bold text-slate-900 leading-tight mb-6 sm:mb-8 text-center px-1 sm:px-4" x-html="getCurrentQuestionHtml()"></h3>
 
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <button type="button" @click="answerYes()" :disabled="isSubmitting" :class="{'opacity-75 cursor-not-allowed': isSubmitting}" class="bg-[#18a04b] text-white font-bold py-4 rounded-2xl shadow-lg shadow-green-600/20 hover:bg-green-700 transition-colors flex items-center justify-center gap-2">
                             <svg x-show="!isSubmitting" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                             <svg x-show="isSubmitting" style="display: none;" class="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -280,7 +280,7 @@
                     <div x-show="getCurrentSubStepType() === 'supervisors'" x-cloak>
                         <div class="mb-6 space-y-4">
                             <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false, selectedName: '' }" @click.away="open = false">
-                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex flex-wrap gap-2 justify-between items-center">
                                     <span>Principal Supervisor</span>
                                     <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.principal_supervisor_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
                                 </span>
@@ -312,7 +312,7 @@
                             </div>
                             
                             <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false, selectedName: '' }" @click.away="open = false">
-                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex flex-wrap gap-2 justify-between items-center">
                                     <span>Co-Supervisor</span>
                                     <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.co_supervisor_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
                                 </span>
@@ -344,7 +344,7 @@
                             </div>
 
                             <div class="p-4 bg-white border border-slate-200 rounded-xl" x-show="isPhd()" x-data="{ mode: 'select', search: '', open: false, selectedName: '' }" @click.away="open = false">
-                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex flex-wrap gap-2 justify-between items-center">
                                     <span>Third Supervisor</span>
                                     <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.third_supervisor_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
                                 </span>
@@ -418,7 +418,7 @@
                             </div>
 
                             <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false }" @click.away="open = false">
-                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex flex-wrap gap-2 justify-between items-center">
                                     <span>Internal Examiner</span>
                                     <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.internal_examiner_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
                                 </span>
@@ -506,7 +506,7 @@
                                        class="w-full rounded-xl border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm font-medium py-3 px-4 transition-colors">
                             </div>
                             <div class="p-4 bg-white border border-slate-200 rounded-xl" x-data="{ mode: 'select', search: '', open: false }" @click.away="open = false">
-                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex justify-between items-center">
+                                <span class="text-xs font-bold text-green-700 tracking-widest uppercase mb-2 flex flex-wrap gap-2 justify-between items-center">
                                     <span>External Examiner</span>
                                     <button type="button" @click="mode = mode === 'select' ? 'manual' : 'select'; if(mode==='manual') form.external_examiner_id='';" class="text-blue-500 hover:underline lowercase font-medium" x-text="mode === 'select' ? 'add manually' : 'choose from list'"></button>
                                 </span>

@@ -24,27 +24,27 @@
 @endphp
 
 @if($link)
-<a href="{{ $link }}" class="glass overflow-hidden sm:rounded-[2rem] transition-all duration-500 hover:shadow-premium hover:-translate-y-1 group animate-in-up block">
+<a href="{{ $link }}" class="glass overflow-hidden rounded-2xl sm:rounded-[2rem] transition-all duration-500 hover:shadow-premium hover:-translate-y-1 group animate-in-up block">
 @else
-<div class="glass overflow-hidden sm:rounded-[2rem] transition-all duration-500 hover:shadow-premium hover:-translate-y-1 group animate-in-up">
+<div class="glass overflow-hidden rounded-2xl sm:rounded-[2rem] transition-all duration-500 hover:shadow-premium hover:-translate-y-1 group animate-in-up">
 @endif
-    <div class="p-8 relative">
+    <div class="p-5 sm:p-8 relative">
         <!-- Floating Decoration -->
         <div class="absolute -top-10 -right-10 w-32 h-32 bg-primary-600/5 blur-[40px] rounded-full group-hover:bg-primary-600/10 transition-all duration-700"></div>
 
         <div class="flex items-center relative z-10">
             <div class="flex-shrink-0">
-                <div class="rounded-2xl w-16 h-16 flex items-center justify-center border shadow-sm {{ $themeColor }} transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
+                <div class="rounded-xl sm:rounded-2xl w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center border shadow-sm {{ $themeColor }} transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
                     {!! $renderedIcon !!}
                 </div>
             </div>
-            <div class="ml-6 w-0 flex-1">
+            <div class="ml-4 sm:ml-6 w-0 flex-1">
                 <dl>
-                    <dt class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+                    <dt class="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1 truncate">
                         {{ $title }}
                     </dt>
                     <dd class="flex items-baseline">
-                        <div class="text-3xl font-bold text-gray-900 tracking-tight group-hover:text-primary-600 transition-colors duration-300">
+                        <div class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight group-hover:text-primary-600 transition-colors duration-300">
                             {{ $value }}
                         </div>
                     </dd>

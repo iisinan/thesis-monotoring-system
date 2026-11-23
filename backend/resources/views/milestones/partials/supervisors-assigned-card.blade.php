@@ -63,10 +63,6 @@
     $secondaryAssignments = $assignments->filter(fn($a) => $a->id !== $primaryAssignment?->id)->values();
     $secondSupervisorId = $secondaryAssignments->get(0)?->supervisor_profile_id ?? ($assignedIds[1] ?? '');
     $thirdSupervisorId = $secondaryAssignments->get(1)?->supervisor_profile_id ?? ($assignedIds[2] ?? '');
-
-    $defaultStudentPath = ($errors->has('supervisor_ids.*') || $errors->has('new_supervisors.*') || $errors->has('supervisor_ids') || old('supervisor_ids') || old('new_supervisors'))
-        ? 'insert'
-        : 'request';
 @endphp
 
 <div id="supervisors-assigned-card-{{ $milestone->id }}" 
@@ -75,32 +71,14 @@
         showStudentMessageModal: false,
         messageRecipient: '{{ addslashes($studentName) }}',
         uploading: false,
-        submittingSelfSups: false,
         requestingSups: false,
         fileError: '',
-        studentPath: '{{ $defaultStudentPath }}',
-        manualMode: [
-            {{ (old('new_supervisors.0.name') || old('new_supervisors.0.email')) ? 'true' : 'false' }},
-            {{ (old('new_supervisors.1.name') || old('new_supervisors.1.email')) ? 'true' : 'false' }},
-            {{ (old('new_supervisors.2.name') || old('new_supervisors.2.email')) ? 'true' : 'false' }}
-        ],
-        slotSearch: ['', '', ''],
         selectedLead: '{{ $leadSupervisorId }}',
         selectedSecond: '{{ $secondSupervisorId }}',
         selectedThird: '{{ $thirdSupervisorId }}',
         supervisorsList: {{ \Illuminate\Support\Js::from($allSupervisorsJson) }},
         isPhD: {{ $isPhD ? 'true' : 'false' }},
         randomizeAlert: '',
-        filteredSupervisors(slotIdx) {
-            const q = (this.slotSearch[slotIdx] || '').toLowerCase().trim();
-            if (!q) return this.supervisorsList;
-            return this.supervisorsList.filter(s =>
-                (s.name || '').toLowerCase().includes(q) ||
-                (s.email || '').toLowerCase().includes(q) ||
-                (s.rank || '').toLowerCase().includes(q) ||
-                (s.department || '').toLowerCase().includes(q)
-            );
-        },
         randomize() {
             const profs = this.supervisorsList.filter(s => s.is_professor && s.current_load < s.max_students);
             const allEligible = this.supervisorsList.filter(s => s.current_load < s.max_students);
@@ -140,8 +118,8 @@
         @if($hasSupervisors)
             {{-- State 1C: Supervisors are already assigned / recorded --}}
             <div class="space-y-6">
-                <div class="bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white rounded-[2.5rem] border border-emerald-200 shadow-xl shadow-slate-200/40 p-8 sm:p-10 relative overflow-hidden animate-in-up">
-                    <div class="relative flex items-start gap-5">
+                <div class="bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white rounded-2xl sm:rounded-[2.5rem] border border-emerald-200 shadow-xl shadow-slate-200/40 p-5 sm:p-10 relative overflow-hidden animate-in-up">
+                    <div class="relative flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
                         <div class="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/25">
                             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
@@ -222,190 +200,11 @@
                 </div>
             </div>
         @else
-            {{-- State 1A / 1B: Student does NOT yet have supervisors on portal -> Choose Insert Supervisors OR Upload Tentative Proposal & Request --}}
+            {{-- State 1A / 1B: Student does NOT yet have supervisors on portal -> Upload Tentative Proposal & Request Supervisors --}}
             <div class="space-y-6 animate-in-up">
-                {{-- Two-Path Selector Header --}}
-                <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-8">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                        <div>
-                            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-black uppercase tracking-wider mb-2 border border-indigo-100">
-                                <span class="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>
-                                <span>Supervisory Panel Setup</span>
-                            </div>
-                            <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                                Do you already have supervisors, or do you need supervisors assigned?
-                            </h2>
-                            <p class="text-xs sm:text-sm font-medium text-slate-600 mt-1">
-                                Candidate: <strong class="text-slate-900">{{ $studentName }}</strong> &bull; Matric No: <strong class="text-slate-900">{{ $matricNumber }}</strong> &bull; Supervisory Panel: <strong>{{ $isPhD ? 'Up to 3 Supervisors (2–3)' : '2 Supervisors' }}</strong> ({{ $isPhD ? 'PhD' : 'MSc' }})
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button type="button"
-                                @click="studentPath = 'insert'"
-                                :class="studentPath === 'insert'
-                                    ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20 shadow-md'
-                                    : 'border-slate-200 bg-slate-50/60 hover:border-indigo-300 hover:bg-white'"
-                                class="text-left p-5 rounded-3xl border-2 transition-all cursor-pointer flex items-start gap-4">
-                            <div :class="studentPath === 'insert' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-600 border border-slate-200'"
-                                 class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="text-[10px] font-black uppercase tracking-widest text-indigo-600">Option 1</span>
-                                <h3 class="text-sm sm:text-base font-black text-slate-900 mt-0.5">I Already Have Supervisors</h3>
-                                <p class="text-xs font-medium text-slate-600 mt-1">
-                                    Insert your existing supervisors ({{ $isPhD ? 'up to 3' : '2' }}) directly to complete this step and unlock Proposal Defence.
-                                </p>
-                            </div>
-                        </button>
-
-                        <button type="button"
-                                @click="studentPath = 'request'"
-                                :class="studentPath === 'request'
-                                    ? 'border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20 shadow-md'
-                                    : 'border-slate-200 bg-slate-50/60 hover:border-emerald-300 hover:bg-white'"
-                                class="text-left p-5 rounded-3xl border-2 transition-all cursor-pointer flex items-start gap-4">
-                            <div :class="studentPath === 'request' ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-600 border border-slate-200'"
-                                 class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-colors">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <span class="text-[10px] font-black uppercase tracking-widest text-emerald-600">Option 2</span>
-                                <h3 class="text-sm sm:text-base font-black text-slate-900 mt-0.5">Upload Tentative Proposal &amp; Request Supervisors</h3>
-                                <p class="text-xs font-medium text-slate-600 mt-1">
-                                    Upload your tentative proposal PDF and immediately notify your Program Coordinator by email with your name &amp; matric number.
-                                </p>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-
-                {{-- OPTION 1 PANEL: Student Inserts Existing Supervisors --}}
-                <div x-show="studentPath === 'insert'" x-cloak class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-10 space-y-6">
-                    <div class="flex items-start gap-4 border-b border-slate-100 pb-5">
-                        <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="text-lg sm:text-xl font-black text-slate-900">Insert Your Supervisory Panel</h3>
-                            <p class="text-xs sm:text-sm text-slate-600 font-medium mt-1">
-                                {{ $isPhD ? 'A PhD candidate can have up to 3 supervisors. Select your Lead Supervisor and Co-Supervisor(s) from the faculty directory, or switch a slot to manual entry if not listed yet.' : 'Select each of your 2 supervisors from the faculty directory, or switch a slot to manual entry if a supervisor is not listed yet.' }}
-                            </p>
-                        </div>
-                    </div>
-
-                    @if($errors->has('supervisor_ids') || $errors->has('supervisor_ids.*') || $errors->has('new_supervisors.*'))
-                        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-bold text-rose-700 space-y-1">
-                            @foreach($errors->all() as $err)
-                                <p>&bull; {{ $err }}</p>
-                            @endforeach
-                        </div>
-                    @endif
-
-                    <form action="{{ route('milestones.supervisors.store', $milestone) }}" method="POST" @submit="submittingSelfSups = true" class="space-y-5">
-                        @csrf
-                        @for($i = 0; $i < $requiredSupervisorCount; $i++)
-                            @php
-                                $slotTitle = $i === 0
-                                    ? 'Lead Supervisor (Main Supervisor — Professor Recommended)'
-                                    : ($isPhD
-                                        ? ($i === 2 ? 'Co-Supervisor 2 (Optional — up to 3 supervisors)' : "Co-Supervisor {$i}")
-                                        : 'Co-Supervisor');
-                            @endphp
-                            <div class="p-5 bg-slate-50 border border-slate-200 rounded-3xl space-y-4">
-                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                    <div class="flex items-center gap-2">
-                                        <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider {{ $i === 0 ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-700' }}">
-                                            Slot {{ $i + 1 }}
-                                        </span>
-                                        <h4 class="text-sm font-black text-slate-900">{{ $slotTitle }}</h4>
-                                    </div>
-                                    <button type="button"
-                                            @click="manualMode[{{ $i }}] = !manualMode[{{ $i }}]"
-                                            class="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer">
-                                        <span x-text="manualMode[{{ $i }}] ? '← Select from Faculty Directory' : '+ Supervisor not listed? Enter Name & Email'"></span>
-                                    </button>
-                                </div>
-
-                                {{-- Existing Faculty Directory Picker --}}
-                                <div x-show="!manualMode[{{ $i }}]" class="space-y-2.5">
-                                    <input type="text"
-                                           x-model="slotSearch[{{ $i }}]"
-                                           placeholder="Filter faculty by name, email, or rank..."
-                                           class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
-                                    <select name="supervisor_ids[{{ $i }}]"
-                                            :disabled="manualMode[{{ $i }}]"
-                                            class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
-                                        <option value="">-- Choose {{ $i === 0 ? 'Lead Supervisor' : 'Co-Supervisor' }} --</option>
-                                        <template x-for="sup in filteredSupervisors({{ $i }})" :key="sup.id">
-                                            <option :value="sup.id"
-                                                    :selected="'{{ old("supervisor_ids.{$i}") }}' === sup.id"
-                                                    x-text="`${sup.name} (${sup.rank || 'Faculty'})${sup.email ? ' — ' + sup.email : ''}`"></option>
-                                        </template>
-                                    </select>
-                                </div>
-
-                                {{-- Manual Unlisted Supervisor Entry --}}
-                                <div x-show="manualMode[{{ $i }}]" x-cloak class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                    <div>
-                                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Full Name *</label>
-                                        <input type="text"
-                                               name="new_supervisors[{{ $i }}][name]"
-                                               value="{{ old("new_supervisors.{$i}.name") }}"
-                                               :disabled="!manualMode[{{ $i }}]"
-                                               placeholder="e.g. Prof. Ada Obi"
-                                               class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800" />
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Email Address *</label>
-                                        <input type="email"
-                                               name="new_supervisors[{{ $i }}][email]"
-                                               value="{{ old("new_supervisors.{$i}.email") }}"
-                                               :disabled="!manualMode[{{ $i }}]"
-                                               placeholder="supervisor@noun.edu.ng"
-                                               class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800" />
-                                    </div>
-                                    <div>
-                                        <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Academic Rank</label>
-                                        <select name="new_supervisors[{{ $i }}][rank]"
-                                                :disabled="!manualMode[{{ $i }}]"
-                                                class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-800">
-                                            <option value="Professor" {{ old("new_supervisors.{$i}.rank", $i === 0 ? 'Professor' : '') === 'Professor' ? 'selected' : '' }}>Professor</option>
-                                            <option value="Associate Professor" {{ old("new_supervisors.{$i}.rank") === 'Associate Professor' ? 'selected' : '' }}>Associate Professor</option>
-                                            <option value="Senior Lecturer" {{ old("new_supervisors.{$i}.rank", $i > 0 ? 'Senior Lecturer' : '') === 'Senior Lecturer' ? 'selected' : '' }}>Senior Lecturer</option>
-                                            <option value="Lecturer I" {{ old("new_supervisors.{$i}.rank") === 'Lecturer I' ? 'selected' : '' }}>Lecturer I</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        @endfor
-
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
-                            <p class="text-xs font-semibold text-slate-500">
-                                Recording your existing supervisors notifies your Program Coordinator and advances your thesis to Proposal Defence.
-                            </p>
-                            <button type="submit"
-                                    :disabled="submittingSelfSups"
-                                    class="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-indigo-600/30 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0">
-                                <span x-text="submittingSelfSups ? 'Saving Supervisors...' : 'Save Supervisors & Continue'"></span>
-                            </button>
-                        </div>
-                    </form>
-                </div>
-
-                {{-- OPTION 2 PANEL: Upload Tentative Proposal & Request Supervisors --}}
-                <div x-show="studentPath === 'request'" class="space-y-6">
-                    @if(!$hasUploaded)
-                        <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-6 sm:p-10 relative overflow-hidden">
-                            <div class="flex items-start gap-5 mb-6">
+                @if(!$hasUploaded)
+                    <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-5 sm:p-10 relative overflow-hidden">
+                        <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-5 mb-6">
                                 <div class="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 shadow-sm">
                                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -419,7 +218,10 @@
                                     <h3 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
                                         Upload Tentative Proposal &amp; Request Supervisors
                                     </h3>
-                                    <p class="text-sm font-medium text-slate-600 mt-1.5 leading-relaxed max-w-3xl">
+                                    <p class="text-xs sm:text-sm font-medium text-slate-600 mt-1">
+                                        Candidate: <strong class="text-slate-900">{{ $studentName }}</strong> &bull; Matric No: <strong class="text-slate-900">{{ $matricNumber }}</strong> &bull; Supervisory Panel: <strong>{{ $isPhD ? 'Up to 3 Supervisors (2–3)' : '2 Supervisors' }}</strong> ({{ $isPhD ? 'PhD' : 'MSc' }})
+                                    </p>
+                                    <p class="text-sm font-medium text-slate-600 mt-2 leading-relaxed max-w-3xl">
                                         Upload your tentative research proposal (PDF). Once submitted, your Program Coordinator will receive an <strong>immediate email</strong> showing your name (<strong class="text-slate-900">{{ $studentName }}</strong>) and matric number (<strong class="text-slate-900">{{ $matricNumber }}</strong>) to assign fitting supervisors.
                                     </p>
                                 </div>
@@ -493,7 +295,7 @@
                                     </div>
                                     <button type="submit"
                                             :disabled="uploading"
-                                            class="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/30 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0">
+                                            class="inline-flex items-center justify-center gap-2.5 px-5 sm:px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-600/30 active:scale-95 disabled:opacity-50 cursor-pointer shrink-0 w-full sm:w-auto">
                                         <span x-text="uploading ? 'Uploading & Emailing Coordinator...' : 'Upload Proposal & Request Supervisors'"></span>
                                     </button>
                                 </div>
@@ -501,8 +303,8 @@
                         </div>
                     @else
                         {{-- State 1B: Student HAS uploaded tentative proposal; show request confirmation & resend option --}}
-                        <div class="bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white rounded-[2.5rem] border border-emerald-200 shadow-xl shadow-slate-200/40 p-8 sm:p-10 relative overflow-hidden">
-                            <div class="relative flex items-start gap-5">
+                        <div class="bg-gradient-to-br from-emerald-50 via-teal-50/50 to-white rounded-2xl sm:rounded-[2.5rem] border border-emerald-200 shadow-xl shadow-slate-200/40 p-5 sm:p-10 relative overflow-hidden">
+                            <div class="relative flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
                                 <div class="w-14 h-14 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/25">
                                     <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
@@ -602,7 +404,6 @@
                             </form>
                         </div>
                     @endif
-                </div>
             </div>
         @endif
 
@@ -612,9 +413,9 @@
     @elseif(auth()->user()->hasRole('Program Coordinator'))
         @if(!$hasUploaded && !$hasSupervisors)
             {{-- State 2A: Student has NOT uploaded proposal or inserted supervisors yet --}}
-            <div class="bg-amber-50/70 border border-amber-200 rounded-[2.5rem] p-8 sm:p-10 shadow-xl shadow-slate-200/40 relative overflow-hidden animate-in-up">
+            <div class="bg-amber-50/70 border border-amber-200 rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-10 shadow-xl shadow-slate-200/40 relative overflow-hidden animate-in-up">
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div class="flex items-start gap-5">
+                    <div class="flex flex-col sm:flex-row items-start gap-4 sm:gap-5">
                         <div class="w-14 h-14 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/25">
                             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -658,7 +459,7 @@
             {{-- State 2B: Student HAS uploaded proposal --}}
             <div class="space-y-6 animate-in-up">
                 {{-- Document Overview & Click-to-Preview Card --}}
-                <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-8 sm:p-10">
+                <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-5 sm:p-10">
                     <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
                         <div>
                             <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider mb-2 border border-emerald-200">
@@ -790,7 +591,7 @@
         <div class="space-y-6 animate-in-up">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {{-- Panel 1: Uploaded Proposal by Student --}}
-                <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-8 flex flex-col justify-between">
+                <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-5 sm:p-8 flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
@@ -849,7 +650,7 @@
                 </div>
 
                 {{-- Panel 2: Supervisors Allocated by Programme Coordinator --}}
-                <div @if(auth()->user()->hasRole('Admin')) x-data="{ editingAdminAssignId: null }" @endif class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-8 flex flex-col justify-between">
+                <div @if(auth()->user()->hasRole('Admin')) x-data="{ editingAdminAssignId: null }" @endif class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-5 sm:p-8 flex flex-col justify-between">
                     <div>
                         <div class="flex items-center justify-between mb-4">
                             <h3 class="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
@@ -966,8 +767,8 @@
     {{-- 4. GENERAL / OTHER ROLES FALLBACK                                         --}}
     {{-- ========================================================================= --}}
     @else
-        <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-8 space-y-6">
-            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-200 shadow-xl shadow-slate-200/40 p-5 sm:p-8 space-y-6">
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
                 <div>
                     <h3 class="text-lg font-black text-slate-900">Supervisors Assigned Overview</h3>
                     <p class="text-xs text-slate-500">Candidate: {{ $studentName }} • Program: {{ $programName }}</p>
@@ -1019,7 +820,7 @@
                  class="fixed z-50 inset-0 overflow-y-auto" 
                  style="display: none;" 
                  x-cloak>
-                <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                <div class="flex items-center justify-center min-h-dvh px-3 sm:px-4 pt-4 pb-10 text-center sm:block sm:p-0">
                     <div x-show="showAssignModal" 
                          @click="showAssignModal = false"
                          x-transition:enter="ease-out duration-300" 
@@ -1031,7 +832,7 @@
                          class="fixed inset-0 transition-opacity bg-slate-900/60 backdrop-blur-sm cursor-pointer" 
                          aria-hidden="true"></div>
 
-                    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                    <span class="hidden sm:inline-block sm:align-middle sm:h-dvh" aria-hidden="true">&#8203;</span>
 
                     <div x-show="showAssignModal" 
                          x-transition:enter="ease-out duration-300" 
@@ -1040,7 +841,7 @@
                          x-transition:leave="ease-in duration-200" 
                          x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
                          x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                         class="inline-block align-bottom bg-white rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full border border-slate-100 relative z-10">
+                         class="inline-block align-bottom bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all my-4 sm:my-8 sm:align-middle sm:max-w-2xl w-full border border-slate-100 relative z-10 max-h-[90dvh] overflow-y-auto">
                         
                         <form action="{{ route('theses.assign_supervisor', $milestone->thesis_project_id) }}" 
                               method="POST"
@@ -1217,7 +1018,7 @@
              class="fixed z-50 inset-0 overflow-y-auto" 
              style="display: none;" 
              x-cloak>
-            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="flex items-center justify-center min-h-dvh px-3 sm:px-4 pt-4 pb-10 text-center sm:block sm:p-0">
                 <div x-show="showStudentMessageModal" 
                      @click="showStudentMessageModal = false"
                      x-transition:enter="ease-out duration-300" 
@@ -1229,7 +1030,7 @@
                      class="fixed inset-0 transition-opacity bg-slate-900/60 backdrop-blur-sm cursor-pointer" 
                      aria-hidden="true"></div>
 
-                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-dvh" aria-hidden="true">&#8203;</span>
 
                 <div x-show="showStudentMessageModal" 
                      x-transition:enter="ease-out duration-300" 
@@ -1238,7 +1039,7 @@
                      x-transition:leave="ease-in duration-200" 
                      x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
                      x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                     class="inline-block align-bottom bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full border border-slate-100 relative z-10">
+                     class="inline-block align-bottom bg-white rounded-2xl sm:rounded-[2.5rem] text-left overflow-hidden shadow-2xl transform transition-all my-4 sm:my-8 sm:align-middle sm:max-w-xl w-full border border-slate-100 relative z-10 max-h-[90dvh] overflow-y-auto">
                      
                     <form action="{{ route('messages.store') }}" method="POST">
                         @csrf

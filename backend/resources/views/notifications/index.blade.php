@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-4xl mx-auto bg-white overflow-hidden shadow-sm sm:rounded-lg">
-    <div class="p-6 text-black">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold">Notifications</h1>
+<div class="max-w-4xl mx-auto bg-white overflow-hidden shadow-sm rounded-2xl">
+    <div class="p-4 sm:p-6 text-black">
+        <div class="flex flex-wrap justify-between items-center gap-3 mb-6">
+            <h1 class="text-xl sm:text-2xl font-bold">Notifications</h1>
             @if($notifications->count() > 0)
                 <form action="{{ route('notifications.readAll') }}" method="POST">
                     @csrf

@@ -1,9 +1,9 @@
 @extends('layouts.admin')
 
 @section('content')
-<div class="space-y-10 pb-10">
+<div class="space-y-6 sm:space-y-10 pb-10">
     <!-- Sophisticated Header -->
-    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 sm:gap-6">
         <div>
             <div class="flex items-center gap-3 mb-2 text-acetel-600">
                 <div class="p-1.5 rounded-lg bg-acetel-50">
@@ -11,11 +11,11 @@
                 </div>
                 <span class="text-[10px] font-black uppercase tracking-[0.3em]">Communication</span>
             </div>
-            <h1 class="text-4xl font-black text-slate-900 tracking-tight">Announcements</h1>
+            <h1 class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">Announcements</h1>
             <p class="mt-2 text-sm font-medium text-slate-500">Post and manage announcements for all students and staff.</p>
         </div>
         <div>
-            <a href="{{ route('admin.announcements.create') }}" class="px-6 py-3 rounded-2xl bg-slate-900 text-white shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 hover:bg-black transition-all flex items-center gap-3 text-xs font-black uppercase tracking-widest">
+            <a href="{{ route('admin.announcements.create') }}" class="px-5 sm:px-6 py-3 rounded-2xl bg-slate-900 text-white shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 hover:bg-black transition-all inline-flex items-center gap-3 text-xs font-black uppercase tracking-widest">
                 <svg class="w-4 h-4 text-acetel-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                 Draft Announcement
             </a>
@@ -23,22 +23,22 @@
     </div>
 
     <!-- Announcements Feed -->
-    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
+    <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead class="bg-slate-50/50">
                     <tr>
-                        <th class="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Title</th>
-                        <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Type</th>
-                        <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Visible to</th>
-                        <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Status / Expiry</th>
-                        <th class="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-right">Actions</th>
+                        <th class="px-4 sm:px-10 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Title</th>
+                        <th class="px-4 sm:px-6 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Type</th>
+                        <th class="px-4 sm:px-6 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Visible to</th>
+                        <th class="px-4 sm:px-6 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Status / Expiry</th>
+                        <th class="px-4 sm:px-10 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                     @forelse($announcements as $announcement)
                     <tr class="hover:bg-slate-50/30 transition-colors group">
-                        <td class="px-10 py-7">
+                        <td class="px-4 sm:px-10 py-5 sm:py-7">
                             <div class="flex items-center gap-4">
                                 <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-acetel-50 group-hover:text-acetel-500 transition-all">
                                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>

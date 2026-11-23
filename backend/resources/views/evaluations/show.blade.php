@@ -6,17 +6,17 @@
 
 @section('content')
 <div class="max-w-4xl mx-auto space-y-8 animate-in-up">
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-4">
-            <a href="{{ route('dashboard') }}" class="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 hover:border-primary-200 transition-all shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+            <a href="{{ route('dashboard') }}" class="p-2 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-primary-600 hover:border-primary-200 transition-all shadow-sm shrink-0">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
             </a>
-            <div>
-                <h2 class="text-2xl font-black text-slate-900">Evaluation Record</h2>
+            <div class="min-w-0">
+                <h2 class="text-xl sm:text-2xl font-black text-slate-900 truncate">Evaluation Record</h2>
                 <p class="text-[10px] uppercase font-black text-slate-500 tracking-widest mt-1">Ref: EV-{{ substr($evaluation->id, 0, 8) }}</p>
             </div>
         </div>
-        <a href="{{ route('evaluations.pdf', $evaluation) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-acetel-50 text-acetel-700 hover:bg-acetel-600 hover:text-white border border-acetel-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm">
+        <a href="{{ route('evaluations.pdf', $evaluation) }}" class="inline-flex items-center gap-2 px-4 py-2 bg-acetel-50 text-acetel-700 hover:bg-acetel-600 hover:text-white border border-acetel-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
             Export PDF
         </a>
@@ -26,7 +26,7 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div class="md:col-span-2 space-y-6">
             <x-card title="Candidate Identity">
-                <div class="grid grid-cols-2 gap-6 p-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 p-1 sm:p-2">
                     <div>
                         <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Scholar</p>
                         <p class="text-lg font-black text-slate-900">{{ $evaluation->defenceEvent->thesis->student->user->name ?? 'Unknown' }}</p>

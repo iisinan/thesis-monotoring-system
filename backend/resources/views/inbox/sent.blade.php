@@ -15,14 +15,14 @@
                 </div>
                 <span class="text-[10px] font-black uppercase tracking-[0.3em]">Outbound Transmissions</span>
             </div>
-            <h1 class="text-4xl font-black text-slate-900 tracking-tight">Sent Messages</h1>
+            <h1 class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">Sent Messages</h1>
         </div>
-        <div class="flex items-center gap-3">
-            <a href="{{ route('inbox.index') }}" class="inline-flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-700 uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+            <a href="{{ route('inbox.index') }}" class="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-700 uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
                 Inbox
             </a>
-            <a href="{{ url('/inbox/compose') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-primary-600 rounded-xl text-xs font-black text-white uppercase tracking-widest hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/20 z-50">
+            <a href="{{ url('/inbox/compose') }}" class="inline-flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 bg-primary-600 rounded-xl text-xs font-black text-white uppercase tracking-widest hover:bg-primary-700 transition-all shadow-lg shadow-primary-500/20 z-50">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 Compose
             </a>
@@ -30,7 +30,7 @@
     </div>
 
     <!-- Sent Messages List -->
-    <div class="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
+    <div class="bg-white rounded-2xl sm:rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
         @forelse($messages as $msg)
             @php
                 $toRecipients = $msg->recipients->where('pivot.recipient_type', 'to');
@@ -38,7 +38,7 @@
                 $bccRecipients = $msg->recipients->where('pivot.recipient_type', 'bcc');
                 $firstRecipient = $toRecipients->first() ?? $msg->recipients->first();
             @endphp
-            <a href="{{ route('inbox.show', $msg) }}" class="flex items-center gap-6 px-8 py-6 border-b border-slate-50 hover:bg-slate-50/50 transition-all duration-300 group">
+            <a href="{{ route('inbox.show', $msg) }}" class="flex items-center gap-4 sm:gap-6 px-4 sm:px-8 py-4 sm:py-6 border-b border-slate-50 hover:bg-slate-50/50 transition-all duration-300 group">
                 <!-- Avatar -->
                 <div class="w-12 h-12 rounded-2xl bg-acetel-100 text-acetel-600 flex items-center justify-center text-lg font-black shrink-0">
                     {{ strtoupper(substr($firstRecipient->name ?? '?', 0, 1)) }}

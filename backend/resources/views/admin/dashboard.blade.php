@@ -195,11 +195,11 @@
         <div class="lg:col-span-8 space-y-6">
 
             {{-- Recent Login Sessions --}}
-            <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-                <div class="px-8 py-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+            <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-slate-50 flex flex-wrap items-center justify-between gap-2 bg-slate-50/30">
                     <div class="flex items-center gap-3">
                         <div class="w-1 h-6 bg-green-500 rounded-full"></div>
-                        <h3 class="text-lg font-black text-slate-900 tracking-tight uppercase">User Activity Feed</h3>
+                        <h3 class="text-base sm:text-lg font-black text-slate-900 tracking-tight uppercase">User Activity Feed</h3>
                     </div>
                     <a href="{{ route('admin.activity-logs.index') }}" class="text-xs text-green-600 hover:text-green-700 font-bold uppercase tracking-wider flex items-center gap-1.5 group">
                         View Full Activity Log
@@ -209,7 +209,7 @@
 
                 <div class="divide-y divide-slate-50">
                     @forelse($recentLogins as $login)
-                        <div class="px-8 py-5 hover:bg-green-50/30 transition-all duration-300 group">
+                        <div class="px-4 sm:px-8 py-4 sm:py-5 hover:bg-green-50/30 transition-all duration-300 group">
                             <div class="flex items-center gap-5">
                                 {{-- User Avatar --}}
                                 <div class="relative shrink-0">
@@ -384,7 +384,7 @@
             </div>
 
             {{-- Control Center --}}
-            <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm flex flex-col gap-6">
+            <div class="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm flex flex-col gap-5 sm:gap-6">
                  <h3 class="text-lg font-black text-slate-900 tracking-tight uppercase border-b border-slate-50 pb-4">Control Center</h3>
                  
                  <div class="space-y-3">

@@ -396,7 +396,7 @@
 
     @if($allScheduled->isEmpty())
         {{-- Empty State --}}
-        <div class="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm max-w-lg mx-auto">
+        <div class="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-12 text-center border border-slate-100 shadow-sm max-w-lg mx-auto">
             <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4 text-slate-400">
                 <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -717,7 +717,7 @@
                                         $presIsGraded = ($todayDefEvent && $todayDefEvent->evaluations->isNotEmpty()) || app(\App\Services\MilestoneWorkflowService::class)->hasBeenGraded($pres);
                                     @endphp
                                     @if(!$presIsGraded)
-                                        <div class="pt-2.5 border-t border-slate-100 grid grid-cols-3 gap-1.5">
+                                        <div class="pt-2.5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                                             <button type="button" 
                                                 @click="slotModalOpen = true; slotIsAddMode = false; slotStudentId = '{{ $pres->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($pres->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $pres->defence_time ? \Carbon\Carbon::parse($pres->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($pres->meeting_link ?? '') }}'; slotTrack = '{{ $pres->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $pres->id]) }}'"
                                                 title="Reschedule presentation"
@@ -967,7 +967,7 @@
                                         $smIsGraded = ($tableDefEvent && $tableDefEvent->evaluations->isNotEmpty()) || app(\App\Services\MilestoneWorkflowService::class)->hasBeenGraded($sm);
                                     @endphp
                                     @if(!$smIsGraded)
-                                        <div class="pt-2 border-t border-slate-100 grid grid-cols-3 gap-1.5">
+                                        <div class="pt-2 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                                             <button type="button" 
                                                 @click="slotModalOpen = true; slotIsAddMode = false; slotStudentId = '{{ $sm->id }}'; slotStudentName = '{{ addslashes($studentName) }}'; slotAction = 'schedule'; slotDate = '{{ \Carbon\Carbon::parse($sm->defence_date)->format('Y-m-d') }}'; slotTime = '{{ $sm->defence_time ? \Carbon\Carbon::parse($sm->defence_time)->format('H:i') : '' }}'; slotLink = '{{ addslashes($sm->meeting_link ?? '') }}'; slotTrack = '{{ $sm->discipline_group ?? 'cybersecurity' }}'; slotFormUrl = '{{ route('admin.milestone-templates.update-student-slot', [$template->id, $sm->id]) }}'"
                                                 title="Reschedule presentation"

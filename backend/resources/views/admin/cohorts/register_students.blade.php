@@ -5,7 +5,7 @@
 @endsection
 
 @section('content')
-<div class="space-y-10 animate-in-up">
+<div class="space-y-6 sm:space-y-10 animate-in-up">
     <!-- Premium Header -->
     <div class="md:flex md:items-center md:justify-between gap-6">
         <div class="flex-1">
@@ -13,12 +13,12 @@
                 <div class="w-1.5 h-1.5 rounded-full bg-acetel-600 animate-pulse"></div>
                 <span class="text-[9px] font-black text-acetel-700 uppercase tracking-widest">Active</span>
             </div>
-            <h2 class="text-4xl font-black text-slate-900 tracking-tighter leading-none mb-3">Register Students</h2>
-            <p class="text-slate-500 font-medium text-lg leading-relaxed max-w-2xl">Registering students for cohort <span class="text-acetel-600 font-bold italic underline underline-offset-4 decoration-acetel-200">{{ $cohort->name }}</span>.</p>
+            <h2 class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tighter leading-none mb-3">Register Students</h2>
+            <p class="text-slate-500 font-medium text-sm sm:text-lg leading-relaxed max-w-2xl">Registering students for cohort <span class="text-acetel-600 font-bold italic underline underline-offset-4 decoration-acetel-200">{{ $cohort->name }}</span>.</p>
         </div>
-        <div class="mt-8 flex md:mt-0 shrink-0">
+        <div class="mt-6 flex md:mt-0 shrink-0">
             @php $backRoute = auth()->user()->hasRole('Admin') ? 'admin.cohorts.show' : 'coordinator.cohorts.show'; @endphp
-            <a href="{{ route($backRoute, $cohort) }}" class="inline-flex items-center gap-3 px-6 py-4 bg-white border border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 hover:border-acetel-200 transition-all shadow-sm">
+            <a href="{{ route($backRoute, $cohort) }}" class="inline-flex items-center gap-3 px-5 sm:px-6 py-3 sm:py-4 bg-white border border-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-slate-50 hover:border-acetel-200 transition-all shadow-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                 View Cohort
             </a>
@@ -26,23 +26,23 @@
     </div>
 
     <!-- Interface Switcher -->
-    <div class="bg-white shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden rounded-[3rem]" x-data="{ tab: 'single' }">
-        <div class="border-b border-slate-200 bg-slate-50/50 px-8 py-2">
-            <nav class="flex space-x-10" aria-label="Tabs">
+    <div class="bg-white shadow-xl shadow-slate-200/40 border border-slate-100 overflow-hidden rounded-2xl sm:rounded-[3rem]" x-data="{ tab: 'single' }">
+        <div class="border-b border-slate-200 bg-slate-50/50 px-4 sm:px-8 py-2 overflow-x-auto">
+            <nav class="flex space-x-6 sm:space-x-10" aria-label="Tabs">
                 <button @click="tab = 'single'" 
                     :class="{ 'border-acetel-600 text-acetel-700': tab === 'single', 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-200': tab !== 'single' }" 
-                    class="relative whitespace-nowrap py-6 px-1 border-b-2 font-black text-[11px] uppercase tracking-widest transition-all focus:outline-none flex items-center gap-3">
+                    class="relative whitespace-nowrap py-4 sm:py-6 px-1 border-b-2 font-black text-[11px] uppercase tracking-widest transition-all focus:outline-none flex items-center gap-3">
                     Single Student
                 </button>
                 <button @click="tab = 'bulk'" 
                     :class="{ 'border-acetel-600 text-acetel-700': tab === 'bulk', 'border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-200': tab !== 'bulk' }" 
-                    class="relative whitespace-nowrap py-6 px-1 border-b-2 font-black text-[11px] uppercase tracking-widest transition-all focus:outline-none flex items-center gap-3">
+                    class="relative whitespace-nowrap py-4 sm:py-6 px-1 border-b-2 font-black text-[11px] uppercase tracking-widest transition-all focus:outline-none flex items-center gap-3">
                     Bulk Import
                 </button>
             </nav>
         </div>
 
-        <div class="p-10 md:p-16 w-full max-w-5xl mx-auto">
+        <div class="p-5 sm:p-10 md:p-16 w-full max-w-5xl mx-auto">
             <!-- Manual Enrollment Form -->
             <div x-show="tab === 'single'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
                 @php $storeRoute = auth()->user()->hasRole('Admin') ? 'admin.cohorts.register-students.store' : 'coordinator.cohorts.register-students.store'; @endphp

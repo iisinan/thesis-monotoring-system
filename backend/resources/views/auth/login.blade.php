@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="min-h-screen flex bg-white" x-data="{ showPassword: false }">
+<div class="min-h-dvh flex bg-white" x-data="{ showPassword: false }">
 
     {{-- ===== LEFT PANEL: Branding ===== --}}
     <div class="hidden lg:flex lg:w-5/12 xl:w-1/2 relative overflow-hidden flex-col">
@@ -78,7 +78,7 @@
     </div>
 
     {{-- ===== RIGHT PANEL: Form ===== --}}
-    <div class="flex-1 flex flex-col items-center justify-center px-6 py-12 lg:px-12 xl:px-20 bg-slate-50">
+    <div class="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-8 sm:py-12 lg:px-12 xl:px-20 bg-slate-50 pb-safe">
 
         {{-- Mobile logo (only visible on small screens) --}}
         <div class="lg:hidden mb-10 flex items-center gap-3">

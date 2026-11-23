@@ -29,12 +29,12 @@
 
 <div class="space-y-10 animate-in-up pb-24">
     <!-- Premium Global Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div class="brand-card rounded-[2.5rem] p-8 relative overflow-hidden group">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-6">
+        <div class="brand-card rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-8 relative overflow-hidden group">
             <div class="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Total Accounts</p>
             <div class="flex items-end justify-between">
-                <h3 class="text-4xl font-black text-slate-900 tracking-tighter leading-none">{{ \App\Models\User::count() }}</h3>
+                <h3 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter leading-none">{{ \App\Models\User::count() }}</h3>
                 <div class="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center text-green-600 shadow-sm">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                 </div>
@@ -45,11 +45,11 @@
             </p>
         </div>
 
-        <div class="brand-card rounded-[2.5rem] p-8 relative overflow-hidden group">
+        <div class="brand-card rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-8 relative overflow-hidden group">
             <div class="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Staff Members</p>
             <div class="flex items-end justify-between">
-                <h3 class="text-4xl font-black text-slate-900 tracking-tighter leading-none">{{ \App\Models\User::role(['Supervisor', 'Program Coordinator'])->count() }}</h3>
+                <h3 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter leading-none">{{ \App\Models\User::role(['Supervisor', 'Program Coordinator'])->count() }}</h3>
                 <div class="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 shadow-sm">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                 </div>
@@ -57,11 +57,11 @@
             <p class="mt-4 text-[10px] font-bold text-blue-500 uppercase tracking-widest flex items-center gap-2">Academic & Admin</p>
         </div>
 
-        <div class="brand-card rounded-[2.5rem] p-8 relative overflow-hidden group">
+        <div class="brand-card rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-8 relative overflow-hidden group">
             <div class="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Active Students</p>
             <div class="flex items-end justify-between">
-                <h3 class="text-4xl font-black text-slate-900 tracking-tighter leading-none">{{ \App\Models\User::role('Student')->count() }}</h3>
+                <h3 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter leading-none">{{ \App\Models\User::role('Student')->count() }}</h3>
                 <div class="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shadow-sm">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477-4.5 1.253v13C19.832 18.247 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                 </div>
@@ -69,18 +69,18 @@
             <p class="mt-4 text-[10px] font-bold text-emerald-500 uppercase tracking-widest flex items-center gap-2">Scholarly Community</p>
         </div>
 
-        <div class="bg-slate-50 rounded-[2.5rem] p-6 border border-slate-200 flex flex-col justify-center space-y-3">
+        <div class="bg-slate-50 rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-6 border border-slate-200 flex flex-col justify-center space-y-3">
             <a href="{{ route('admin.users.create') }}" class="btn-create py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
                 Register New User
             </a>
-            <div class="flex gap-2">
-                <a href="{{ route('admin.users.import-form') }}" class="flex-1 py-4 bg-white border border-green-200 text-green-700 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-green-50 transition-all shadow-sm">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+            <div class="flex flex-wrap sm:flex-nowrap gap-2">
+                <a href="{{ route('admin.users.import-form') }}" class="flex-1 py-4 px-3 bg-white border border-green-200 text-green-700 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-green-50 transition-all shadow-sm">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                     Import
                 </a>
-                <a href="{{ route('admin.users.download-supervisors') }}" class="flex-1 py-4 bg-white border border-blue-200 text-blue-700 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 hover:bg-blue-50 transition-all shadow-sm text-center" title="Download Supervisor Emails">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                <a href="{{ route('admin.users.download-supervisors') }}" class="flex-1 py-4 px-3 bg-white border border-blue-200 text-blue-700 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1 hover:bg-blue-50 transition-all shadow-sm text-center" title="Download Supervisor Emails">
+                    <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     Supervisors
                 </a>
             </div>
@@ -88,9 +88,9 @@
     </div>
 
     <!-- Interface Dashboard -->
-    <div class="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl sm:rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
         <!-- Dashboard Filters -->
-        <div class="p-8 lg:p-12 border-b border-slate-50 bg-slate-50/20">
+        <div class="p-4 sm:p-8 lg:p-12 border-b border-slate-50 bg-slate-50/20">
             <form action="{{ route('admin.users.index') }}" method="GET" class="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                 <div class="md:col-span-4 space-y-3">
                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Search Identity</label>
@@ -139,16 +139,16 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-slate-50/30">
-                        <th class="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">Identity Profile</th>
-                        <th class="px-8 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">Roles</th>
-                        <th class="px-8 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-center">Security Status</th>
-                        <th class="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-right">Governance</th>
+                        <th class="px-4 sm:px-8 lg:px-10 py-4 sm:py-6 lg:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">Identity Profile</th>
+                        <th class="px-4 sm:px-8 py-4 sm:py-6 lg:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">Roles</th>
+                        <th class="px-4 sm:px-8 py-4 sm:py-6 lg:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-center">Security Status</th>
+                        <th class="px-4 sm:px-8 lg:px-10 py-4 sm:py-6 lg:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-right">Governance</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                     @forelse($users as $user)
                     <tr class="hover:bg-green-50/10 transition-all duration-300 group">
-                        <td class="px-10 py-8">
+                        <td class="px-4 sm:px-8 lg:px-10 py-4 sm:py-6 lg:py-8">
                             <div class="flex items-center gap-6">
                                 <div class="relative shrink-0">
                                     <div class="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-xl font-black text-slate-900 shadow-sm group-hover:scale-105 group-hover:border-green-300 transition-all duration-500">
@@ -214,7 +214,7 @@
                                                 </button>
                                                 
                                                 <template x-teleport="body">
-                                                    <div x-show="open" style="display: none;" class="fixed inset-0 z-[100] flex items-center justify-center">
+                                                    <div x-show="open" style="display: none;" class="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4">
                                                         <!-- Backdrop -->
                                                         <div x-show="open" 
                                                              x-transition:enter="ease-out duration-300"

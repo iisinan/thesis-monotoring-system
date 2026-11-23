@@ -1052,7 +1052,7 @@ class="space-y-8">
         <div class="flex min-h-full items-center justify-center p-4">
             <div x-show="reviewModalOpen" x-transition.opacity @click="reviewModalOpen = false" class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs"></div>
 
-            <div x-show="reviewModalOpen" x-transition.scale.origin.bottom class="relative bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl p-6 sm:p-8 z-10 space-y-5">
+            <div x-show="reviewModalOpen" x-transition.scale.origin.bottom class="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 w-full max-w-2xl p-5 sm:p-8 z-10 space-y-5 max-h-[90dvh] overflow-y-auto">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-widest text-purple-600">Internal Examiner Assessment</p>
@@ -1214,7 +1214,7 @@ class="space-y-8">
         <div class="flex min-h-full items-center justify-center p-4">
             <div x-show="messageModalOpen" x-transition.opacity @click="messageModalOpen = false" class="fixed inset-0 bg-slate-900/70 backdrop-blur-xs"></div>
 
-            <div x-show="messageModalOpen" x-transition.scale.origin.bottom class="relative bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-xl p-6 sm:p-8 z-10 space-y-5">
+            <div x-show="messageModalOpen" x-transition.scale.origin.bottom class="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 w-full max-w-xl p-5 sm:p-8 z-10 space-y-5 max-h-[90dvh] overflow-y-auto">
                 <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
                     <div>
                         <p class="text-[10px] font-black uppercase tracking-widest text-emerald-600">Direct Candidate Communication</p>

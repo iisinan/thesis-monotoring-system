@@ -6,7 +6,7 @@
     <link rel="icon" href="{{ asset('images/acetel-logo.jpeg') }}" type="image/jpeg">
     <link rel="shortcut icon" href="{{ asset('images/acetel-logo.jpeg') }}" type="image/jpeg">
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -43,11 +43,11 @@
     </style>
 </head>
 <body class="font-sans antialiased text-slate-800 coordinator-main selection:bg-brand-200 selection:text-brand-800 h-full overflow-hidden">
-    <div class="flex h-screen overflow-hidden relative">
+    <div class="flex h-dvh overflow-hidden relative">
         
         <!-- Mobile Sidebar Backdrop -->
         <div x-show="$store.sidebar.open" 
-             @click="$store.sidebar.open = false" 
+             @click="$store.sidebar.close()" 
              x-transition:enter="transition-opacity ease-linear duration-300"
              x-transition:enter-start="opacity-0"
              x-transition:enter-end="opacity-100"
@@ -58,11 +58,11 @@
              x-cloak></div>
 
         <!-- Sidebar Navigation -->
-        <aside class="fixed inset-y-0 left-0 z-50 w-72 light-sidebar transition-all duration-500 transform md:translate-x-0 md:relative flex flex-col group"
-               :class="$store.sidebar.open ? 'translate-x-0' : '-translate-x-full'"
+        <aside class="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] light-sidebar transition-all duration-300 ease-in-out transform flex flex-col md:static shrink-0 overscroll-contain group"
+               :class="$store.sidebar.open ? 'translate-x-0 md:ml-0' : '-translate-x-full md:translate-x-0 md:-ml-72'"
                x-cloak>
             
-            <div class="flex items-center justify-between px-6 sm:px-8 h-20 sm:h-24 shrink-0 border-b border-green-100">
+            <div class="flex items-center justify-between px-5 sm:px-6 lg:px-8 min-h-20 sm:h-24 pt-safe shrink-0 border-b border-green-100">
                 <div class="flex items-center gap-3 sm:gap-4 cursor-pointer">
                     <div class="w-10 h-10 sm:w-12 sm:h-12 bg-green-50 border-2 border-green-200 rounded-2xl flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-300">
                         <img src="{{ asset('images/acetel-logo.jpeg') }}" alt="Logo" class="w-full h-full object-cover rounded-xl">
@@ -85,7 +85,7 @@
                 @include('layouts.partials.sidebar-menu')
             </nav>
             
-            <div class="p-4 sm:p-6 bg-green-50 border-t border-green-100 shrink-0">
+            <div class="p-4 sm:p-6 pb-safe bg-green-50 border-t border-green-100 shrink-0">
                 <div class="flex items-center gap-3 sm:gap-4 group/user">
                     <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sidebar-avatar flex items-center justify-center font-black text-sm shadow-sm group-hover/user:scale-105 transition-transform">
                         {{ substr(Auth::user()->name, 0, 1) }}
@@ -109,13 +109,13 @@
             <x-impersonation-banner />
             
             <!-- Global Header -->
-            <header class="h-16 sm:h-20 flex items-center justify-between px-4 sm:px-6 lg:px-10 light-header z-30 shrink-0">
-                <div class="flex items-center gap-3 sm:gap-6 min-w-0">
-                    <button @click="Alpine.store('sidebar').toggle()" class="md:hidden p-2.5 sm:p-3 bg-green-50 hover:bg-green-100 rounded-xl text-green-700 border border-green-200 transition-colors shrink-0">
+            <header class="min-h-16 sm:h-20 pt-safe flex items-center justify-between px-3 sm:px-6 lg:px-10 light-header z-30 shrink-0">
+                <div class="flex items-center gap-2.5 sm:gap-4 lg:gap-6 min-w-0">
+                    <button @click="Alpine.store('sidebar').toggle()" class="p-2.5 bg-green-50 hover:bg-green-100 rounded-xl text-green-700 border border-green-200 transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-green-400" title="Toggle Sidebar (Ctrl+B)">
                         <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path></svg>
                     </button>
                     <div class="min-w-0">
-                        <h1 class="text-base sm:text-xl lg:text-2xl font-black text-slate-800 tracking-tight truncate">
+                        <h1 class="text-sm sm:text-xl lg:text-2xl font-black text-slate-800 tracking-tight truncate">
                             @yield('header', 'Program Governance')
                         </h1>
                     </div>
@@ -134,34 +134,34 @@
             </header>
 
             <!-- Scrollable Workspace -->
-            <main class="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-10 custom-scrollbar">
-                <div class="max-w-[1400px] mx-auto space-y-6 sm:space-y-8 pb-16 animate-in-up">
+            <main class="flex-1 overflow-x-hidden overflow-y-auto p-3 sm:p-6 lg:p-10 pb-20 md:pb-16 pb-safe custom-scrollbar overscroll-y-contain">
+                <div class="max-w-[1400px] mx-auto space-y-5 sm:space-y-8 pb-8 sm:pb-16 animate-in-up min-w-0">
 
                     
                     @if (session('success'))
-                        <div class="bg-green-50 text-green-800 px-6 py-4 rounded-2xl flex items-center gap-4 border border-green-200 shadow-sm animate-in-up" role="alert">
-                            <div class="w-10 h-10 rounded-xl bg-green-500 text-white flex items-center justify-center shrink-0">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                        <div class="bg-green-50 text-green-800 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 border border-green-200 shadow-sm animate-in-up" role="alert">
+                            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-green-500 text-white flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
                             </div>
-                            <span class="font-semibold text-sm">{{ session('success') }}</span>
+                            <span class="font-semibold text-xs sm:text-sm min-w-0 break-words">{{ session('success') }}</span>
                         </div>
                     @endif
 
                     @if (session('warning'))
-                        <div class="bg-amber-50 text-amber-800 px-6 py-4 rounded-2xl flex items-center gap-4 border border-amber-200 shadow-sm animate-in-up" role="alert">
-                            <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <div class="bg-amber-50 text-amber-800 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 border border-amber-200 shadow-sm animate-in-up" role="alert">
+                            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                             </div>
-                            <span class="font-semibold text-sm">{{ session('warning') }}</span>
+                            <span class="font-semibold text-xs sm:text-sm min-w-0 break-words">{{ session('warning') }}</span>
                         </div>
                     @endif
 
                     @if (session('error'))
-                        <div class="bg-rose-50 text-rose-800 px-6 py-4 rounded-2xl flex items-center gap-4 border border-rose-200 shadow-sm animate-in-up" role="alert">
-                            <div class="w-10 h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        <div class="bg-rose-50 text-rose-800 px-4 py-3 sm:px-6 sm:py-4 rounded-2xl flex items-center gap-3 sm:gap-4 border border-rose-200 shadow-sm animate-in-up" role="alert">
+                            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </div>
-                            <span class="font-semibold text-sm">{{ session('error') }}</span>
+                            <span class="font-semibold text-xs sm:text-sm min-w-0 break-words">{{ session('error') }}</span>
                         </div>
                     @endif
 

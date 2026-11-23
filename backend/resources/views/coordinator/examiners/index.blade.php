@@ -125,8 +125,8 @@
 
     <!-- AlpineJS Modals -->
     <!-- Internal Examiner Modal -->
-        <div x-show="showInternalModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm">
-            <div @click.away="showInternalModal = false" class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-2xl w-full max-w-lg overflow-hidden animate-in-up">
+        <div x-show="showInternalModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm">
+            <div @click.away="showInternalModal = false" class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-2xl w-full max-w-lg max-h-[90dvh] overflow-y-auto animate-in-up">
                 <div class="px-5 sm:px-10 py-5 sm:py-8 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between">
                     <div>
                         <h3 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Onboard Internal</h3>
@@ -164,8 +164,8 @@
         </div>
 
     <!-- External Examiner Modal -->
-        <div x-show="showExternalModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm outline-none">
-            <div @click.away="showExternalModal = false" class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-2xl w-full max-w-lg overflow-hidden animate-in-up flex flex-col md:max-h-[90vh]">
+        <div x-show="showExternalModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-sm outline-none">
+            <div @click.away="showExternalModal = false" class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-2xl w-full max-w-lg overflow-y-auto animate-in-up flex flex-col max-h-[90dvh]">
                 <div class="px-5 sm:px-10 py-5 sm:py-8 border-b border-slate-50 bg-slate-50/50 flex items-center justify-between shrink-0">
                     <div>
                         <h3 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Onboard External</h3>

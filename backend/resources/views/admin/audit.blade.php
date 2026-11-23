@@ -13,16 +13,16 @@
                 </div>
                 <span class="text-[10px] font-black uppercase tracking-[0.3em]">Review</span>
             </div>
-            <h1 class="text-4xl font-black text-slate-900 tracking-tight">Review Theses</h1>
+            <h1 class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">Review Theses</h1>
             <p class="mt-2 text-sm font-medium text-slate-500 italic max-w-2xl">
                 Restricted access to theses that have cleared Internal Defense.
             </p>
         </div>
 
-        <div class="relative group">
+        <div class="relative group w-full md:w-auto">
             <form action="{{ route('admin.audit.index') }}" method="GET">
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Filter by Title or Student..." 
-                       class="pl-12 pr-6 py-4 bg-white rounded-2xl border border-slate-200 outline-none w-80 text-xs font-black uppercase tracking-widest focus:ring-4 focus:ring-acetel-500/10 focus:border-acetel-500 transition-all shadow-sm">
+                       class="pl-12 pr-4 sm:pr-6 py-3.5 sm:py-4 bg-white rounded-2xl border border-slate-200 outline-none w-full md:w-80 text-xs font-black uppercase tracking-widest focus:ring-4 focus:ring-acetel-500/10 focus:border-acetel-500 transition-all shadow-sm">
                 <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-acetel-500 transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor font-black"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                 </div>
@@ -31,9 +31,9 @@
     </div>
 
     <!-- Audit List Matrix -->
-    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden divide-y divide-slate-50">
+    <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden divide-y divide-slate-50">
         @forelse($theses as $thesis)
-            <div class="group/audit px-10 py-8 hover:bg-slate-50/50 transition-all duration-300">
+            <div class="group/audit px-4 sm:px-10 py-5 sm:py-8 hover:bg-slate-50/50 transition-all duration-300">
                 <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                     <div class="max-w-3xl">
                         <div class="flex items-center gap-4 mb-3">
@@ -83,7 +83,7 @@
                                 {{ $thesis->milestones->first(fn($m) => optional($m->template)->order == 6)?->updated_at?->format('M d, Y') ?? 'N/A' }}
                             </p>
                         </div>
-                        <a href="{{ route('admin.audit.show', $thesis) }}" class="px-8 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-acetel-600 transition-all active:scale-95 shadow-lg shadow-slate-900/10">
+                        <a href="{{ route('admin.audit.show', $thesis) }}" class="w-full sm:w-auto text-center px-6 sm:px-8 py-3.5 sm:py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-acetel-600 transition-all active:scale-95 shadow-lg shadow-slate-900/10">
                             Review Thesis
                         </a>
                     </div>

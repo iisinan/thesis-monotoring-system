@@ -14,10 +14,10 @@
                 </a>
                 <span class="text-[10px] font-black uppercase tracking-[0.3em]">Directory / User Profile</span>
             </div>
-            <h1 class="text-4xl font-black text-slate-900 tracking-tight">{{ $user->name }}</h1>
-            <p class="mt-2 text-sm font-medium text-slate-500">{{ $user->email }}</p>
+            <h1 class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight break-words">{{ $user->name }}</h1>
+            <p class="mt-2 text-sm font-medium text-slate-500 break-all">{{ $user->email }}</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2.5 sm:gap-3">
             @if($user->id !== auth()->id())
                 <form action="{{ route('admin.users.impersonate', $user) }}" method="POST" class="inline">
                     @csrf
@@ -34,8 +34,8 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 col-span-1">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
+        <div class="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm border border-slate-100 md:col-span-1">
             <div class="flex flex-col items-center text-center">
                 <div class="w-24 h-24 rounded-2xl bg-gradient-to-br from-brand-100 to-brand-50 text-brand-600 flex items-center justify-center text-3xl font-black mb-4 shadow-inner">
                     {{ substr($user->name, 0, 1) }}
@@ -73,13 +73,13 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100 col-span-2">
-            <h3 class="text-lg font-bold text-slate-900 mb-6">Profile Configuration</h3>
+        <div class="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm border border-slate-100 md:col-span-2">
+            <h3 class="text-lg font-bold text-slate-900 mb-4 sm:mb-6">Profile Configuration</h3>
             
             @if($user->hasRole('Student') && $user->studentProfile)
                 <div class="space-y-6">
-                    <div class="p-6 bg-slate-50 rounded-2xl border border-slate-100">
-                        <div class="grid grid-cols-2 gap-6">
+                    <div class="p-4 sm:p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                             <div>
                                 <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Matric Number</p>
                                 <p class="text-base font-bold text-slate-800">{{ $user->studentProfile->student_id_number }}</p>

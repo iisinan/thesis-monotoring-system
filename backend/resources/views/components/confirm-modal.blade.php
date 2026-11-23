@@ -63,7 +63,7 @@
              x-transition:leave="ease-in duration-200"
              x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
              x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-             class="relative transform overflow-hidden rounded-[2.5rem] bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg border border-slate-100"
+             class="relative transform overflow-hidden rounded-2xl sm:rounded-[2.5rem] bg-white text-left shadow-2xl transition-all w-full max-w-lg sm:my-8 border border-slate-100"
              @click.stop
         >
             <!-- Top Ambient Glow -->
@@ -76,7 +76,7 @@
                  }">
             </div>
 
-            <div class="p-8 sm:p-10 relative z-10">
+            <div class="p-5 sm:p-10 relative z-10">
                 <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
                     <!-- Icon Badge with Soft Glow -->
                     <div class="w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-sm border transition-all duration-300"
@@ -120,7 +120,7 @@
             </div>
 
             <!-- Footer Action Buttons -->
-            <div class="bg-slate-50/80 px-8 py-5 sm:px-10 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-3">
+            <div class="bg-slate-50/80 px-5 py-4 sm:px-10 sm:py-5 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-end gap-3">
                 <button type="button"
                         @click="cancel()"
                         class="w-full sm:w-auto px-6 py-3 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-wider text-slate-800 hover:bg-slate-50 transition-colors shadow-sm"

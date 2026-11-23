@@ -126,10 +126,10 @@
                 </label>
 
                 <div x-show="requiresSubmission" x-transition class="space-y-4">
-                    <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                    <div class="p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
                         @php $subTypes = old('submission_type', $milestoneTemplate->submission_type ?? ['file']); @endphp
                         <span class="block text-[10px] font-black text-blue-600 uppercase tracking-[0.15em]">Required Artifact Types</span>
-                        <div class="grid grid-cols-3 gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <label class="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all bg-white hover:border-blue-300">
                                 <input type="checkbox" name="submission_type[]" value="ppt" {{ in_array('ppt', $subTypes) ? 'checked' : '' }} class="w-4 h-4 rounded text-blue-600 border-slate-300">
                                 <span class="text-sm font-bold text-slate-700">Presentation (PDF)</span>
@@ -154,10 +154,10 @@
                                 <span class="text-xs text-slate-400">An authorized role must unlock submissions before the student can upload.</span>
                             </div>
                         </label>
-                        <div class="pl-7 space-y-2">
+                        <div class="pl-2 sm:pl-7 space-y-2">
                             @php $subApprovers = old('submission_approver_roles', $milestoneTemplate->submission_approver_roles ?? []); @endphp
                             <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Roles authorized to unlock:</span>
-                            <div class="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                 @foreach($roles as $role)
                                 <label class="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:border-blue-300 cursor-pointer transition-all">
                                     <input type="checkbox" name="submission_approver_roles[]" value="{{ $role }}" {{ in_array($role, $subApprovers) ? 'checked' : '' }}
@@ -174,19 +174,19 @@
 
         {{-- STEP 3: PLAGIARISM PROTOCOL --}}
         <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div class="px-8 py-6 border-b border-slate-50 flex items-center gap-4 bg-slate-50/50">
-                <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+            <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-slate-50 flex items-center gap-4 bg-slate-50/50">
+                <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
                     <span class="text-sm font-black">3</span>
                 </div>
                 <div>
                     <h2 class="text-lg font-black text-slate-900 tracking-tight">Plagiarism Verification</h2>
                 </div>
             </div>
-            <div class="p-8 space-y-6">
-                <label class="flex items-center justify-between p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300"
+            <div class="p-5 sm:p-8 space-y-6">
+                <label class="flex items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300"
                        :class="allowPlagiarism ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100 hover:border-slate-200'">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
+                    <div class="flex items-center gap-3 sm:gap-4">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0"
                              :class="allowPlagiarism ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25' : 'bg-slate-100 text-slate-400'">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4"/></svg>
                         </div>
@@ -202,10 +202,10 @@
                     </div>
                 </label>
 
-                <div x-show="allowPlagiarism" x-transition class="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                <div x-show="allowPlagiarism" x-transition class="p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
                     @php $pRole = old('plagiarism_report_role', $milestoneTemplate->plagiarism_report_role ?? 'Admin'); @endphp
                     <span class="block text-[10px] font-black text-amber-600 uppercase tracking-[0.15em]">Primary Upload Authority</span>
-                    <div class="grid grid-cols-2 gap-3 pt-1">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         <label class="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all bg-white hover:border-amber-300">
                             <input type="radio" name="plagiarism_report_role" value="Admin" {{ $pRole === 'Admin' ? 'checked' : '' }} class="w-4 h-4 text-amber-600 border-slate-300">
                             <span class="text-sm font-bold text-slate-700">Admin</span>

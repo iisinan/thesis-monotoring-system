@@ -174,7 +174,7 @@ class="space-y-8 animate-in">
             </div>
 
             {{-- Right: Faculty Appointments Telemetry Cards --}}
-            <div class="shrink-0 flex flex-wrap sm:flex-nowrap lg:flex-col gap-2.5 min-w-[210px]">
+            <div class="shrink-0 flex flex-wrap lg:flex-col gap-2.5 w-full lg:w-auto lg:min-w-[210px]">
                 @if($activeFacultyRoles['supervisor'])
                     <div class="flex-1 min-w-[130px] bg-green-50/80 border border-green-100 rounded-2xl p-4 text-center">
                         <div class="flex items-center justify-between gap-2 mb-1">
@@ -579,10 +579,10 @@ class="space-y-8 animate-in">
         @endif
 
         {{-- Overview Grid: Portfolios & Institutional Assets --}}
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8">
             {{-- Left: Role Portfolios Quick Jump Cards --}}
             <div class="lg:col-span-8 space-y-6">
-                <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 space-y-6">
+                <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-5 sm:p-8 space-y-5 sm:space-y-6">
                     <div class="flex items-center justify-between border-b border-slate-50 pb-4">
                         <div>
                             <h3 class="text-base font-black text-slate-800 tracking-tight">ACTIVE ACADEMIC DOMAINS</h3>
@@ -874,8 +874,8 @@ class="space-y-8 animate-in">
                 if (this.statusFilter === 'defense') return order >= 6;
                 return true;
             }
-        }" class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div class="px-8 py-6 border-b border-slate-50 space-y-4">
+        }" class="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-slate-50 space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div class="flex items-center gap-3">
                         <div class="w-2 h-6 bg-emerald-500 rounded-full"></div>
@@ -1254,8 +1254,8 @@ class="space-y-8 animate-in">
                 if (this.coordProgFilter !== 'all' && progCode !== this.coordProgFilter) return false;
                 return true;
             }
-        }" class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div class="px-8 py-6 border-b border-slate-50 space-y-4">
+        }" class="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+            <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-slate-50 space-y-4">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <h3 class="text-base font-black text-slate-800 tracking-tight uppercase">PROGRAM CANDIDATE PIPELINE</h3>
@@ -1290,11 +1290,11 @@ class="space-y-8 animate-in">
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                            <th class="px-8 py-4">Candidate</th>
-                            <th class="px-6 py-4">Program & Level</th>
-                            <th class="px-6 py-4">Supervisor Allocation</th>
-                            <th class="px-6 py-4">Current Milestone</th>
-                            <th class="px-8 py-4 text-right">Actions</th>
+                            <th class="px-4 sm:px-8 py-3.5 sm:py-4">Candidate</th>
+                            <th class="px-4 sm:px-6 py-3.5 sm:py-4">Program & Level</th>
+                            <th class="px-4 sm:px-6 py-3.5 sm:py-4">Supervisor Allocation</th>
+                            <th class="px-4 sm:px-6 py-3.5 sm:py-4">Current Milestone</th>
+                            <th class="px-4 sm:px-8 py-3.5 sm:py-4 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-50 text-xs font-medium">
@@ -1613,7 +1613,7 @@ class="space-y-8 animate-in">
 
         {{-- Pending Oral Viva Defence Evaluations --}}
         @if($pending_evaluations->count() > 0)
-        <div class="bg-white rounded-3xl border border-slate-100 shadow-sm p-8 space-y-4">
+        <div class="bg-white rounded-2xl sm:rounded-3xl border border-slate-100 shadow-sm p-5 sm:p-8 space-y-4">
             <div class="flex items-center justify-between border-b border-slate-50 pb-4">
                 <h3 class="text-base font-black text-slate-800 tracking-tight">ORAL DEFENCE EVALUATION SCORING</h3>
                 <span class="px-2.5 py-1 bg-amber-50 text-amber-700 text-[10px] font-black rounded-lg uppercase">

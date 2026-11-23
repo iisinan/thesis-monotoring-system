@@ -3,28 +3,28 @@
 @section('header', 'Review')
 
 @section('content')
-<div class="space-y-8 pb-32">
+<div class="space-y-6 sm:space-y-8 pb-20 sm:pb-32">
     <!-- Audit Node Header -->
-    <div class="bg-slate-900 rounded-[3rem] p-12 text-white relative overflow-hidden shadow-2xl">
+    <div class="bg-slate-900 rounded-2xl sm:rounded-[3rem] p-6 sm:p-10 lg:p-12 text-white relative overflow-hidden shadow-2xl">
         <div class="absolute inset-0 opacity-10">
             <div class="absolute inset-0 bg-gradient-to-br from-acetel-500 to-slate-900"></div>
         </div>
         
-        <div class="relative z-10 flex flex-col md:flex-row justify-between items-start gap-12">
-            <div class="flex-1">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-acetel-500/20 border border-acetel-500/30 text-[9px] font-black uppercase tracking-widest text-acetel-400 mb-6 font-black">
+        <div class="relative z-10 flex flex-col md:flex-row justify-between items-start gap-6 sm:gap-12">
+            <div class="flex-1 min-w-0">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-acetel-500/20 border border-acetel-500/30 text-[9px] font-black uppercase tracking-widest text-acetel-400 mb-4 sm:mb-6">
                     Phase: Post-Internal Defence
                 </div>
-                <h1 class="text-4xl font-black tracking-tight leading-none mb-6 uppercase">{{ $thesis->title }}</h1>
-                <div class="flex flex-wrap gap-8 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                <h1 class="text-2xl sm:text-4xl font-black tracking-tight leading-tight sm:leading-none mb-4 sm:mb-6 uppercase break-words">{{ $thesis->title }}</h1>
+                <div class="flex flex-wrap gap-4 sm:gap-8 text-[10px] font-black uppercase tracking-widest text-slate-400">
                     <p>Student: <span class="text-white ml-2 italic">{{ $thesis->student->user->name }}</span></p>
                     <p>Program: <span class="text-white ml-2 italic">{{ $thesis->student->program->name }}</span></p>
                 </div>
             </div>
 
-            <div class="shrink-0 text-right">
-                <div class="flex items-center gap-4 justify-end">
-                    <div class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-acetel-400 text-xl font-black">
+            <div class="shrink-0 sm:text-right">
+                <div class="flex items-center gap-4 sm:justify-end">
+                    <div class="px-3 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-acetel-400 text-base sm:text-xl font-black">
                          {{ $thesis->student->student_id ?? 'ID' }}
                     </div>
                 </div>
@@ -32,18 +32,18 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-10">
         <!-- Artifact Discovery -->
-        <div class="lg:col-span-8 space-y-10">
-            <div class="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-sm transition-all hover:bg-slate-50/50">
-                <div class="flex items-center justify-between mb-8">
+        <div class="lg:col-span-8 space-y-6 sm:space-y-10">
+            <div class="bg-white rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-10 border border-slate-100 shadow-sm transition-all hover:bg-slate-50/50">
+                <div class="flex items-center justify-between mb-6 sm:mb-8">
                     <h3 class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Documents</h3>
                     <span class="text-[8px] font-black text-acetel-600 uppercase italic">Admin Only</span>
                 </div>
 
-                <div class="space-y-6">
+                <div class="space-y-4 sm:space-y-6">
                     @foreach($thesis->milestones->sortBy('template.order') as $milestone)
-                        <div class="p-8 bg-white rounded-[2rem] border border-slate-100 relative group overflow-hidden">
+                        <div class="p-5 sm:p-8 bg-white rounded-2xl sm:rounded-[2rem] border border-slate-100 relative group overflow-hidden">
                             <div class="absolute inset-y-0 left-0 w-1 bg-slate-100 group-hover:bg-acetel-500 transition-all"></div>
                             
                             <div class="flex items-center justify-between mb-6">

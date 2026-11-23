@@ -13,20 +13,20 @@
     </a>
 
     <!-- Compose Card -->
-    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
-        <div class="px-10 py-8 border-b border-slate-50 bg-slate-50/30">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-lg shadow-primary-500/20">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+    <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
+        <div class="px-5 sm:px-10 py-5 sm:py-8 border-b border-slate-50 bg-slate-50/30">
+            <div class="flex items-center gap-3 sm:gap-4">
+                <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-lg shadow-primary-500/20 shrink-0">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                 </div>
-                <div>
-                    <h2 class="text-xl font-black text-slate-900 tracking-tight">New Message</h2>
+                <div class="min-w-0">
+                    <h2 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">New Message</h2>
                     <p class="text-xs font-medium text-slate-500">Compose and send a message.</p>
                 </div>
             </div>
         </div>
 
-        <form action="{{ route('inbox.store') }}" method="POST" enctype="multipart/form-data" class="px-10 py-8 space-y-6" 
+        <form action="{{ route('inbox.store') }}" method="POST" enctype="multipart/form-data" class="px-5 sm:px-10 py-5 sm:py-8 space-y-6" 
             x-data="{ 
                 showCC: false, 
                 showBCC: false,

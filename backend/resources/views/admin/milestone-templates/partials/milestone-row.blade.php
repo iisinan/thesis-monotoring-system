@@ -1219,7 +1219,7 @@
                                                                             <span class="text-[10px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1.5 rounded-xl shrink-0">
                                                                                 Internal Examiner
                                                                             </span>
-                                                                            <div class="relative flex-1 min-w-[260px]" @click.outside="batchExaminerOpen = false">
+                                                                            <div class="relative w-full sm:flex-1 sm:min-w-[260px]" @click.outside="batchExaminerOpen = false">
                                                                                 <div class="relative">
                                                                                     <svg class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                                                                                     <input type="text"
@@ -1261,7 +1261,7 @@
                                                                 </div>
 
                                                                 {{-- Per-student rows Table --}}
-                                                                <div class="overflow-y-auto flex-1 min-h-0">
+                                                                <div class="overflow-auto flex-1 min-h-0">
                                                                     <table class="w-full text-left text-xs">
                                                                         <thead class="bg-slate-50 sticky top-0 z-10 border-b border-slate-200/80 text-[10px] font-black uppercase tracking-wider text-slate-500">
                                                                             <tr>
@@ -2205,7 +2205,7 @@
                                                     </p>
                                                 </div>
 
-                                                <div class="grid grid-cols-7 gap-1.5">
+                                                <div class="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                                                     <template x-for="day in dayOptions" :key="day.key">
                                                         <button type="button" 
                                                             @click="toggleDay(day.key)"
@@ -2427,7 +2427,7 @@
                                     </div>
 
                                     <div class="overflow-hidden border border-slate-100 rounded-xl">
-                                        <div class="max-h-[400px] overflow-y-auto" data-students-scroll>
+                                        <div class="max-h-[400px] overflow-auto" data-students-scroll>
                                             <table class="w-full text-left text-sm">
                                                 <thead class="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                                                     <tr>
@@ -3357,7 +3357,7 @@
                                                             <label class="block text-[11px] font-black text-slate-800 uppercase tracking-wider">1. Student Recipients ({{ $template->name }})</label>
                                                             <span class="text-[10px] font-bold text-slate-400">Filter candidates by level</span>
                                                         </div>
-                                                        <div class="grid grid-cols-3 gap-2 p-1 bg-slate-200/70 rounded-xl">
+                                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 p-1 bg-slate-200/70 rounded-xl">
                                                             <button type="button" 
                                                                 @click="messageTarget = 'all'"
                                                                 class="py-2 px-2.5 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
@@ -3381,7 +3381,7 @@
                                                             </button>
                                                         </div>
 
-                                                        <div x-show="messageTarget === 'all'" x-transition class="grid grid-cols-3 gap-2 pt-1">
+                                                        <div x-show="messageTarget === 'all'" x-transition class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                                                             <button type="button" @click="studentDegreeFilter = 'all'"
                                                                 :class="studentDegreeFilter === 'all' ? 'bg-slate-900 text-white border-slate-900 shadow-2xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'"
                                                                 class="py-1.5 px-2.5 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 cursor-pointer transition">

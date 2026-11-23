@@ -151,8 +151,50 @@
     to   { opacity: 1; transform: none; }
 }
 
-.custom-scrollbar::-webkit-scrollbar       { width: 4px; }
+.custom-scrollbar { -webkit-overflow-scrolling: touch; }
+.custom-scrollbar::-webkit-scrollbar       { width: 4px; height: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #bbf7d0; border-radius: 10px; }
+
+.overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+}
+
+@utility pb-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+@utility pt-safe {
+    padding-top: env(safe-area-inset-top);
+}
+
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+        overflow-x: clip;
+    }
+
+    body {
+        overflow-x: clip;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: rgba(22, 163, 74, 0.12);
+    }
+
+    iframe {
+        max-width: 100%;
+    }
+}
+
+/* Prevent iOS Safari automatic viewport zoom on form field focus (<16px) and horizontal overflow */
+@media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]),
+    select,
+    textarea {
+        font-size: 16px !important;
+        max-width: 100%;
+    }
+}
 
 [x-cloak] { display: none !important; }

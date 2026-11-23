@@ -29,7 +29,7 @@
         }
     }"
     @notify.window="add($event.detail.message, $event.detail.type)"
-    class="fixed top-10 right-10 z-[100] flex flex-col gap-4 pointer-events-none w-full max-w-md">
+    class="fixed top-4 sm:top-10 inset-x-3 sm:left-auto sm:right-10 pt-safe z-[100] flex flex-col gap-3 sm:gap-4 pointer-events-none sm:w-full max-w-md">
     
     <template x-for="message in messages" :key="message.id">
         <div x-transition:enter="transition cubic-bezier(0.175, 0.885, 0.32, 1.275) duration-500"

@@ -158,7 +158,7 @@ class SupervisorsAssignedMilestoneTest extends TestCase
     }
 
     #[Test]
-    public function student_page_shows_both_insert_supervisors_and_request_supervisors_options(): void
+    public function student_page_shows_request_supervisors_option_and_hides_self_insert_tab(): void
     {
         [$studentUser, , $thesis, $supMilestone] = $this->createStudentAtSupervisorsAssigned(
             $this->mscLevel,
@@ -171,7 +171,8 @@ class SupervisorsAssignedMilestoneTest extends TestCase
         ]));
 
         $response->assertOk();
-        $response->assertSee('I Already Have Supervisors');
+        $response->assertDontSee('I Already Have Supervisors');
+        $response->assertDontSee('Insert Your Supervisory Panel');
         $response->assertSee('Upload Tentative Proposal');
         $response->assertSee('Request Supervisors');
         $response->assertSee('NOU20260011');

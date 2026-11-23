@@ -66,7 +66,7 @@ class="relative z-[100]" aria-labelledby="modal-title" role="dialog" aria-modal=
          class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"></div>
 
     <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
-        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+        <div class="flex min-h-full items-center justify-center p-2 sm:p-4 text-center">
             <!-- Modal panel -->
             <div x-show="isOpen" 
                  @click.away="closeModal()"
@@ -76,18 +76,18 @@ class="relative z-[100]" aria-labelledby="modal-title" role="dialog" aria-modal=
                  x-transition:leave="ease-in duration-200" 
                  x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
                  x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-                 class="relative transform overflow-hidden rounded-[2rem] bg-white text-left shadow-2xl transition-all w-full max-w-5xl h-[85vh] flex flex-col border border-slate-100">
+                 class="relative transform overflow-hidden rounded-2xl sm:rounded-[2rem] bg-white text-left shadow-2xl transition-all w-full max-w-5xl h-[90dvh] sm:h-[85dvh] flex flex-col border border-slate-100">
                 
                 <!-- Header -->
-                <div class="bg-slate-50 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between border-b border-slate-100 shrink-0">
-                    <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2 sm:pr-4">
+                <div class="bg-slate-50 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-2 border-b border-slate-100 shrink-0">
+                    <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                         <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-acetel-50 text-acetel-600 flex items-center justify-center shrink-0">
                             <!-- Document Icon -->
                             <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
                         </div>
-                        <div class="min-w-0">
-                            <h3 class="text-xs sm:text-sm font-black text-slate-900 truncate max-w-[150px] sm:max-w-md" id="modal-title" x-text="documentTitle || 'Document Preview'"></h3>
-                            <p class="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Secure Artifact Viewer</p>
+                        <div class="min-w-0 flex-1">
+                            <h3 class="text-xs sm:text-sm font-black text-slate-900 truncate" id="modal-title" x-text="documentTitle || 'Document Preview'"></h3>
+                            <p class="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 truncate">Secure Artifact Viewer</p>
                         </div>
                     </div>
                     
@@ -117,19 +117,25 @@ class="relative z-[100]" aria-labelledby="modal-title" role="dialog" aria-modal=
                 </div>
 
                 <!-- Content Area -->
-                <div class="flex-1 bg-slate-900 overflow-hidden relative group">
+                <div class="flex-1 bg-slate-900 overflow-auto relative group" style="-webkit-overflow-scrolling: touch;">
                     <template x-if="documentType === 'pdf'">
-                        <iframe :src="documentUrl" id="document-preview-iframe" class="w-full h-full border-0 bg-white" title="PDF Preview"></iframe>
+                        <div class="w-full h-full flex flex-col">
+                            <div class="sm:hidden bg-slate-800 text-slate-200 px-3 py-2 flex items-center justify-between gap-2 text-[11px] font-semibold border-b border-slate-700 shrink-0">
+                                <span>Trouble scrolling PDF on mobile?</span>
+                                <a :href="documentUrl" target="_blank" class="px-2.5 py-1 bg-acetel-600 text-white rounded-lg font-bold shrink-0">Open Full PDF</a>
+                            </div>
+                            <iframe :src="documentUrl" id="document-preview-iframe" class="w-full flex-1 border-0 bg-white" title="PDF Preview"></iframe>
+                        </div>
                     </template>
                     
                     <template x-if="documentType === 'image'">
-                        <div class="w-full h-full flex items-center justify-center p-8">
+                        <div class="w-full h-full flex items-center justify-center p-3 sm:p-8">
                             <img :src="documentUrl" :alt="documentTitle" class="max-w-full max-h-full object-contain rounded-xl shadow-2xl">
                         </div>
                     </template>
 
                     <template x-if="documentType !== 'pdf' && documentType !== 'image'">
-                        <div class="w-full h-full flex flex-col items-center justify-center p-12 text-center">
+                        <div class="w-full h-full flex flex-col items-center justify-center p-6 sm:p-12 text-center">
                             <div class="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 mb-6 shadow-inner">
                                 <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                             </div>

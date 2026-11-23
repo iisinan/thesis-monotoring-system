@@ -5,9 +5,9 @@
 @endsection
 
 @section('content')
-<div class="space-y-10 pb-20">
+<div class="space-y-6 sm:space-y-10 pb-16 sm:pb-20">
     {{-- Sophisticated Professional Header --}}
-    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-8">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-6 sm:gap-8">
         <div class="space-y-4">
             <div class="flex items-center gap-2.5 text-green-600">
                 <div class="p-2 rounded-xl bg-green-50 border border-green-100 shadow-sm">
@@ -15,34 +15,34 @@
                 </div>
                 <span class="text-[10px] font-black uppercase tracking-[0.3em]">Institutional Governance</span>
             </div>
-            <h1 class="text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none uppercase">System <span class="text-green-600">Audit Ledger</span></h1>
-            <p class="text-lg font-medium text-slate-500 max-w-2xl leading-relaxed italic">Immutable record of system state changes, administrative actions, and tactical interactions.</p>
+            <h1 class="text-2xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-none uppercase">System <span class="text-green-600">Audit Ledger</span></h1>
+            <p class="text-sm sm:text-lg font-medium text-slate-500 max-w-2xl leading-relaxed italic">Immutable record of system state changes, administrative actions, and tactical interactions.</p>
         </div>
         
-        <div class="flex items-center gap-4 bg-white/80 backdrop-blur-md px-6 py-4 rounded-[2rem] border border-green-100 shadow-sm">
+        <div class="flex items-center gap-4 bg-white/80 backdrop-blur-md px-5 py-3.5 sm:px-6 sm:py-4 rounded-2xl sm:rounded-[2rem] border border-green-100 shadow-sm w-fit">
             <span class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.6)]"></span>
             <span class="text-[10px] font-black text-green-700 uppercase tracking-widest leading-none">Status: Integrity Verified</span>
         </div>
     </div>
 
     {{-- Intelligence Navigation Tabs --}}
-    <div class="flex p-1.5 bg-slate-100 rounded-2xl w-full sm:w-fit">
-        <a href="{{ route('admin.activity-logs.index') }}" class="px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-slate-500 hover:text-slate-800">
+    <div class="flex flex-wrap sm:flex-nowrap p-1.5 bg-slate-100 rounded-2xl w-full sm:w-fit gap-1">
+        <a href="{{ route('admin.activity-logs.index') }}" class="flex-1 sm:flex-initial text-center px-4 sm:px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-slate-500 hover:text-slate-800">
             Login Sessions
         </a>
-        <a href="{{ route('admin.audit-logs.index') }}" class="px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white text-green-700 shadow-sm border border-slate-200/50">
+        <a href="{{ route('admin.audit-logs.index') }}" class="flex-1 sm:flex-initial text-center px-4 sm:px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-white text-green-700 shadow-sm border border-slate-200/50">
             System Actions
         </a>
     </div>
 
     {{-- Professional Audit Feed --}}
-    <div class="bg-white rounded-[3.5rem] border border-slate-100 shadow-sm overflow-hidden">
-        <div class="px-10 py-10 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+    <div class="bg-white rounded-2xl sm:rounded-[3.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div class="px-5 py-6 sm:px-10 sm:py-10 border-b border-slate-50 flex flex-wrap items-center justify-between gap-4 bg-slate-50/30">
             <div class="flex items-center gap-4">
-                 <div class="w-1 h-10 bg-green-600 rounded-full shadow-lg"></div>
-                 <h3 class="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">Event <span class="text-slate-400">Stream</span></h3>
+                 <div class="w-1 h-8 sm:h-10 bg-green-600 rounded-full shadow-lg"></div>
+                 <h3 class="text-lg sm:text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">Event <span class="text-slate-400">Stream</span></h3>
             </div>
-            <div class="px-5 py-2 bg-slate-900 text-white text-[10px] font-black rounded-full uppercase tracking-widest leading-none">
+            <div class="px-4 sm:px-5 py-2 bg-slate-900 text-white text-[10px] font-black rounded-full uppercase tracking-widest leading-none">
                 Total Events: {{ $logs->total() }}
             </div>
         </div>
@@ -51,17 +51,17 @@
             <table class="w-full text-left border-collapse">
                 <thead>
                     <tr class="bg-slate-50/50">
-                        <th class="px-12 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] border-b border-slate-50">Temporal Marker</th>
-                        <th class="px-8 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] border-b border-slate-50">Actor Identity</th>
-                        <th class="px-8 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] border-b border-slate-50">State Interaction</th>
-                        <th class="px-8 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] border-b border-slate-50 text-center">Entity Model</th>
-                        <th class="px-12 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] border-b border-slate-50 text-right">Verification</th>
+                        <th class="px-4 sm:px-8 lg:px-12 py-4 sm:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 whitespace-nowrap">Temporal Marker</th>
+                        <th class="px-4 sm:px-8 py-4 sm:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 whitespace-nowrap">Actor Identity</th>
+                        <th class="px-4 sm:px-8 py-4 sm:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 whitespace-nowrap">State Interaction</th>
+                        <th class="px-4 sm:px-8 py-4 sm:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-center whitespace-nowrap">Entity Model</th>
+                        <th class="px-4 sm:px-8 lg:px-12 py-4 sm:py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-right whitespace-nowrap">Verification</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                     @forelse($logs as $log)
                     <tr class="hover:bg-green-50/10 transition-all duration-300 group">
-                        <td class="px-12 py-8">
+                        <td class="px-4 sm:px-8 lg:px-12 py-4 sm:py-8 whitespace-nowrap">
                             <div class="flex flex-col gap-1.5 translate-x-0 group-hover:translate-x-1 transition-transform">
                                 <p class="text-sm font-black text-slate-900 italic uppercase leading-none tracking-tight">{{ $log->created_at->format('M d, Y') }}</p>
                                 <div class="flex items-center gap-2">
@@ -70,9 +70,9 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="px-8 py-8">
-                            <div class="flex items-center gap-5">
-                                <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 text-slate-600 group-hover:from-green-600 group-hover:text-white group-hover:border-green-500 transition-all shadow-sm flex items-center justify-center text-sm font-black italic">
+                        <td class="px-4 sm:px-8 py-4 sm:py-8">
+                            <div class="flex items-center gap-3 sm:gap-5">
+                                <div class="w-10 h-10 sm:w-11 sm:h-11 shrink-0 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 text-slate-600 group-hover:from-green-600 group-hover:text-white group-hover:border-green-500 transition-all shadow-sm flex items-center justify-center text-sm font-black italic">
                                     {{ substr($log->user->name ?? '?', 0, 1) }}
                                 </div>
                                 <div class="min-w-0">
@@ -84,7 +84,7 @@
                                 </div>
                             </div>
                         </td>
-                        <td class="px-8 py-8">
+                        <td class="px-4 sm:px-8 py-4 sm:py-8 whitespace-nowrap">
                             @php
                                 $actionColor = match(strtolower($log->action)) {
                                     'created', 'approved', 'pass' => 'text-green-600 bg-green-50 border-green-100',

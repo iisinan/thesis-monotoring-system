@@ -181,9 +181,9 @@
                 </label>
 
                 <div x-show="requiresSubmission" x-transition class="space-y-4">
-                    <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                    <div class="p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
                         <span class="block text-[10px] font-black text-blue-600 uppercase tracking-[0.15em]">Required Artifact Types</span>
-                        <div class="grid grid-cols-3 gap-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             @foreach([
                                 ['ppt', 'Presentation (PDF)', 'M8 14h8M8 10h8M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'],
                                 ['file', 'Manuscript', 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],
@@ -208,9 +208,9 @@
                                 <span class="text-xs text-slate-400">An authorized role must unlock submissions before the student can upload.</span>
                             </div>
                         </label>
-                        <div class="pl-7 space-y-2">
+                        <div class="pl-2 sm:pl-7 space-y-2">
                             <span class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Roles authorized to unlock:</span>
-                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
                                 @foreach($roles as $role)
                                 <label class="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-slate-200 hover:border-blue-300 cursor-pointer transition-all">
                                     <input type="checkbox" name="submission_approver_roles[]" value="{{ $role }}" {{ (is_array(old('submission_approver_roles')) && in_array($role, old('submission_approver_roles'))) ? 'checked' : '' }}
@@ -232,8 +232,8 @@
          x-transition:enter-start="opacity-0 translate-y-3"
          x-transition:enter-end="opacity-100 translate-y-0">
         <div class="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-            <div class="px-8 py-6 border-b border-slate-50 flex items-center gap-4 bg-slate-50/50">
-                <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm">
+            <div class="px-5 sm:px-8 py-5 sm:py-6 border-b border-slate-50 flex items-center gap-4 bg-slate-50/50">
+                <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-sm shrink-0">
                     <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                 </div>
                 <div>
@@ -241,11 +241,11 @@
                     <p class="text-xs font-medium text-slate-400 mt-0.5">Configure the similarity certification step for this milestone.</p>
                 </div>
             </div>
-            <div class="p-8 space-y-6">
-                <label class="flex items-center justify-between p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300"
+            <div class="p-5 sm:p-8 space-y-6">
+                <label class="flex items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300"
                        :class="allowPlagiarism ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-100 hover:border-slate-200'">
-                    <div class="flex items-center gap-4">
-                        <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
+                    <div class="flex items-center gap-3 sm:gap-4">
+                        <div class="w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0"
                              :class="allowPlagiarism ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25' : 'bg-slate-100 text-slate-400'">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4"/></svg>
                         </div>
@@ -262,10 +262,10 @@
                     </div>
                 </label>
 
-                <div x-show="allowPlagiarism" x-transition class="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                <div x-show="allowPlagiarism" x-transition class="p-4 sm:p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
                     <span class="block text-[10px] font-black text-amber-600 uppercase tracking-[0.15em]">Primary Upload Authority</span>
                     <p class="text-xs text-slate-400">Which role is responsible for uploading and certifying the similarity report?</p>
-                    <div class="grid grid-cols-2 gap-3 pt-1">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                         @foreach(['Admin','Program Coordinator'] as $pRole)
                         <label class="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all bg-white hover:border-amber-300">
                             <input type="radio" name="plagiarism_report_role" value="{{ $pRole }}" {{ $pRole === 'Admin' ? 'checked' : '' }}

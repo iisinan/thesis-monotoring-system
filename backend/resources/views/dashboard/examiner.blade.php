@@ -46,9 +46,9 @@
                 </div>
             </div>
 
-            <div class="shrink-0 flex flex-col items-center justify-center bg-purple-50 border border-purple-100 rounded-2xl p-8 min-w-[170px] text-center">
+            <div class="shrink-0 flex flex-col items-center justify-center bg-purple-50 border border-purple-100 rounded-2xl p-5 sm:p-8 w-full md:w-auto sm:min-w-[170px] text-center">
                 <p class="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-2">Portfolio Load</p>
-                <p class="text-5xl font-black text-slate-800 tracking-tighter leading-none">
+                <p class="text-4xl sm:text-5xl font-black text-slate-800 tracking-tighter leading-none">
                     {{ $stats['assigned_theses'] ?? $theses->count() }}
                 </p>
                 <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mt-2">Active Theses</p>

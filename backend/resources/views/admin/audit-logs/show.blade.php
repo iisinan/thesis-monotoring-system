@@ -5,22 +5,22 @@
 @endsection
 
 @section('content')
-<div class="max-w-5xl mx-auto space-y-10 animate-in-up">
+<div class="max-w-5xl mx-auto space-y-6 sm:space-y-10 animate-in-up">
     <!-- Sophisticated Header -->
-    <div class="flex items-center justify-between">
-        <div class="flex items-center gap-5">
-            <a href="{{ route('admin.audit-logs.index') }}" class="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3 sm:gap-5">
+            <a href="{{ route('admin.audit-logs.index') }}" class="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-sm shrink-0">
                 <svg class="w-5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor font-black"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             </a>
             <div>
                 <div class="flex items-center gap-2 text-acetel-600 mb-1">
                     <span class="text-[10px] font-black uppercase tracking-[0.2em]">System Record</span>
                 </div>
-                <h1 class="text-3xl font-black text-slate-900 tracking-tight">Log Entry</h1>
+                <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Log Entry</h1>
             </div>
         </div>
         
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-3 sm:gap-4">
              <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Record #{{ $auditLog->id }}</span>
              <div class="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
              <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{{ $auditLog->created_at->format('M d, Y H:i:s') }}</span>
@@ -28,18 +28,18 @@
     </div>
 
     <!-- Master Record Card -->
-    <div class="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden">
+    <div class="bg-white rounded-2xl sm:rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden">
         <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-50/50">
             <!-- Left: Identity Node -->
-            <div class="p-12 space-y-10 bg-slate-50/30">
+            <div class="p-6 sm:p-10 lg:p-12 space-y-6 sm:space-y-10 bg-slate-50/30">
                 <div>
                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 leading-none">User</label>
-                    <div class="flex flex-col items-center gap-6">
-                        <div class="w-28 h-28 rounded-[2rem] bg-gradient-to-br from-slate-900 to-black text-white flex items-center justify-center text-4xl font-black shadow-2xl shadow-slate-950/20">
+                    <div class="flex flex-col items-center gap-4 sm:gap-6">
+                        <div class="w-20 h-20 sm:w-28 sm:h-28 rounded-2xl sm:rounded-[2rem] bg-gradient-to-br from-slate-900 to-black text-white flex items-center justify-center text-3xl sm:text-4xl font-black shadow-2xl shadow-slate-950/20">
                             {{ substr($auditLog->user->name ?? '?', 0, 1) }}
                         </div>
                         <div class="text-center">
-                            <h2 class="text-2xl font-black text-slate-900 tracking-tight leading-tight">{{ $auditLog->user->name ?? 'System User' }}</h2>
+                            <h2 class="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">{{ $auditLog->user->name ?? 'System User' }}</h2>
                             <p class="text-xs font-bold text-acetel-600 uppercase tracking-widest mt-2">{{ optional($auditLog->user)->getRoleNames()->first() ?? 'System Account' }}</p>
                         </div>
                     </div>
@@ -58,16 +58,16 @@
             </div>
 
             <!-- Middle: Action Protocols -->
-            <div class="p-12 md:col-span-2 space-y-12">
+            <div class="p-6 sm:p-10 lg:p-12 md:col-span-2 space-y-8 sm:space-y-12">
                 <div>
-                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-10 leading-none">Action</label>
-                    <div class="inline-flex items-center gap-5 px-8 py-5 rounded-[2.5rem] bg-acetel-500/5 border border-acetel-500/10 shadow-sm border-2">
-                        <div class="w-4 h-4 rounded-full bg-acetel-500 animate-pulse-subtle"></div>
-                        <span class="text-2xl font-black text-slate-900 tracking-tighter uppercase">{{ $auditLog->action }}</span>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 sm:mb-10 leading-none">Action</label>
+                    <div class="inline-flex items-center gap-4 sm:gap-5 px-5 py-3.5 sm:px-8 sm:py-5 rounded-2xl sm:rounded-[2.5rem] bg-acetel-500/5 border border-acetel-500/10 shadow-sm border-2 max-w-full">
+                        <div class="w-4 h-4 shrink-0 rounded-full bg-acetel-500 animate-pulse-subtle"></div>
+                        <span class="text-lg sm:text-2xl font-black text-slate-900 tracking-tighter uppercase break-words">{{ $auditLog->action }}</span>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10">
                     <div class="space-y-8">
                          <div>
                              <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 leading-none italic underline decoration-slate-200 underline-offset-4">Original Values</p>

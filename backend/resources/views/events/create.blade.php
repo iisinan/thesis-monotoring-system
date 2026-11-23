@@ -30,7 +30,7 @@
                 </select>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-black">Start Time</label>
                     <input type="datetime-local" name="schedule_start" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">

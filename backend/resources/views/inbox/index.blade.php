@@ -36,10 +36,10 @@
     attachedFileName: '',
     chatAttachedFileName: '',
     mobileShowChat: {{ $selectedPartner ? 'true' : 'false' }}
-}" class="h-[calc(100dvh-5.5rem)] sm:h-[calc(100vh-8rem)] min-h-[500px] sm:min-h-[600px] flex flex-col pb-4 animate-in-up">
+}" class="h-[calc(100dvh-10.5rem)] md:h-[calc(100dvh-8rem)] min-h-[400px] sm:min-h-[540px] flex flex-col pb-2 sm:pb-4 animate-in-up">
 
     {{-- Main Chat App Container --}}
-    <div class="flex-1 bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row relative">
+    <div class="flex-1 bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col md:flex-row relative">
         
         {{-- LEFT PANEL: Conversations List --}}
         <div class="w-full md:w-[350px] lg:w-[400px] shrink-0 border-r border-slate-200 flex flex-col bg-white z-10"
@@ -158,19 +158,19 @@
                 @endphp
                 
                 {{-- Chat Header --}}
-                <div class="h-[68px] px-5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 z-10 shadow-xs">
-                    <div class="flex items-center gap-3">
-                        <button type="button" @click="mobileShowChat = false" class="md:hidden -ml-2 p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors">
+                <div class="h-16 sm:h-[68px] px-3 sm:px-5 bg-white border-b border-slate-200 flex items-center justify-between shrink-0 z-10 shadow-xs">
+                    <div class="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                        <button type="button" @click="mobileShowChat = false" class="md:hidden -ml-1 p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors shrink-0">
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7" /></svg>
                         </button>
 
-                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black bg-slate-200 text-slate-700 border border-slate-300/50">
+                        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-black bg-slate-200 text-slate-700 border border-slate-300/50 shrink-0">
                             {{ strtoupper(collect(explode(' ', $selectedPartner->name))->map(fn($n) => substr($n, 0, 1))->take(2)->implode('')) }}
                         </div>
 
-                        <div class="flex flex-col justify-center">
-                            <h3 class="text-[15px] font-bold text-slate-900 leading-none mb-1">{{ $selectedPartner->name }}</h3>
-                            <p class="text-[12px] font-medium text-slate-500 leading-none">
+                        <div class="flex flex-col justify-center min-w-0 flex-1">
+                            <h3 class="text-sm sm:text-[15px] font-bold text-slate-900 leading-none mb-1 truncate">{{ $selectedPartner->name }}</h3>
+                            <p class="text-[11px] sm:text-[12px] font-medium text-slate-500 leading-none truncate">
                                 {{ $partnerRole }} • {{ $selectedPartner->email }}
                             </p>
                         </div>
@@ -343,7 +343,7 @@
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs transition-opacity"
          @keydown.escape.window="newModalOpen = false">
         
-        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden animate-in-up"
+        <div class="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-xl max-h-[90dvh] flex flex-col overflow-hidden animate-in-up"
              @click.outside="newModalOpen = false">
             
             {{-- Modal Header --}}

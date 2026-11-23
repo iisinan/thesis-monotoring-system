@@ -5,7 +5,7 @@
 @endsection
 
 @section('content')
-<div class="space-y-10 pb-20">
+<div class="space-y-6 sm:space-y-10 pb-16 sm:pb-20">
     {{-- Back Navigation --}}
     <div>
         <a href="{{ route('admin.activity-logs.index') }}" class="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-green-600 transition-colors group">
@@ -15,19 +15,19 @@
     </div>
 
     {{-- User Identity Header --}}
-    <div class="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-slate-800 to-slate-900 p-10 lg:p-14 text-white shadow-2xl">
+    <div class="relative overflow-hidden rounded-2xl sm:rounded-[2.5rem] bg-gradient-to-br from-slate-800 to-slate-900 p-6 sm:p-10 lg:p-14 text-white shadow-2xl">
         <div class="absolute top-0 right-0 w-[30rem] h-[30rem] bg-green-500/10 blur-[120px] rounded-full -mr-32 -mt-32 pointer-events-none"></div>
         <div class="absolute bottom-0 left-0 w-48 h-48 bg-green-500/5 blur-[80px] rounded-full -ml-16 -mb-16 pointer-events-none"></div>
 
-        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-10">
-            <div class="flex items-center gap-8">
-                <div class="w-20 h-20 rounded-3xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-black text-3xl shadow-xl shadow-green-500/30">
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6 sm:gap-10">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 min-w-0">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-2xl sm:rounded-3xl bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-black text-2xl sm:text-3xl shadow-xl shadow-green-500/30">
                     {{ substr($user->name, 0, 1) }}
                 </div>
-                <div>
-                    <h1 class="text-3xl lg:text-4xl font-black tracking-tight leading-none mb-3 uppercase">{{ $user->name }}</h1>
-                    <div class="flex items-center gap-4 text-sm">
-                        <span class="text-slate-400 font-bold">{{ $user->email }}</span>
+                <div class="min-w-0">
+                    <h1 class="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight sm:leading-none mb-2 sm:mb-3 uppercase break-words">{{ $user->name }}</h1>
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-4 text-sm">
+                        <span class="text-slate-400 font-bold break-all">{{ $user->email }}</span>
                         <span class="px-3 py-1 rounded-full bg-green-500/20 border border-green-500/30 text-green-400 text-[9px] font-black uppercase tracking-widest">
                             {{ $user->getRoleNames()->first() ?? 'User' }}
                         </span>
@@ -37,13 +37,13 @@
 
             <div class="flex items-center gap-4">
                 @if($user->last_login_at)
-                    <div class="text-right">
+                    <div class="lg:text-right">
                         <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Last Seen</p>
                         <p class="text-lg font-black text-white italic">{{ \Carbon\Carbon::parse($user->last_login_at)->diffForHumans() }}</p>
                         <p class="text-[10px] font-bold text-slate-400 mt-0.5">{{ \Carbon\Carbon::parse($user->last_login_at)->format('M d, Y · H:i') }}</p>
                     </div>
                 @else
-                    <div class="text-right">
+                    <div class="lg:text-right">
                         <p class="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Last Seen</p>
                         <p class="text-lg font-black text-slate-500 italic">Never</p>
                     </div>

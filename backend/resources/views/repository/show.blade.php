@@ -68,7 +68,7 @@
     }
 </style>
 
-<div class="min-h-screen bg-white pb-40 hero-pattern relative overflow-hidden">
+<div class="min-h-dvh bg-white pb-20 sm:pb-40 hero-pattern relative overflow-hidden">
     <!-- Orbs -->
     <div class="floating-orb top-40 -right-40 animate-float" style="animation-duration: 12s;"></div>
     <div class="floating-orb bottom-20 -left-40 animate-float" style="animation-duration: 18s;"></div>
@@ -187,7 +187,7 @@
                                             Preview
                                         </button>
                                         <a href="{{ route('repository.submissions.view', $submission) }}" download
-                                           class="flex-1 sm:flex-none btn-premium flex items-center justify-center gap-3 px-8 py-5 rounded-3xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                           class="flex-1 sm:flex-none btn-premium flex items-center justify-center gap-2.5 sm:gap-3 px-5 sm:px-8 py-3.5 sm:py-5 rounded-2xl sm:rounded-3xl text-[10px] font-black uppercase tracking-widest transition-all"
                                            title="Secure Download">
                                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                             Export
@@ -201,20 +201,20 @@
             </div>
 
             <!-- Sidebar -->
-            <div class="lg:col-span-4 space-y-12 shrink-0">
+            <div class="lg:col-span-4 space-y-6 sm:space-y-12 shrink-0">
 
                 <!-- Library Copy Access (Primary CTA) -->
                 @if($thesis->library_copy)
-                <div class="sidebar-panel p-10 bg-slate-950 text-white relative overflow-hidden animate-in-up">
+                <div class="sidebar-panel p-6 sm:p-10 bg-slate-950 text-white relative overflow-hidden animate-in-up">
                     <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-acetel-600/20 blur-[50px] rounded-full"></div>
-                    <div class="w-16 h-16 bg-acetel-600 rounded-2xl flex items-center justify-center text-white mb-10 shadow-premium">
-                        <svg class="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <div class="w-12 h-12 sm:w-16 sm:h-16 bg-acetel-600 rounded-2xl flex items-center justify-center text-white mb-6 sm:mb-10 shadow-premium">
+                        <svg class="w-7 h-7 sm:w-9 sm:h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                     </div>
-                    <h3 class="text-2xl font-black text-white mb-4 tracking-tighter leading-none">Official Library Copy</h3>
-                    <p class="text-sm text-acetel-400 font-medium leading-relaxed mb-10">
+                    <h3 class="text-xl sm:text-2xl font-black text-white mb-3 sm:mb-4 tracking-tighter leading-none">Official Library Copy</h3>
+                    <p class="text-sm text-acetel-400 font-medium leading-relaxed mb-6 sm:mb-10">
                         This is the final institutionally-cleared version of this research, approved for public archival and reference.
                     </p>
-                    <a href="{{ route('repository.submissions.view', $thesis->library_copy) }}" target="_blank" class="flex items-center justify-center gap-4 w-full py-5 bg-white text-slate-900 rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-acetel-500 hover:text-white transition-all shadow-premium">
+                    <a href="{{ route('repository.submissions.view', $thesis->library_copy) }}" target="_blank" class="flex items-center justify-center gap-3 sm:gap-4 w-full py-4 sm:py-5 bg-white text-slate-900 rounded-2xl sm:rounded-[1.5rem] text-[10px] font-black uppercase tracking-[0.2em] hover:bg-acetel-500 hover:text-white transition-all shadow-premium">
                         Download Manuscript (PDF)
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </a>
@@ -222,20 +222,20 @@
                 @endif
 
                 <!-- Institutional Archival Status -->
-                <div class="sidebar-panel p-10 bg-acetel-50/50 border-acetel-100 relative overflow-hidden animate-in-up" style="animation-delay: 0.1s;">
+                <div class="sidebar-panel p-6 sm:p-10 bg-acetel-50/50 border-acetel-100 relative overflow-hidden animate-in-up" style="animation-delay: 0.1s;">
                     <div class="absolute -right-10 -top-10 w-40 h-40 bg-acetel-600/10 blur-[50px] rounded-full"></div>
-                    <div class="w-16 h-16 bg-white border border-acetel-100 rounded-2xl flex items-center justify-center text-acetel-600 mb-10 shadow-sm">
-                        <svg class="w-9 h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <div class="w-12 h-12 sm:w-16 sm:h-16 bg-white border border-acetel-100 rounded-2xl flex items-center justify-center text-acetel-600 mb-6 sm:mb-10 shadow-sm">
+                        <svg class="w-7 h-7 sm:w-9 sm:h-9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
-                    <h3 class="text-2xl font-black text-slate-950 mb-4 tracking-tighter leading-none">Archival Clearance</h3>
+                    <h3 class="text-xl sm:text-2xl font-black text-slate-950 mb-3 sm:mb-4 tracking-tighter leading-none">Archival Clearance</h3>
                     <p class="text-sm text-slate-600 font-medium leading-relaxed">
                         Institutional Milestone 13 (Library Archival) has been successfully verified for this project. This record is stored in the eternal ACETEL research ledger.
                     </p>
                 </div>
 
                 <!-- Strategic Committee Panel -->
-                <div class="sidebar-panel p-10 animate-in-up" style="animation-delay: 0.2s;">
-                    <div class="flex items-center gap-4 mb-10">
+                <div class="sidebar-panel p-6 sm:p-10 animate-in-up" style="animation-delay: 0.2s;">
+                    <div class="flex items-center gap-4 mb-6 sm:mb-10">
                         <div class="w-2 h-7 bg-acetel-600 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.3)]"></div>
                         <h3 class="text-[10px] font-black text-slate-950 uppercase tracking-[0.3em]">Institutional Panel</h3>
                     </div>

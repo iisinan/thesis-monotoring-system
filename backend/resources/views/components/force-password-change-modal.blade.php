@@ -5,7 +5,7 @@
          aria-labelledby="modal-title" role="dialog" aria-modal="true"
          style="display: none;">
         
-        <div class="flex items-end justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+        <div class="flex items-center justify-center min-h-dvh px-4 pt-4 pb-10 text-center sm:block sm:p-0">
             <!-- Background overlay -->
             <div x-show="open"
                  x-transition:enter="ease-out duration-300"
@@ -14,13 +14,13 @@
                  class="fixed inset-0 transition-opacity bg-slate-900/80 backdrop-blur-sm"
                  aria-hidden="true"></div>
 
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-dvh" aria-hidden="true">&#8203;</span>
 
             <div x-show="open"
                  x-transition:enter="ease-out duration-300"
                  x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
                  x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                 class="inline-block relative overflow-hidden text-left align-bottom transition-all transform bg-white rounded-[2rem] shadow-premium sm:my-8 sm:align-middle sm:max-w-md w-full border border-slate-100 p-8 sm:p-10 pointer-events-auto">
+                 class="inline-block relative overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl sm:rounded-[2rem] shadow-premium sm:my-8 sm:align-middle sm:max-w-md w-full border border-slate-100 p-5 sm:p-10 pointer-events-auto">
 
                 <div class="text-center">
                     <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-50 text-red-600 mb-6 group-hover:scale-110 transition-transform">

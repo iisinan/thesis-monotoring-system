@@ -71,7 +71,7 @@
 
     <div class="col-span-1 lg:col-span-2 bg-white overflow-hidden shadow-sm rounded-2xl border border-slate-200">
         <div class="p-5">
-            <dl class="grid grid-cols-2 gap-x-4 gap-y-4">
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
 
                 <div class="sm:col-span-1">
                     <dt class="text-sm font-medium text-black">Created By</dt>
@@ -184,7 +184,7 @@
     class="fixed inset-0 z-50 overflow-y-auto" 
     style="display: none;">
     
-    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+    <div class="flex items-center justify-center min-h-dvh px-3 sm:px-4 pt-4 pb-10 text-center sm:p-0">
         <div x-show="open" 
              x-transition:enter="ease-out duration-300" 
              x-transition:enter-start="opacity-0" 
@@ -204,7 +204,7 @@
              x-transition:leave="ease-in duration-200" 
              x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" 
              x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" 
-             class="inline-block w-full max-w-xl mx-auto overflow-hidden text-left align-bottom transition-all transform bg-white rounded-3xl shadow-2xl sm:my-8 sm:align-middle p-8 border border-slate-100 relative">
+             class="inline-block w-full max-w-xl mx-auto overflow-hidden text-left align-bottom transition-all transform bg-white rounded-2xl sm:rounded-3xl shadow-2xl my-4 sm:my-8 sm:align-middle p-5 sm:p-8 border border-slate-100 relative max-h-[90dvh] overflow-y-auto">
             
             <div class="absolute top-0 right-0 pt-6 pr-6">
                 <button @click="open = false" type="button" class="text-slate-400 hover:text-slate-500 focus:outline-none transition-colors">

@@ -208,7 +208,7 @@
                 </div>
             </div>
 
-            <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+            <div class="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm">
                 <h3 class="text-lg font-black text-slate-900 mb-6 tracking-tight uppercase border-b border-slate-50 pb-4">Quick Governance</h3>
                 
                 <div class="grid grid-cols-1 gap-3">
@@ -249,7 +249,7 @@
 
             {{-- Institutional Resource Center --}}
             @if(isset($document_templates) && $document_templates->count() > 0)
-            <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+            <div class="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm">
                 <h3 class="text-lg font-black text-slate-900 mb-6 tracking-tight uppercase border-b border-slate-50 pb-4">Resource Center</h3>
                 <div class="space-y-4">
                     @foreach($document_templates as $template)
@@ -268,7 +268,7 @@
             </div>
             @endif
 
-            <div class="bg-white border border-slate-100 rounded-3xl p-8 shadow-sm">
+            <div class="bg-white border border-slate-100 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm">
                 <h3 class="text-lg font-black text-slate-900 mb-8 tracking-tight uppercase border-b border-slate-50 pb-4">Academic Mix</h3>
                 
                 <div class="space-y-8">

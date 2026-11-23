@@ -44,7 +44,7 @@
                 </div>
                 <span class="text-[10px] font-black uppercase tracking-[0.3em]">Milestone Templates</span>
             </div>
-            <h1 class="text-4xl font-black text-slate-900 tracking-tight">Milestones</h1>
+            <h1 class="text-2xl sm:text-4xl font-black text-slate-900 tracking-tight">Milestones</h1>
             <p class="mt-2 text-sm font-medium text-slate-500">View the static milestones and approval requirements for student progress.</p>
         </div>
 
@@ -244,16 +244,16 @@
     </div>
 
 
-    <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
+    <div class="bg-white rounded-2xl sm:rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/40 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead class="bg-slate-50/50">
                     <tr>
-                        <th class="w-20 px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Order</th>
-                        <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Milestone Name</th>
-                        <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Program</th>
-                        <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Requirements</th>
-                        <th class="px-6 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-right">Schedule</th>
+                        <th class="w-16 sm:w-20 px-4 sm:px-10 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-center">Order</th>
+                        <th class="px-4 sm:px-6 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Milestone Name</th>
+                        <th class="px-4 sm:px-6 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Program</th>
+                        <th class="px-4 sm:px-6 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50">Requirements</th>
+                        <th class="px-4 sm:px-6 py-4 sm:py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-50 text-right">Schedule</th>
                     </tr>
                 </thead>
                 

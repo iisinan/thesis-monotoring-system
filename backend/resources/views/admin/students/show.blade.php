@@ -928,21 +928,24 @@
 
                                                         {{-- Document Review Modal --}}
                                                         <div x-show="open" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                                                            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                                                            <div class="flex items-center justify-center min-h-dvh pt-4 px-3 sm:px-4 pb-10 text-center sm:block sm:p-0">
                                                                 <div x-show="open" x-transition.opacity class="fixed inset-0 bg-slate-900/75 backdrop-blur-sm transition-opacity" aria-hidden="true" @click="open = false"></div>
-                                                                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                                                                <span class="hidden sm:inline-block sm:align-middle sm:h-dvh" aria-hidden="true">&#8203;</span>
                                                                 
-                                                                <div x-show="open" x-transition.scale.origin.bottom class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl w-full p-6">
-                                                                    <div class="flex items-center justify-between mb-5">
-                                                                        <h3 class="text-lg font-black text-slate-900" id="modal-title">
+                                                                <div x-show="open" x-transition.scale.origin.bottom class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-5xl w-full p-4 sm:p-6 max-h-[90dvh] flex flex-col">
+                                                                    <div class="flex items-center justify-between gap-2 mb-4 sm:mb-5 shrink-0">
+                                                                        <h3 class="text-base sm:text-lg font-black text-slate-900 truncate" id="modal-title">
                                                                             Review v{{ $sub->version }} Manuscript
                                                                         </h3>
-                                                                        <button @click="open = false" class="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-xl transition-all">
-                                                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                                                        </button>
+                                                                        <div class="flex items-center gap-2 shrink-0">
+                                                                            <a href="{{ $sub->file_url }}" target="_blank" class="sm:hidden px-2.5 py-1.5 bg-acetel-600 text-white rounded-lg text-[10px] font-bold">Open PDF</a>
+                                                                            <button @click="open = false" class="p-2 bg-slate-50 text-slate-400 hover:text-rose-500 rounded-xl transition-all">
+                                                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                     
-                                                                    <div class="bg-slate-100 rounded-xl overflow-hidden shadow-inner border border-slate-200" style="height: 70vh;">
+                                                                    <div class="bg-slate-100 rounded-xl overflow-auto shadow-inner border border-slate-200 flex-1" style="height: 65dvh;">
                                                                         <iframe src="{{ $sub->file_url }}" class="w-full h-full border-0"></iframe>
                                                                     </div>
                                                                 </div>
