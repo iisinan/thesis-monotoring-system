@@ -43,6 +43,8 @@
         else if (tab === 'internal_exam') role = 'Internal Examiner';
         else if (tab === 'external_exam') role = 'External Examiner';
         if (role) {
+            localStorage.setItem('activeDashboardRole', role);
+            document.cookie = 'active_dashboard_role=' + encodeURIComponent(role) + '; path=/; max-age=31536000';
             window.dispatchEvent(new CustomEvent('role-changed', {detail: role}));
         }
     }
@@ -54,18 +56,23 @@ x-on:role-changed.window="
     else if ($event.detail === 'External Examiner') activeTab = 'external_exam';
 "
 x-init="
-    @if($facultyRoleCount > 1)
-    const saved = localStorage.getItem('facultyDashboardTab');
-    if (saved && ['overview', 'supervision', 'coordination', 'internal_exam', 'external_exam'].includes(saved)) {
-        if (saved === 'supervision' && {{ $activeFacultyRoles['supervisor'] ? 'true' : 'false' }}) activeTab = saved;
-        else if (saved === 'coordination' && {{ $activeFacultyRoles['coordinator'] ? 'true' : 'false' }}) activeTab = saved;
-        else if (saved === 'internal_exam' && {{ $activeFacultyRoles['internal_examiner'] ? 'true' : 'false' }}) activeTab = saved;
-        else if (saved === 'external_exam' && {{ $activeFacultyRoles['external_examiner'] ? 'true' : 'false' }}) activeTab = saved;
-        else if (saved === 'overview') activeTab = saved;
+    const urlRole = new URLSearchParams(window.location.search).get('role');
+    if (urlRole) {
+        localStorage.setItem('facultyDashboardTab', activeTab);
+    } else {
+        @if($facultyRoleCount > 1)
+        const saved = localStorage.getItem('facultyDashboardTab');
+        if (saved && ['overview', 'supervision', 'coordination', 'internal_exam', 'external_exam'].includes(saved)) {
+            if (saved === 'supervision' && {{ $activeFacultyRoles['supervisor'] ? 'true' : 'false' }}) activeTab = saved;
+            else if (saved === 'coordination' && {{ $activeFacultyRoles['coordinator'] ? 'true' : 'false' }}) activeTab = saved;
+            else if (saved === 'internal_exam' && {{ $activeFacultyRoles['internal_examiner'] ? 'true' : 'false' }}) activeTab = saved;
+            else if (saved === 'external_exam' && {{ $activeFacultyRoles['external_examiner'] ? 'true' : 'false' }}) activeTab = saved;
+            else if (saved === 'overview') activeTab = saved;
+        }
+        @else
+        activeTab = '{{ $defaultTab }}';
+        @endif
     }
-    @else
-    activeTab = '{{ $defaultTab }}';
-    @endif
 "
 class="space-y-8 animate-in">
 
