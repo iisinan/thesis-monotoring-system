@@ -470,9 +470,26 @@ class MilestoneController extends Controller
         }
 
         $workflow = app(\App\Services\MilestoneWorkflowService::class);
-        $reason = $workflow->getEndSessionBlockReason($milestone);
-
+        $isInternalDefence = $workflow->isInternalDefence($milestone);
         $studentName = $milestone->thesis?->student?->user?->name ?? 'Candidate';
+
+        if ($isInternalDefence
+            && !$workflow->isPostDefencePhase($milestone)
+            && !empty($milestone->defence_date)
+            && !$workflow->hasBeenGraded($milestone)) {
+            $workflow->resetInternalDefenceForRepeat(
+                $milestone,
+                'Internal Defence presentation ended without examiner grading. Candidate must re-upload thesis for supervisor approval and be rescheduled.',
+                false
+            );
+            $repeatMsg = "Internal Defence presentation ended for {$studentName} without an evaluation grade. Previous thesis upload has been deleted; candidate must re-upload for supervisor approval and be rescheduled.";
+            if ($request->expectsJson()) {
+                return response()->json(['success' => true, 'message' => $repeatMsg, 'repeated' => true]);
+            }
+            return back()->with('warning', $repeatMsg);
+        }
+
+        $reason = $workflow->getEndSessionBlockReason($milestone);
 
         if ($reason) {
             $msg = "Cannot end presentation for {$studentName}: {$reason}.";
@@ -492,7 +509,6 @@ class MilestoneController extends Controller
             return back()->with('warning', $failMsg);
         }
 
-        $isInternalDefence = $workflow->isInternalDefence($milestone);
         if ($isInternalDefence) {
             // Internal defence: Conclude presentation session and transition candidate to post-defence corrections!
             // Candidate must upload corrected thesis, which must be approved by the Internal Examiner to advance.
@@ -885,7 +901,7 @@ class MilestoneController extends Controller
             if ($milestone->thesis->internalExaminer && $milestone->thesis->internalExaminer->user_id) {
                 $recipients->push($milestone->thesis->internalExaminer->user_id);
             }
-            foreach ($milestone->examiners as $examinerUser) {
+            foreach (($milestone->examiners ?? []) as $examinerUser) {
                 $recipients->push($examinerUser->id);
             }
 

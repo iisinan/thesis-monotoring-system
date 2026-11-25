@@ -1418,6 +1418,16 @@ class MilestoneTemplateController extends Controller
             foreach ($milestones as $sm) {
                 $reason = $workflow->getEndSessionBlockReason($sm);
                 if ($reason) {
+                    if ($workflow->isInternalDefence($sm) && !$workflow->hasBeenGraded($sm)) {
+                        $workflow->resetInternalDefenceForRepeat(
+                            $sm,
+                            'Internal Defence presentation session ended without examiner grading. Candidate must re-upload thesis for supervisor approval and be rescheduled.',
+                            false
+                        );
+                        $skipped[] = ($sm->thesis?->student?->user?->name ?? 'Unknown student') . ' — not graded (previous upload deleted; must re-upload thesis for supervisor approval and reschedule)';
+                        continue;
+                    }
+
                     $skipped[] = ($sm->thesis?->student?->user?->name ?? 'Unknown student') . ' — ' . $reason;
                     // End of presentation session: clear active schedule so presentation tab closes until rescheduled
                     $sm->update([
