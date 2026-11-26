@@ -1881,11 +1881,20 @@ class MilestoneTemplateController extends Controller
 
     public function assignExaminer(Request $request, $milestoneId)
     {
+        $authUser = auth()->user();
+        if (!$authUser || !$authUser->hasAnyRole(['Admin', 'Program Coordinator'])) {
+            abort(403, 'Unauthorized.');
+        }
+
         $request->validate([
             'supervisor_profile_id' => 'nullable|exists:supervisor_profiles,id',
             'supervisor_profile_ids' => 'nullable|array',
             'supervisor_profile_ids.*' => 'exists:supervisor_profiles,id',
             'internal_examiner_profile_id' => 'nullable|exists:internal_examiner_profiles,id',
+            'promote_supervisor_profile_id' => 'nullable|exists:supervisor_profiles,id',
+            'remove_internal_examiner' => 'nullable|boolean',
+            'remove_examiner_user_id' => 'nullable|exists:users,id',
+            'internal_examiner_explicit' => 'nullable|boolean',
         ]);
 
         $milestone = $milestoneId instanceof \App\Models\StudentMilestone ? $milestoneId : \App\Models\StudentMilestone::findOrFail($milestoneId);
@@ -1894,7 +1903,7 @@ class MilestoneTemplateController extends Controller
         $profileIds = $request->supervisor_profile_ids ?? ($request->supervisor_profile_id ? [$request->supervisor_profile_id] : []);
         $thesis = $milestone->thesis;
         $thesisId = $milestone->thesis_project_id ?? $thesis?->id;
-        if (!$thesisId) {
+        if (!$thesisId || !$thesis) {
             return back()->with('error', 'No linked research thesis project found for this milestone.');
         }
 
@@ -1908,23 +1917,88 @@ class MilestoneTemplateController extends Controller
             default => 'first_seminar',
         };
 
-        $candidateName = $thesis?->student?->user?->name ?? 'candidate';
+        $candidateName = $thesis->student?->user?->name ?? 'candidate';
+        $workflow = app(\App\Services\MilestoneWorkflowService::class);
 
-        $hasInternalExaminerInput = $request->filled('internal_examiner_profile_id');
+        // Quick-remove only the designated Internal Examiner for this student
+        if ($request->boolean('remove_internal_examiner')) {
+            $prevInternalUserId = $thesis->internalExaminer?->user_id;
+            $thesis->update(['internal_examiner_profile_id' => null]);
+            \App\Models\ExaminerAssignment::where('thesis_project_id', $thesisId)
+                ->where('type', 'internal_examiner')
+                ->delete();
+
+            $event = \App\Models\DefenceEvent::where('thesis_project_id', $thesisId)
+                ->where('type', $type)
+                ->first();
+            if ($event) {
+                if ($prevInternalUserId) {
+                    \App\Models\PanelMember::where('defence_event_id', $event->id)
+                        ->where('user_id', $prevInternalUserId)
+                        ->where('role', 'examiner')
+                        ->delete();
+                }
+                if ($type === 'internal' || $template->slug === 'internal_defence') {
+                    $workflow->syncInternalDefencePanel($event);
+                }
+            }
+
+            if ($thesis->student?->user_id) {
+                \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $thesis->student->user_id);
+            }
+            if ($template) {
+                $this->markSchedulePendingApproval($template);
+            }
+
+            return $this->respondMilestoneAction($request, $template, 'success', "Internal Examiner removed for {$candidateName}.");
+        }
+
+        // Quick-remove a specific examiner badge from this student's milestone panel
+        if ($request->filled('remove_examiner_user_id')) {
+            $removeUserId = $request->input('remove_examiner_user_id');
+            $event = \App\Models\DefenceEvent::where('thesis_project_id', $thesisId)
+                ->where('type', $type)
+                ->first();
+            if ($event) {
+                \App\Models\PanelMember::where('defence_event_id', $event->id)
+                    ->where('user_id', $removeUserId)
+                    ->where('role', 'examiner')
+                    ->delete();
+            }
+            if ($thesis->internalExaminer && (string) $thesis->internalExaminer->user_id === (string) $removeUserId) {
+                $thesis->update(['internal_examiner_profile_id' => null]);
+                \App\Models\ExaminerAssignment::where('thesis_project_id', $thesisId)
+                    ->where('type', 'internal_examiner')
+                    ->delete();
+            }
+            if ($thesis->student?->user_id) {
+                \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $thesis->student->user_id);
+            }
+            if ($template) {
+                $this->markSchedulePendingApproval($template);
+            }
+
+            return $this->respondMilestoneAction($request, $template, 'success', "Examiner removed for {$candidateName}.");
+        }
+
+        $hasInternalExaminerInput = $request->filled('internal_examiner_profile_id') || $request->filled('promote_supervisor_profile_id');
         $hasSupervisorInput = !empty($profileIds);
 
-        // Clearing assignments if nothing selected
+        // Clearing all assignments if nothing selected
         if (!$hasInternalExaminerInput && !$hasSupervisorInput) {
             $event = \App\Models\DefenceEvent::where('thesis_project_id', $thesisId)->where('type', $type)->first();
             if ($event) {
                 \App\Models\PanelMember::where('defence_event_id', $event->id)->where('role', 'examiner')->delete();
             }
             if ($type === 'internal' || $template->slug === 'internal_defence') {
-                $thesis?->update(['internal_examiner_profile_id' => null]);
+                $thesis->update(['internal_examiner_profile_id' => null]);
                 \App\Models\ExaminerAssignment::where('thesis_project_id', $thesisId)->where('type', 'internal_examiner')->delete();
                 if ($event) {
-                    app(\App\Services\MilestoneWorkflowService::class)->syncInternalDefencePanel($event);
+                    $workflow->syncInternalDefencePanel($event);
                 }
+            }
+            if ($thesis->student?->user_id) {
+                \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $thesis->student->user_id);
             }
             if ($template) {
                 $this->markSchedulePendingApproval($template);
@@ -1953,26 +2027,48 @@ class MilestoneTemplateController extends Controller
 
         // Handle Internal Examiner logic
         if ($type === 'internal' || $template->slug === 'internal_defence' || $hasInternalExaminerInput) {
-            if ($hasInternalExaminerInput) {
-                $internalEx = \App\Models\InternalExaminerProfile::with('user')->find($request->internal_examiner_profile_id);
-                if ($internalEx && $internalEx->user) {
-                    if (!$internalEx->user->hasRole('Internal Examiner')) {
-                        $internalEx->user->assignRole('Internal Examiner');
-                    }
-                    $thesis->update(['internal_examiner_profile_id' => $internalEx->id]);
-                    \App\Models\ExaminerAssignment::updateOrCreate(
+            $internalEx = null;
+            if ($request->filled('promote_supervisor_profile_id')) {
+                $supToPromote = \App\Models\SupervisorProfile::with(['user', 'programs'])->find($request->promote_supervisor_profile_id);
+                if ($supToPromote && $supToPromote->user) {
+                    $internalEx = \App\Models\InternalExaminerProfile::firstOrCreate(
+                        ['user_id' => $supToPromote->user_id],
                         [
-                            'thesis_project_id' => $thesisId,
-                            'type' => 'internal_examiner',
-                        ],
-                        [
-                            'examiner_id' => $internalEx->user_id,
-                            'assigned_by' => auth()->id(),
+                            'program_id' => $thesis->student?->program_id ?? $supToPromote->programs->first()?->id,
+                            'institution' => 'National Open University of Nigeria (NOUN)',
+                            'qualification' => 'Faculty Internal Examiner',
                             'active' => true,
                         ]
                     );
-                    $assignedUsers->push($internalEx->user);
+                    $internalEx->load('user');
                 }
+            } elseif ($request->filled('internal_examiner_profile_id')) {
+                $internalEx = \App\Models\InternalExaminerProfile::with('user')->find($request->internal_examiner_profile_id);
+            }
+
+            if ($internalEx && $internalEx->user) {
+                if (!$internalEx->user->hasRole('Internal Examiner')) {
+                    $internalEx->user->assignRole('Internal Examiner');
+                }
+                $thesis->update(['internal_examiner_profile_id' => $internalEx->id]);
+                \App\Models\ExaminerAssignment::updateOrCreate(
+                    [
+                        'thesis_project_id' => $thesisId,
+                        'type' => 'internal_examiner',
+                    ],
+                    [
+                        'examiner_id' => $internalEx->user_id,
+                        'assigned_by' => $authUser->id,
+                        'active' => true,
+                    ]
+                );
+                $assignedUsers->push($internalEx->user);
+            } elseif ($request->boolean('internal_examiner_explicit')) {
+                // Admin/Coordinator explicitly cleared the Internal Examiner field while keeping panel supervisors
+                $thesis->update(['internal_examiner_profile_id' => null]);
+                \App\Models\ExaminerAssignment::where('thesis_project_id', $thesisId)
+                    ->where('type', 'internal_examiner')
+                    ->delete();
             } elseif ($supervisors->isNotEmpty()) {
                 $firstSup = $supervisors->first();
                 if ($firstSup->user && !$firstSup->user->hasRole('Internal Examiner')) {
@@ -1995,7 +2091,7 @@ class MilestoneTemplateController extends Controller
                     ],
                     [
                         'examiner_id' => $firstSup->user_id,
-                        'assigned_by' => auth()->id(),
+                        'assigned_by' => $authUser->id,
                         'active' => true,
                     ]
                 );
@@ -2020,7 +2116,11 @@ class MilestoneTemplateController extends Controller
         }
 
         if ($type === 'internal' || $template?->slug === 'internal_defence') {
-            app(\App\Services\MilestoneWorkflowService::class)->syncInternalDefencePanel($event);
+            $workflow->syncInternalDefencePanel($event);
+        }
+
+        if ($thesis->student?->user_id) {
+            \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $thesis->student->user_id);
         }
 
         if ($template) {
@@ -2028,13 +2128,17 @@ class MilestoneTemplateController extends Controller
         }
 
         try {
-            $workflow = app(\App\Services\MilestoneWorkflowService::class);
             $namesStr = $assignedUsers->pluck('name')->implode(', ');
-            $workflow->notifyUpdate($milestone, "Examiner(s) ({$namesStr}) assigned to {$candidateName}.");
+            if ($namesStr !== '') {
+                $workflow->notifyUpdate($milestone, "Examiner(s) ({$namesStr}) assigned to {$candidateName}.");
+            }
         } catch (\Throwable $e) {}
 
         $names = $assignedUsers->pluck('name')->implode(', ');
-        return $this->respondMilestoneAction($request, $template, 'success', "Examiner(s) ({$names}) assigned for {$candidateName} in draft mode (no emails sent until you approve the schedule).");
+        $msg = $names !== ''
+            ? "Examiner(s) ({$names}) updated for {$candidateName} in draft mode (no emails sent until you approve the schedule)."
+            : "Examiner assignments updated for {$candidateName}.";
+        return $this->respondMilestoneAction($request, $template, 'success', $msg);
     }
 
     public function assignExaminerGlobal(Request $request, $templateId)

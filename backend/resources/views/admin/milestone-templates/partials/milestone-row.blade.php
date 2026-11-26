@@ -71,6 +71,34 @@
                                     'badge' => ($onMsc && $onPhd) ? 'MSc & PhD' : ($onPhd ? 'PhD' : 'MSc'),
                                 ];
                             })->values();
+
+                        $internalExaminersForJs = ($internalExaminers ?? collect())->map(function($iex) {
+                            $name = $iex->user?->name ?? 'Examiner';
+                            $email = $iex->user?->email ?? '';
+                            $prog = $iex->program?->code ?? $iex->program?->name ?? 'Institutional Examiner';
+                            return [
+                                'id' => (string) $iex->id,
+                                'name' => $name,
+                                'email' => $email,
+                                'program' => $prog,
+                                'search_text' => strtolower($name . ' ' . $email . ' ' . $prog),
+                                'display' => $name . ($email ? ' — ' . $email : '') . ' (' . $prog . ')',
+                            ];
+                        })->values();
+
+                        $allSupervisorsForJs = ($supervisors ?? collect())->map(function($sup) {
+                            $name = $sup->user?->name ?? 'Faculty';
+                            $email = $sup->user?->email ?? '';
+                            $prog = $sup->programs->first()?->code ?? ($sup->degree_badge ?? 'Staff');
+                            return [
+                                'id' => (string) $sup->id,
+                                'name' => $name,
+                                'email' => $email,
+                                'program' => $prog,
+                                'search_text' => strtolower($name . ' ' . $email . ' ' . $prog),
+                                'display' => $name . ($email ? ' — ' . $email : '') . ' (' . $prog . ')',
+                            ];
+                        })->values();
                     @endphp
                     <tbody id="milestone-block-{{ $template->id }}"
                         data-milestone-block="{{ $template->id }}"
@@ -228,12 +256,32 @@
                         assignFormUrl: '',
                         assignProfileIds: [],
                         assignInternalExaminerProfileId: '',
+                        assignPromoteSupId: '',
+                        assignInternalMode: 'examiner',
+                        assignInternalSearch: '',
                         assignSupDegreeFilter: 'all',
+                        internalExaminersPool: {{ \Illuminate\Support\Js::from($internalExaminersForJs) }},
+                        allSupervisorsPool: {{ \Illuminate\Support\Js::from($allSupervisorsForJs) }},
+                        get filteredAssignInternalExaminers() {
+                            const q = (this.assignInternalSearch || '').toLowerCase().trim();
+                            if (!q) return this.internalExaminersPool;
+                            const terms = q.split(/\s+/).filter(Boolean);
+                            return this.internalExaminersPool.filter(e => terms.every(t => e.search_text.includes(t)));
+                        },
+                        get filteredAssignPromoteSupervisors() {
+                            const q = (this.assignInternalSearch || '').toLowerCase().trim();
+                            if (!q) return this.allSupervisorsPool;
+                            const terms = q.split(/\s+/).filter(Boolean);
+                            return this.allSupervisorsPool.filter(s => terms.every(t => s.search_text.includes(t)));
+                        },
                         openAssignModal(name, formUrl, profileIds, internalExaminerProfileId = '') {
                             this.assignStudentName = name;
                             this.assignFormUrl = formUrl;
                             this.assignProfileIds = (profileIds || []).map(String);
                             this.assignInternalExaminerProfileId = internalExaminerProfileId ? String(internalExaminerProfileId) : '';
+                            this.assignPromoteSupId = '';
+                            this.assignInternalMode = 'examiner';
+                            this.assignInternalSearch = '';
                             this.assignSupDegreeFilter = 'all';
                             this.assignModalOpen = true;
                         }
@@ -2731,18 +2779,63 @@
                                                                     $assignedInternalEx = ($template->slug === 'internal_defence') ? $sm->thesis?->internalExaminer : null;
                                                                     $otherPanelists = $rowExaminers->filter(fn($ex) => !$assignedInternalEx || $ex->user_id !== $assignedInternalEx->user_id);
                                                                     $panelTooltip = $otherPanelists->map(fn($ex) => ($ex->user?->name ?? 'Examiner') . ($ex->is_present ? ' (Graded)' : ''))->filter()->implode(', ');
+                                                                    $cellAssignUrl = (auth()->user()->hasRole('Program Coordinator') && !auth()->user()->hasRole('Admin'))
+                                                                        ? route('coordinator.milestone-templates.assign-examiner', $sm->id)
+                                                                        : route('admin.milestone-templates.assign-examiner', $sm->id);
+                                                                    $cellExaminerUserIds = $rowExaminers->pluck('user_id')->all();
+                                                                    $cellAssignedProfileIds = $supervisors->whereIn('user_id', $cellExaminerUserIds)->pluck('id')->values()->all();
+                                                                    $cellInternalExProfileId = $sm->thesis?->internal_examiner_profile_id ?? '';
+                                                                    $canEditRowExaminers = ($sm->status !== 'approved') && ((!isset($isCoordinator) || !$isCoordinator) || $template->slug === 'internal_defence');
                                                                 @endphp
                                                                 @if($template->slug === 'internal_defence')
                                                                     <div class="flex flex-col gap-1">
                                                                         @if($assignedInternalEx)
-                                                                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 text-[11px] font-bold border border-indigo-200 max-w-[190px]" title="Designated Internal Examiner (Presentation + Stage-2 Manuscript Clearance)">
-                                                                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0"></span>
-                                                                                <span class="truncate">⭐ {{ $assignedInternalEx->user->name ?? 'Internal Examiner' }}</span>
-                                                                            </span>
+                                                                            <div class="flex items-center gap-1">
+                                                                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-800 text-[11px] font-bold border border-indigo-200 max-w-[165px]" title="Designated Internal Examiner (Presentation + Stage-2 Manuscript Clearance)">
+                                                                                    <span class="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0"></span>
+                                                                                    <span class="truncate">⭐ {{ $assignedInternalEx->user->name ?? 'Internal Examiner' }}</span>
+                                                                                </span>
+                                                                                @if($canEditRowExaminers)
+                                                                                    <button type="button"
+                                                                                        @click="openAssignModal('{{ addslashes($studentName) }}', '{{ $cellAssignUrl }}', {{ json_encode($cellAssignedProfileIds) }}, '{{ $cellInternalExProfileId }}')"
+                                                                                        class="p-1 rounded-md text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-colors cursor-pointer shrink-0"
+                                                                                        title="Change Internal Examiner">
+                                                                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                                                                        </svg>
+                                                                                    </button>
+                                                                                    <form action="{{ $cellAssignUrl }}" method="POST" class="inline-flex shrink-0">
+                                                                                        @csrf
+                                                                                        <input type="hidden" name="remove_internal_examiner" value="1">
+                                                                                        <button type="submit"
+                                                                                            data-confirm="Remove {{ addslashes($assignedInternalEx->user->name ?? 'this examiner') }} as Internal Examiner for {{ addslashes($studentName) }}?"
+                                                                                            data-confirm-title="Remove Internal Examiner"
+                                                                                            data-confirm-type="danger"
+                                                                                            data-confirm-btn="Remove"
+                                                                                            class="p-1 rounded-md text-rose-400 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                                                                                            title="Remove Internal Examiner">
+                                                                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                                                                            </svg>
+                                                                                        </button>
+                                                                                    </form>
+                                                                                @endif
+                                                                            </div>
                                                                         @else
-                                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 max-w-[190px]">
-                                                                                No Internal Examiner Yet
-                                                                            </span>
+                                                                            <div class="flex items-center gap-1.5">
+                                                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 max-w-[160px]">
+                                                                                    No Internal Examiner Yet
+                                                                                </span>
+                                                                                @if($canEditRowExaminers)
+                                                                                    <button type="button"
+                                                                                        @click="openAssignModal('{{ addslashes($studentName) }}', '{{ $cellAssignUrl }}', {{ json_encode($cellAssignedProfileIds) }}, '')"
+                                                                                        class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer shrink-0"
+                                                                                        title="Assign Internal Examiner">
+                                                                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                                                                        <span>Assign</span>
+                                                                                    </button>
+                                                                                @endif
+                                                                            </div>
                                                                         @endif
                                                                         @if($otherPanelists->count() > 0)
                                                                             <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-50 text-slate-700 text-[10px] font-semibold border border-slate-200 max-w-[190px]" title="Panel Examiners: {{ $panelTooltip }}">
@@ -2758,19 +2851,56 @@
                                                                 @elseif($assignedInternalEx || $rowExaminers->count() > 0)
                                                                     <div class="flex flex-col gap-1">
                                                                         @foreach($rowExaminers as $ex)
-                                                                            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 text-[11px] font-bold border border-purple-100 max-w-[170px]" title="{{ $ex->is_present ? 'Present (Graded candidate)' : 'Assigned (Pending grading)' }}">
-                                                                                <span class="w-1.5 h-1.5 rounded-full {{ $ex->is_present ? 'bg-emerald-500' : 'bg-purple-300' }}"></span>
-                                                                                <span class="truncate">{{ $ex->user?->name ?? 'Examiner' }}</span>
-                                                                                @if($ex->is_present)
-                                                                                    <span class="text-[9px] text-emerald-600 font-extrabold uppercase shrink-0">Present</span>
+                                                                            <div class="flex items-center gap-1">
+                                                                                <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 text-[11px] font-bold border border-purple-100 max-w-[165px]" title="{{ $ex->is_present ? 'Present (Graded candidate)' : 'Assigned (Pending grading)' }}">
+                                                                                    <span class="w-1.5 h-1.5 rounded-full {{ $ex->is_present ? 'bg-emerald-500' : 'bg-purple-300' }}"></span>
+                                                                                    <span class="truncate">{{ $ex->user?->name ?? 'Examiner' }}</span>
+                                                                                    @if($ex->is_present)
+                                                                                        <span class="text-[9px] text-emerald-600 font-extrabold uppercase shrink-0">Present</span>
+                                                                                    @endif
+                                                                                </span>
+                                                                                @if($canEditRowExaminers)
+                                                                                    <form action="{{ $cellAssignUrl }}" method="POST" class="inline-flex shrink-0">
+                                                                                        @csrf
+                                                                                        <input type="hidden" name="remove_examiner_user_id" value="{{ $ex->user_id }}">
+                                                                                        <button type="submit"
+                                                                                            data-confirm="Remove {{ addslashes($ex->user?->name ?? 'this examiner') }} from {{ addslashes($studentName) }}'s panel?"
+                                                                                            data-confirm-title="Remove Examiner"
+                                                                                            data-confirm-type="danger"
+                                                                                            data-confirm-btn="Remove"
+                                                                                            class="p-0.5 rounded text-rose-400 hover:text-rose-700 hover:bg-rose-50 transition-colors cursor-pointer"
+                                                                                            title="Remove Examiner">
+                                                                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                                                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                                                                            </svg>
+                                                                                        </button>
+                                                                                    </form>
                                                                                 @endif
-                                                                            </span>
+                                                                            </div>
                                                                         @endforeach
+                                                                        @if($canEditRowExaminers)
+                                                                            <button type="button"
+                                                                                @click="openAssignModal('{{ addslashes($studentName) }}', '{{ $cellAssignUrl }}', {{ json_encode($cellAssignedProfileIds) }}, '{{ $cellInternalExProfileId }}')"
+                                                                                class="inline-flex items-center gap-1 self-start text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline mt-0.5 cursor-pointer">
+                                                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                                                                                <span>Change Examiners</span>
+                                                                            </button>
+                                                                        @endif
                                                                     </div>
                                                                 @else
-                                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                                                                        Unassigned
-                                                                    </span>
+                                                                    <div class="flex items-center gap-1.5">
+                                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                                                            Unassigned
+                                                                        </span>
+                                                                        @if($canEditRowExaminers)
+                                                                            <button type="button"
+                                                                                @click="openAssignModal('{{ addslashes($studentName) }}', '{{ $cellAssignUrl }}', {{ json_encode($cellAssignedProfileIds) }}, '')"
+                                                                                class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-colors cursor-pointer shrink-0">
+                                                                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                                                                                <span>Assign</span>
+                                                                            </button>
+                                                                        @endif
+                                                                    </div>
                                                                 @endif
                                                             </td>
                                                             @if($template->slug === 'seminar_as_a_course')
@@ -2875,8 +3005,26 @@
                                                                                     <svg class="w-3.5 h-3.5 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
                                                                                     </svg>
-                                                                                    <span>Assign Examiner(s)</span>
+                                                                                    <span>Assign / Change Examiner(s)</span>
                                                                                 </button>
+                                                                                @if($template->slug === 'internal_defence' && $sm->thesis?->internalExaminer)
+                                                                                <form action="{{ $assignUrl }}" method="POST">
+                                                                                    @csrf
+                                                                                    <input type="hidden" name="remove_internal_examiner" value="1">
+                                                                                    <button type="submit"
+                                                                                        @click="menuOpen = false"
+                                                                                        data-confirm="Remove {{ addslashes($sm->thesis->internalExaminer->user->name ?? 'this examiner') }} as Internal Examiner for {{ addslashes($studentName) }}?"
+                                                                                        data-confirm-title="Remove Internal Examiner"
+                                                                                        data-confirm-type="danger"
+                                                                                        data-confirm-btn="Remove"
+                                                                                        class="w-full text-left px-3 py-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors flex items-center gap-2">
+                                                                                        <svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                                                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
+                                                                                        </svg>
+                                                                                        <span>Remove Internal Examiner</span>
+                                                                                    </button>
+                                                                                </form>
+                                                                                @endif
                                                                                 @endif
                                                                                 @if(!$isPostDefRow && $template->slug !== 'supervisors_assigned' && (!empty($sm->defence_date) || in_array($template->slug, ['seminar_as_a_course', 'proposal_defence', 'progress_report_1', 'progress_report_2', 'internal_defence'])))
                                                                                 <form action="{{ route('milestones.end_presentation', $sm) }}" method="POST">
@@ -3127,17 +3275,63 @@
                                         <form data-milestone-ajax="{{ $template->id }}" :action="assignFormUrl" method="POST" class="space-y-4">
                                             @csrf
                                             @if($template->slug === 'internal_defence')
-                                            <div>
-                                                <label class="block text-xs font-bold text-slate-800 mb-1">
-                                                    Institutional Internal Examiner <span class="text-indigo-600 font-semibold">(Milestone 6 Clearance)</span>
-                                                </label>
-                                                <p class="text-[11px] text-slate-500 mb-2">Select the examiner authorized to review post-defence revisions and give final institutional clearance.</p>
-                                                <select name="internal_examiner_profile_id" x-model="assignInternalExaminerProfileId" class="w-full text-xs rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 py-2.5 bg-slate-50 font-medium">
-                                                    <option value="">-- None / Select Internal Examiner --</option>
-                                                    @foreach($internalExaminers as $iex)
-                                                        <option value="{{ $iex->id }}">{{ $iex->user->name ?? 'Examiner' }} ({{ $iex->program->name ?? 'Institutional Examiner' }})</option>
-                                                    @endforeach
-                                                </select>
+                                            <input type="hidden" name="internal_examiner_explicit" value="1">
+                                            <div class="space-y-2.5">
+                                                <div class="flex items-center justify-between gap-2">
+                                                    <label class="block text-xs font-bold text-slate-800">
+                                                        Institutional Internal Examiner <span class="text-indigo-600 font-semibold">(Milestone 6 Clearance)</span>
+                                                    </label>
+                                                    <button type="button"
+                                                        x-show="assignInternalExaminerProfileId || assignPromoteSupId"
+                                                        @click="assignInternalExaminerProfileId = ''; assignPromoteSupId = ''"
+                                                        class="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer">
+                                                        Remove Internal Examiner
+                                                    </button>
+                                                </div>
+                                                <p class="text-[11px] text-slate-500">Choose an existing Internal Examiner or promote any faculty/supervisor to handle post-defence clearance.</p>
+
+                                                <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                                                    <button type="button" @click="assignInternalMode = 'examiner'; assignPromoteSupId = ''"
+                                                        :class="assignInternalMode === 'examiner' ? 'bg-white text-slate-900 shadow-xs font-black' : 'text-slate-600 font-semibold'"
+                                                        class="flex-1 py-1.5 px-2.5 rounded-lg text-[11px] transition cursor-pointer">
+                                                        Internal Examiner Profiles
+                                                    </button>
+                                                    <button type="button" @click="assignInternalMode = 'supervisor'; assignInternalExaminerProfileId = ''"
+                                                        :class="assignInternalMode === 'supervisor' ? 'bg-white text-slate-900 shadow-xs font-black' : 'text-slate-600 font-semibold'"
+                                                        class="flex-1 py-1.5 px-2.5 rounded-lg text-[11px] transition cursor-pointer">
+                                                        Promote Faculty / Supervisor
+                                                    </button>
+                                                </div>
+
+                                                <div class="relative">
+                                                    <input type="text"
+                                                        x-model="assignInternalSearch"
+                                                        placeholder="Search examiner by name or email..."
+                                                        class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 placeholder:text-slate-400 focus:ring-indigo-500 focus:border-indigo-500">
+                                                    <button type="button" x-show="assignInternalSearch" @click="assignInternalSearch = ''" class="absolute inset-y-0 right-2.5 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer">&times;</button>
+                                                </div>
+
+                                                <div x-show="assignInternalMode === 'examiner'">
+                                                    <select :name="assignInternalMode === 'examiner' ? 'internal_examiner_profile_id' : ''"
+                                                        x-model="assignInternalExaminerProfileId"
+                                                        class="w-full text-xs rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 py-2.5 bg-slate-50 font-medium">
+                                                        <option value="">-- None / Remove Internal Examiner --</option>
+                                                        <template x-for="iex in filteredAssignInternalExaminers" :key="iex.id">
+                                                            <option :value="iex.id" :selected="assignInternalExaminerProfileId === iex.id" x-text="iex.display"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
+
+                                                <div x-show="assignInternalMode === 'supervisor'">
+                                                    <select :name="assignInternalMode === 'supervisor' ? 'promote_supervisor_profile_id' : ''"
+                                                        x-model="assignPromoteSupId"
+                                                        class="w-full text-xs rounded-xl border-slate-300 focus:ring-indigo-500 focus:border-indigo-500 py-2.5 bg-slate-50 font-medium">
+                                                        <option value="">-- Choose Faculty / Supervisor --</option>
+                                                        <template x-for="sup in filteredAssignPromoteSupervisors" :key="sup.id">
+                                                            <option :value="sup.id" :selected="assignPromoteSupId === sup.id" x-text="sup.display"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
                                             </div>
                                             <div>
                                                 <div class="flex items-center justify-between mb-1.5">

@@ -447,4 +447,117 @@ class InternalDefenceRedesignTest extends TestCase
             $res->assertDontSee('Scholarly Evaluation');
         }
     }
+
+    #[Test]
+    public function admin_can_change_and_remove_internal_examiner_per_student_from_milestone_panel(): void
+    {
+        Notification::fake();
+        Mail::fake();
+
+        [, , $thesis, $milestone, $internalTpl] = $this->createCandidateAtInternalDefence($this->progA, 'SingleEdit');
+
+        // Active supervisor on the thesis (to verify explicit clear doesn't fall back to supervisor)
+        $supUser = User::factory()->create(['name' => 'Dr. Thesis Supervisor', 'is_active' => true]);
+        $supUser->assignRole('Supervisor');
+        $supProf = SupervisorProfile::create(['user_id' => $supUser->id, 'active' => true]);
+        SupervisionAssignment::create([
+            'thesis_project_id' => $thesis->id,
+            'supervisor_profile_id' => $supProf->id,
+            'role' => 'primary',
+            'status' => 'active',
+        ]);
+
+        // Two Internal Examiners + one Faculty Supervisor to promote
+        $iexUser1 = User::factory()->create(['name' => 'Prof. Ishaq Oyefolahan', 'is_active' => true]);
+        $iexUser1->assignRole('Internal Examiner');
+        $iexProf1 = InternalExaminerProfile::create([
+            'user_id' => $iexUser1->id,
+            'program_id' => $this->progA->id,
+            'active' => true,
+        ]);
+
+        $iexUser2 = User::factory()->create(['name' => 'Dr. Abayomi Jegede', 'is_active' => true]);
+        $iexUser2->assignRole('Internal Examiner');
+        $iexProf2 = InternalExaminerProfile::create([
+            'user_id' => $iexUser2->id,
+            'program_id' => $this->progA->id,
+            'active' => true,
+        ]);
+
+        $facUser = User::factory()->create(['name' => 'Prof. Promoted Faculty', 'is_active' => true]);
+        $facUser->assignRole('Supervisor');
+        $facProf = SupervisorProfile::create(['user_id' => $facUser->id, 'active' => true]);
+        $facProf->programs()->attach($this->progA->id);
+
+        // 1. Assign first Internal Examiner
+        $res1 = $this->actingAs($this->admin)
+            ->postJson(route('admin.milestone-templates.assign-examiner', $milestone->id), [
+                'internal_examiner_explicit' => 1,
+                'internal_examiner_profile_id' => $iexProf1->id,
+                'supervisor_profile_ids' => [$supProf->id],
+            ]);
+        $res1->assertOk()->assertJson(['ok' => true]);
+        $this->assertEquals($iexProf1->id, $thesis->fresh()->internal_examiner_profile_id);
+        $this->assertStringContainsString('Change Internal Examiner', $res1->json('html'));
+        $this->assertStringContainsString('Remove Internal Examiner', $res1->json('html'));
+
+        // 2. Change to second Internal Examiner
+        $res2 = $this->actingAs($this->admin)
+            ->postJson(route('admin.milestone-templates.assign-examiner', $milestone->id), [
+                'internal_examiner_explicit' => 1,
+                'internal_examiner_profile_id' => $iexProf2->id,
+                'supervisor_profile_ids' => [$supProf->id],
+            ]);
+        $res2->assertOk()->assertJson(['ok' => true]);
+        $this->assertEquals($iexProf2->id, $thesis->fresh()->internal_examiner_profile_id);
+        $this->assertTrue(
+            ExaminerAssignment::where('thesis_project_id', $thesis->id)
+                ->where('type', 'internal_examiner')
+                ->where('examiner_id', $iexUser2->id)
+                ->exists()
+        );
+
+        // 3. Explicit clear via modal while supervisor remains checked must NOT promote supervisor
+        $res3 = $this->actingAs($this->admin)
+            ->postJson(route('admin.milestone-templates.assign-examiner', $milestone->id), [
+                'internal_examiner_explicit' => 1,
+                'internal_examiner_profile_id' => '',
+                'supervisor_profile_ids' => [$supProf->id],
+            ]);
+        $res3->assertOk()->assertJson(['ok' => true]);
+        $this->assertNull($thesis->fresh()->internal_examiner_profile_id);
+        $this->assertFalse(
+            ExaminerAssignment::where('thesis_project_id', $thesis->id)
+                ->where('type', 'internal_examiner')
+                ->exists()
+        );
+
+        // 4. Promote Faculty/Supervisor to Internal Examiner per student
+        $res4 = $this->actingAs($this->admin)
+            ->postJson(route('admin.milestone-templates.assign-examiner', $milestone->id), [
+                'internal_examiner_explicit' => 1,
+                'promote_supervisor_profile_id' => $facProf->id,
+                'supervisor_profile_ids' => [$supProf->id],
+            ]);
+        $res4->assertOk()->assertJson(['ok' => true]);
+        $facUser->refresh();
+        $this->assertTrue($facUser->hasRole('Internal Examiner'));
+        $promotedProf = InternalExaminerProfile::where('user_id', $facUser->id)->first();
+        $this->assertNotNull($promotedProf);
+        $this->assertEquals($promotedProf->id, $thesis->fresh()->internal_examiner_profile_id);
+
+        // 5. Quick-remove Internal Examiner directly from the row button
+        $res5 = $this->actingAs($this->admin)
+            ->postJson(route('admin.milestone-templates.assign-examiner', $milestone->id), [
+                'remove_internal_examiner' => 1,
+            ]);
+        $res5->assertOk()->assertJson(['ok' => true]);
+        $this->assertNull($thesis->fresh()->internal_examiner_profile_id);
+        $this->assertFalse(
+            ExaminerAssignment::where('thesis_project_id', $thesis->id)
+                ->where('type', 'internal_examiner')
+                ->exists()
+        );
+        $this->assertStringContainsString('No Internal Examiner Yet', $res5->json('html'));
+    }
 }
