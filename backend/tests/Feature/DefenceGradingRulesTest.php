@@ -290,12 +290,26 @@ class DefenceGradingRulesTest extends TestCase
             ->assertSee('Relevance of project to Society')
             ->assertSee('Referencing:');
 
-        // Out-of-bounds score (format_sections max is 3)
+        // Out-of-bounds score (format_sections max is 3; cannot exceed item max or push overall > 100)
         $badRubric = $this->buildInternalRubricPayload(50);
         $badRubric['format_sections'] = 4;
         $this->actingAs($failCtx['examinerUser'])->post(route('evaluations.store', $failCtx['event']), [
             'rubric' => $badRubric,
         ])->assertSessionHasErrors('rubric.format_sections');
+
+        $over100Rubric = $this->buildInternalRubricPayload(100);
+        $over100Rubric['referencing_apa'] = 6; // max is 5, would make total 101
+        $this->actingAs($failCtx['examinerUser'])->post(route('evaluations.store', $failCtx['event']), [
+            'rubric' => $over100Rubric,
+        ])->assertSessionHasErrors('rubric.referencing_apa');
+
+        $negativeRubric = $this->buildInternalRubricPayload(60);
+        $negativeRubric['format_abstract'] = -1;
+        $this->actingAs($failCtx['examinerUser'])->post(route('evaluations.store', $failCtx['event']), [
+            'rubric' => $negativeRubric,
+        ])->assertSessionHasErrors('rubric.format_abstract');
+
+        $this->assertDatabaseCount('evaluations', 0);
 
         // 2. Score 49 (< 50%) -> FAIL -> Repeat Internal Defence
         $this->actingAs($failCtx['examinerUser'])->post(route('evaluations.store', $failCtx['event']), [

@@ -109,11 +109,63 @@
                 <div x-data="{
                         scores: {{ \Illuminate\Support\Js::from($initialRubricValues) }},
                         sections: {{ \Illuminate\Support\Js::from($internalSections) }},
+                        warnings: {},
+                        updateScore(key, max, rawVal, el) {
+                            if (rawVal === '' || rawVal === null || rawVal === undefined) {
+                                this.scores[key] = '';
+                                delete this.warnings[key];
+                                return;
+                            }
+                            let num = parseFloat(rawVal);
+                            if (isNaN(num)) {
+                                this.scores[key] = '';
+                                if (el) el.value = '';
+                                delete this.warnings[key];
+                                return;
+                            }
+                            if (num < 0) {
+                                num = 0;
+                                this.warnings[key] = 'Min mark is 0';
+                            } else if (num > max) {
+                                num = max;
+                                this.warnings[key] = 'Max mark is ' + max;
+                            } else {
+                                delete this.warnings[key];
+                            }
+                            this.scores[key] = String(num);
+                            if (el && String(el.value) !== String(num)) {
+                                el.value = num;
+                            }
+                        },
+                        validateBeforeSubmit(event) {
+                            for (const sec of this.sections) {
+                                for (const item of sec.items) {
+                                    const raw = this.scores[item.key];
+                                    const val = parseFloat(raw);
+                                    if (raw === '' || isNaN(val) || val < 0 || val > item.max) {
+                                        this.updateScore(item.key, item.max, raw);
+                                        event.preventDefault();
+                                        alert(item.label + ' must be between 0 and ' + item.max + ' marks.');
+                                        return false;
+                                    }
+                                }
+                            }
+                            if (this.grandTotal > 100) {
+                                event.preventDefault();
+                                alert('Overall total score cannot exceed 100 marks.');
+                                return false;
+                            }
+                            return true;
+                        },
                         sectionTotal(sec) {
-                            return sec.items.reduce((sum, item) => sum + (parseFloat(this.scores[item.key]) || 0), 0);
+                            return sec.items.reduce((sum, item) => {
+                                const val = Math.min(item.max, Math.max(0, parseFloat(this.scores[item.key]) || 0));
+                                return sum + val;
+                            }, 0);
                         },
                         get grandTotal() {
-                            return Math.round(this.sections.reduce((sum, sec) => sum + this.sectionTotal(sec), 0) * 100) / 100;
+                            const total = Math.round(this.sections.reduce((sum, sec) => sum + this.sectionTotal(sec), 0) * 100) / 100;
+                            return Math.min(100, total);
                         },
                         get isPass() {
                             return this.grandTotal >= 50;
@@ -169,15 +221,26 @@
                                             </td>
                                             <td class="px-4 py-2.5 text-center font-bold text-slate-400 border-r border-slate-200">Max {{ $item['max'] }}</td>
                                             <td class="px-4 py-2 text-center">
-                                                <input type="number"
-                                                       name="rubric[{{ $item['key'] }}]"
-                                                       x-model="scores['{{ $item['key'] }}']"
-                                                       min="0"
-                                                       max="{{ $item['max'] }}"
-                                                       step="0.5"
-                                                       required
-                                                       placeholder="0–{{ $item['max'] }}"
-                                                       class="w-24 text-center font-black text-sm bg-white border border-slate-300 rounded-xl py-1.5 px-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                                <div class="inline-flex flex-col items-center">
+                                                    <input type="number"
+                                                           name="rubric[{{ $item['key'] }}]"
+                                                           :value="scores['{{ $item['key'] }}']"
+                                                           @input="updateScore('{{ $item['key'] }}', {{ $item['max'] }}, $event.target.value, $event.target)"
+                                                           @change="updateScore('{{ $item['key'] }}', {{ $item['max'] }}, $event.target.value, $event.target)"
+                                                           @keydown="if (['-', '+', 'e', 'E'].includes($event.key)) $event.preventDefault()"
+                                                           @wheel.prevent
+                                                           min="0"
+                                                           max="{{ $item['max'] }}"
+                                                           step="0.5"
+                                                           required
+                                                           placeholder="0–{{ $item['max'] }}"
+                                                           :class="warnings['{{ $item['key'] }}'] ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-300'"
+                                                           class="w-24 text-center font-black text-sm bg-white border rounded-xl py-1.5 px-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                                                    <span x-show="warnings['{{ $item['key'] }}']"
+                                                          x-text="warnings['{{ $item['key'] }}']"
+                                                          x-cloak
+                                                          class="mt-1 text-[10px] font-bold text-rose-600 leading-tight"></span>
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -214,7 +277,7 @@
 
                     <div class="mt-8 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4 border-t border-slate-100 pt-6">
                         <a href="{{ route('dashboard') }}" class="w-full sm:w-auto text-center px-6 py-3 text-xs font-black text-slate-600 uppercase tracking-widest hover:bg-slate-100 rounded-xl transition-colors">Cancel</a>
-                        <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary-500/20 transition-all active:scale-95 cursor-pointer">
+                        <button type="submit" @click="validateBeforeSubmit($event)" class="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary-500/20 transition-all active:scale-95 cursor-pointer">
                             Submit Internal Defence Score &amp; Mark Attendance
                         </button>
                     </div>
@@ -305,7 +368,7 @@
                             <p class="text-[10px] font-medium text-slate-500 max-w-sm">Does the thesis provide a novel contribution to the field of study?</p>
                         </div>
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <input type="number" name="score[originality]" min="0" max="25" required class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
+                            <input type="number" name="score[originality]" min="0" max="25" required oninput="if(this.value !== '' && parseFloat(this.value) > 25) this.value = 25; if(this.value !== '' && parseFloat(this.value) < 0) this.value = 0;" onwheel="return false;" class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
                             <span class="text-xs font-black text-slate-400">/ 25</span>
                         </div>
                     </div>
@@ -316,7 +379,7 @@
                             <p class="text-[10px] font-medium text-slate-500 max-w-sm">Are the research methods appropriate, correctly applied, and rigorous?</p>
                         </div>
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <input type="number" name="score[methodology]" min="0" max="25" required class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
+                            <input type="number" name="score[methodology]" min="0" max="25" required oninput="if(this.value !== '' && parseFloat(this.value) > 25) this.value = 25; if(this.value !== '' && parseFloat(this.value) < 0) this.value = 0;" onwheel="return false;" class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
                             <span class="text-xs font-black text-slate-400">/ 25</span>
                         </div>
                     </div>
@@ -327,7 +390,7 @@
                             <p class="text-[10px] font-medium text-slate-500 max-w-sm">Is the thesis well-written, structured logically, and correctly formatted?</p>
                         </div>
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <input type="number" name="score[presentation]" min="0" max="25" required class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
+                            <input type="number" name="score[presentation]" min="0" max="25" required oninput="if(this.value !== '' && parseFloat(this.value) > 25) this.value = 25; if(this.value !== '' && parseFloat(this.value) < 0) this.value = 0;" onwheel="return false;" class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
                             <span class="text-xs font-black text-slate-400">/ 25</span>
                         </div>
                     </div>
@@ -338,7 +401,7 @@
                             <p class="text-[10px] font-medium text-slate-500 max-w-sm">How well did the candidate defend their work against panel questions?</p>
                         </div>
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <input type="number" name="score[qa]" min="0" max="25" required class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
+                            <input type="number" name="score[qa]" min="0" max="25" required oninput="if(this.value !== '' && parseFloat(this.value) > 25) this.value = 25; if(this.value !== '' && parseFloat(this.value) < 0) this.value = 0;" onwheel="return false;" class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
                             <span class="text-xs font-black text-slate-400">/ 25</span>
                         </div>
                     </div>

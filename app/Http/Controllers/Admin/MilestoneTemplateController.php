@@ -2895,6 +2895,7 @@ class MilestoneTemplateController extends Controller
             ->whereNotNull('defence_date')
             ->where('status', '!=', 'approved')
             ->with([
+                'template',
                 'thesis.student.user',
                 'thesis.student.program',
                 'thesis.student.level',
@@ -2903,6 +2904,7 @@ class MilestoneTemplateController extends Controller
                 'thesis.internalExaminer.user',
                 'thesis.examinerAssignments.examiner',
                 'thesis.defenceEvents.panelMembers.user',
+                'thesis.defenceEvents.evaluations',
             ]);
 
         if ($isCoordinator) {
@@ -2911,8 +2913,11 @@ class MilestoneTemplateController extends Controller
             });
         }
 
+        $workflow = app(\App\Services\MilestoneWorkflowService::class);
         $milestones = $query->get()
-            ->reject(fn($m) => $m->thesis && $m->thesis->isExemptFromMilestone($template))
+            ->reject(fn($m) => ($m->thesis && $m->thesis->isExemptFromMilestone($template))
+                || $workflow->hasBeenGraded($m)
+                || $workflow->isPostDefencePhase($m))
             ->values();
 
         $selectedGroup = request()->query('discipline_group');
@@ -3079,7 +3084,11 @@ class MilestoneTemplateController extends Controller
         $fileName = str_replace([' ', '—', '-'], '_', strtolower($title)) . '_' . now()->format('Ymd_His') . '.pdf';
         $fileName = preg_replace('/_+/', '_', $fileName);
 
-        return $pdf->download($fileName);
+        return $pdf->download($fileName)->withHeaders([
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
     }
 
     /**

@@ -52,13 +52,19 @@ class EvaluationController extends Controller
             $rules = [
                 'comments' => 'nullable|string|max:5000',
             ];
+            $attributes = [];
+            $messages = [];
             foreach ($sections as $section) {
                 foreach ($section['items'] as $item) {
-                    $rules['rubric.' . $item['key']] = 'required|numeric|min:0|max:' . $item['max'];
+                    $field = 'rubric.' . $item['key'];
+                    $rules[$field] = 'required|numeric|min:0|max:' . $item['max'];
+                    $attributes[$field] = $item['label'];
+                    $messages[$field . '.max'] = "{$item['label']} cannot exceed {$item['max']} marks.";
+                    $messages[$field . '.min'] = "{$item['label']} cannot be less than 0 marks.";
                 }
             }
 
-            $validated = $request->validate($rules);
+            $validated = $request->validate($rules, $messages, $attributes);
             $rubricInput = $validated['rubric'] ?? [];
 
             $score = [
@@ -71,15 +77,30 @@ class EvaluationController extends Controller
                 $sectionSum = 0.0;
                 foreach ($section['items'] as $item) {
                     $val = round((float) ($rubricInput[$item['key']] ?? 0), 2);
+                    if ($val < 0 || $val > $item['max']) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'rubric.' . $item['key'] => "{$item['label']} cannot exceed {$item['max']} marks.",
+                        ]);
+                    }
                     $score[$item['key']] = $val;
                     $sectionSum += $val;
                 }
                 $sectionSum = round($sectionSum, 2);
+                if ($sectionSum > $section['max']) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'rubric' => "{$section['title']} total ({$sectionSum}) cannot exceed {$section['max']} marks.",
+                    ]);
+                }
                 $score['sections'][$section['key']] = $sectionSum;
                 $total += $sectionSum;
             }
 
             $total = round($total, 2);
+            if ($total > 100) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'rubric' => "Overall total score ({$total}) cannot exceed 100 marks.",
+                ]);
+            }
             $verdict = $total >= 50 ? 'pass' : 'fail';
             $score['total'] = $total;
             $score['verdict'] = $verdict;
