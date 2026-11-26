@@ -46,6 +46,93 @@ class Evaluation extends Model
     }
 
     /**
+     * Canonical rubric sections & criteria for Internal Defence (100 points total; >= 50 Pass, < 50 Fail).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function internalDefenceRubricSections(): array
+    {
+        return [
+            [
+                'sn' => '1.',
+                'key' => 'format_presentation',
+                'title' => 'Format & Presentation:',
+                'max' => 10,
+                'items' => [
+                    ['key' => 'format_sections', 'label' => '(a) General Arrangements of Sections', 'max' => 3],
+                    ['key' => 'format_references', 'label' => '(b) References', 'max' => 3],
+                    ['key' => 'format_writing', 'label' => '(c) Style of writing', 'max' => 2],
+                    ['key' => 'format_abstract', 'label' => '(d) Abstract', 'max' => 2],
+                ],
+            ],
+            [
+                'sn' => '2.',
+                'key' => 'theoretical_consideration',
+                'title' => 'Theoretical consideration:',
+                'max' => 15,
+                'items' => [
+                    ['key' => 'theory_problem', 'label' => '(a) Problem definition', 'max' => 3],
+                    ['key' => 'theory_framework', 'label' => '(b) Theoretical Framework', 'max' => 5],
+                    ['key' => 'theory_literature', 'label' => '(c) Quality of literature', 'max' => 7],
+                ],
+            ],
+            [
+                'sn' => '3.',
+                'key' => 'methodology',
+                'title' => 'Methodology',
+                'max' => 20,
+                'items' => [
+                    ['key' => 'method_sources', 'label' => '(a) Sources', 'max' => 6],
+                    ['key' => 'method_design', 'label' => '(b) System Design', 'max' => 6],
+                    ['key' => 'method_adequacy', 'label' => '(c) Adequacy', 'max' => 8],
+                ],
+            ],
+            [
+                'sn' => '4.',
+                'key' => 'data_analysis',
+                'title' => 'Data Analysis & Interpretation',
+                'max' => 25,
+                'items' => [
+                    ['key' => 'analysis_implementation', 'label' => '(a) System Implementation', 'max' => 5],
+                    ['key' => 'analysis_results', 'label' => '(b) Results and Discussion', 'max' => 10],
+                    ['key' => 'analysis_findings', 'label' => '(c) Summary of Findings', 'max' => 10],
+                ],
+            ],
+            [
+                'sn' => '5.',
+                'key' => 'summary_conclusion',
+                'title' => 'Summary and Conclusion',
+                'max' => 15,
+                'items' => [
+                    ['key' => 'conclusion_discussion', 'label' => '- Discussion of results appropriate, related to findings, and conclusions consistent with the obtained results', 'max' => 5],
+                    ['key' => 'conclusion_recommendations', 'label' => '- Recommendations', 'max' => 5],
+                    ['key' => 'conclusion_generalizations', 'label' => '- Generalizations confined to the population from which the sample was drawn or design used', 'max' => 5],
+                ],
+            ],
+            [
+                'sn' => '6.',
+                'key' => 'relevance_society',
+                'title' => 'Relevance of project to Society',
+                'max' => 10,
+                'items' => [
+                    ['key' => 'relevance_situations', 'label' => '(a) Education/Business/Management situations', 'max' => 4],
+                    ['key' => 'relevance_contribution', 'label' => '(b) Overall contribution to knowledge', 'max' => 5],
+                    ['key' => 'relevance_current', 'label' => '(c) How current is the topic ?', 'max' => 1],
+                ],
+            ],
+            [
+                'sn' => '7.',
+                'key' => 'referencing',
+                'title' => 'Referencing:',
+                'max' => 5,
+                'items' => [
+                    ['key' => 'referencing_apa', 'label' => 'Materials – correctly cited using the APA format', 'max' => 5],
+                ],
+            ],
+        ];
+    }
+
+    /**
      * Load submitted evaluation records for the dashboard, excluding Seminar as a Course
      * evaluations once that seminar presentation has ended.
      */

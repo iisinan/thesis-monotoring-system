@@ -25,6 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
+        $middleware->encryptCookies(except: [
+            'active_dashboard_role',
+        ]);
         $middleware->web(append: [
             \App\Http\Middleware\ForcePasswordChange::class,
         ]);

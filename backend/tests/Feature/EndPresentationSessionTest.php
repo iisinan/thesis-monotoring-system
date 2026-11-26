@@ -303,4 +303,210 @@ class EndPresentationSessionTest extends TestCase
         $removeRes->assertOk()->assertJsonPath('ok', true);
         $this->assertNull($newSemMilestone->fresh()->defence_date);
     }
+
+    private function createScheduledInternalDefenceCandidate(string $name, string $matric, ?string $verdict = null): array
+    {
+        $supUser = User::factory()->create(['name' => "Prof. Sup {$matric}", 'is_active' => true]);
+        $supUser->assignRole('Supervisor');
+        $supProfile = \App\Models\SupervisorProfile::create([
+            'user_id' => $supUser->id,
+            'rank' => 'Professor',
+            'max_students' => 10,
+            'current_load' => 1,
+        ]);
+
+        $examinerUser = User::factory()->create(['name' => "Dr. Examiner {$matric}", 'is_active' => true]);
+        $examinerUser->assignRole('Internal Examiner');
+        $examinerProfile = \App\Models\InternalExaminerProfile::create([
+            'user_id' => $examinerUser->id,
+            'program_id' => $this->cyberProgram->id,
+            'active' => true,
+        ]);
+
+        $studentUser = User::factory()->create(['name' => $name, 'is_active' => true]);
+        $studentUser->assignRole('Student');
+        $student = $studentUser->studentProfile()->create([
+            'program_id' => $this->cyberProgram->id,
+            'cohort_id' => $this->cohort->id,
+            'level_id' => $this->mscLevel->id,
+            'student_id_number' => $matric,
+            'enrollment_status' => 'active',
+        ]);
+
+        $thesis = ThesisProject::create([
+            'student_profile_id' => $student->id,
+            'title' => "Internal Defence Thesis - {$name}",
+            'status' => 'active',
+            'started_at' => now(),
+            'internal_examiner_profile_id' => $examinerProfile->id,
+        ]);
+
+        \App\Models\SupervisionAssignment::create([
+            'thesis_project_id' => $thesis->id,
+            'supervisor_profile_id' => $supProfile->id,
+            'role' => 'primary',
+            'status' => 'active',
+        ]);
+
+        $thesis->syncMilestones();
+        $internalTemplate = MilestoneTemplate::where('slug', 'internal_defence')->firstOrFail();
+
+        // Approve prerequisite milestones so student is cleanly on Internal Defence
+        $thesis->milestones()
+            ->where('milestone_template_id', '!=', $internalTemplate->id)
+            ->get()
+            ->each(fn($m) => $m->update(['status' => 'approved', 'approved_at' => now()]));
+
+        $internalMilestone = $thesis->milestones()
+            ->where('milestone_template_id', $internalTemplate->id)
+            ->firstOrFail();
+
+        $filePath = "submissions/{$thesis->id}/old_thesis_{$matric}.pdf";
+        Storage::put($filePath, '%PDF-1.4 old thesis content');
+
+        $oldSubmission = \App\Models\Submission::create([
+            'student_milestone_id' => $internalMilestone->id,
+            'submitted_by' => $studentUser->id,
+            'type' => 'manuscript',
+            'version' => 1,
+            'file_url' => $filePath,
+            'file_meta' => [
+                'original_name' => 'old_thesis.pdf',
+                'mime_type' => 'application/pdf',
+                'size' => 1024,
+            ],
+        ]);
+
+        $internalMilestone->update([
+            'status' => 'submitted',
+            'submitted_at' => now()->subDays(2),
+            'defence_date' => now()->subDay()->toDateString(),
+            'defence_time' => '10:00:00',
+            'meeting_link' => 'https://zoom.us/j/internal',
+        ]);
+
+        $workflow = app(\App\Services\MilestoneWorkflowService::class);
+        $workflow->recordSupervisorReview($internalMilestone->fresh(), $supUser, 'approved', 'Ready for internal');
+
+        $event = DefenceEvent::create([
+            'thesis_project_id' => $thesis->id,
+            'type' => 'internal',
+            'schedule_start' => now()->subDay()->setTime(10, 0),
+            'schedule_end' => now()->subDay()->setTime(11, 0),
+            'location' => 'https://zoom.us/j/internal',
+            'outcome' => 'pending',
+        ]);
+
+        if ($verdict !== null) {
+            Evaluation::create([
+                'defence_event_id' => $event->id,
+                'evaluator_id' => $examinerUser->id,
+                'score' => ['verdict' => $verdict, 'total' => $verdict === 'pass' ? 100 : 0],
+                'recommendation' => $verdict,
+                'comments' => "Verdict: {$verdict}",
+                'submitted_at' => now()->subDay(),
+            ]);
+        }
+
+        return compact('supUser', 'examinerUser', 'studentUser', 'thesis', 'internalTemplate', 'internalMilestone', 'oldSubmission', 'filePath', 'event');
+    }
+
+    #[Test]
+    public function ungraded_and_failed_internal_defence_delete_previous_upload_reset_supervisor_approval_and_require_reupload_before_reschedule(): void
+    {
+        $ungraded = $this->createScheduledInternalDefenceCandidate('Ungraded Candidate', 'ACE/INT/001', null);
+        $failed = $this->createScheduledInternalDefenceCandidate('Failed Candidate', 'ACE/INT/002', 'fail');
+        $internalTemplate = $ungraded['internalTemplate'];
+
+        // Admin ends Internal Defence presentation session (bulk endSchedule)
+        $endResp = $this->actingAs($this->admin)
+            ->post(route('admin.milestone-templates.end-schedule', $internalTemplate));
+        $endResp->assertRedirect(route('admin.milestone-templates.index'));
+
+        foreach ([$ungraded, $failed] as $cand) {
+            $ms = $cand['internalMilestone']->fresh();
+            $this->assertEquals('revision_required', $ms->status);
+            $this->assertFalse((bool) $ms->is_supervisor_approved);
+            $this->assertArrayNotHasKey('supervisor_reviews', $ms->approvals ?? []);
+            $this->assertNull($ms->defence_date);
+            $this->assertNull($ms->defence_time);
+            $this->assertNull($ms->meeting_link);
+            $this->assertNull($ms->submitted_at);
+
+            // Previous upload record and file must be deleted
+            $this->assertDatabaseMissing('submissions', ['id' => $cand['oldSubmission']->id]);
+            Storage::assertMissing($cand['filePath']);
+
+            // Old evaluations cleared and workflow helper reports false
+            $this->assertDatabaseCount('evaluations', 0);
+            $this->assertFalse(app(\App\Services\MilestoneWorkflowService::class)->isSupervisorApproved($ms));
+            $this->assertFalse(app(\App\Services\MilestoneWorkflowService::class)->hasBeenGraded($ms));
+
+            // Admin cannot reschedule before student re-uploads and gets supervisor approval again
+            $this->actingAs($this->admin)->postJson(
+                route('admin.milestone-templates.update-student-slot', [$internalTemplate->id, $ms->id]),
+                [
+                    'slot_action' => 'schedule',
+                    'defence_date' => now()->addDays(5)->toDateString(),
+                    'defence_time' => '11:00',
+                ]
+            )->assertStatus(422);
+
+            // Student re-uploads revised thesis
+            $newPdf = \Illuminate\Http\UploadedFile::fake()->create('revised_thesis.pdf', 250, 'application/pdf');
+            $this->actingAs($cand['studentUser'])->post(route('milestones.store', $ms), [
+                'file' => $newPdf,
+                'description' => 'Revised thesis manuscript after internal defence',
+            ])->assertRedirect();
+
+            $ms->refresh();
+            $this->assertEquals('submitted', $ms->status);
+            $this->assertFalse(
+                app(\App\Services\MilestoneWorkflowService::class)->isSupervisorApproved($ms),
+                'Previous supervisor approval must NOT carry over to the repeat upload'
+            );
+
+            // Supervisor approves the newly uploaded thesis
+            $this->actingAs($cand['supUser'])->post(route('milestones.accept_upload', $ms), [
+                'remarks' => 'Approved revised manuscript for repeat internal defence.',
+            ])->assertRedirect();
+
+            $ms->refresh();
+            $this->assertTrue(app(\App\Services\MilestoneWorkflowService::class)->isSupervisorApproved($ms));
+
+            // Now Admin CAN schedule candidate for another Internal Defence
+            $this->actingAs($this->admin)->postJson(
+                route('admin.milestone-templates.update-student-slot', [$internalTemplate->id, $ms->id]),
+                [
+                    'slot_action' => 'schedule',
+                    'defence_date' => now()->addDays(7)->toDateString(),
+                    'defence_time' => '09:30',
+                    'meeting_link' => 'https://zoom.us/j/repeat-internal',
+                ]
+            )->assertOk()->assertJsonPath('ok', true);
+
+            $this->assertSame(now()->addDays(7)->toDateString(), $ms->fresh()->defence_date?->format('Y-m-d'));
+        }
+    }
+
+    #[Test]
+    public function single_end_presentation_on_ungraded_internal_defence_resets_for_repeat_and_deletes_previous_upload(): void
+    {
+        $ungraded = $this->createScheduledInternalDefenceCandidate('Single Ungraded', 'ACE/INT/003', null);
+
+        $res = $this->actingAs($this->admin)
+            ->postJson(route('milestones.end_presentation', $ungraded['internalMilestone']));
+
+        $res->assertOk()->assertJson([
+            'success' => true,
+            'repeated' => true,
+        ]);
+
+        $ms = $ungraded['internalMilestone']->fresh();
+        $this->assertEquals('revision_required', $ms->status);
+        $this->assertFalse((bool) $ms->is_supervisor_approved);
+        $this->assertNull($ms->defence_date);
+        $this->assertDatabaseMissing('submissions', ['id' => $ungraded['oldSubmission']->id]);
+        Storage::assertMissing($ungraded['filePath']);
+    }
 }

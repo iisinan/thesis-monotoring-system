@@ -593,4 +593,78 @@ class InternalDefenceScheduleManagerTest extends TestCase
             'recommendation' => 'pass',
         ]);
     }
+
+    #[Test]
+    public function scheduled_pdf_excludes_concluded_and_graded_candidates_and_exports_only_recent_active_schedule(): void
+    {
+        $concludedCand = $this->createScheduledCandidate('ConcludedOld');
+        $concludedCand['milestone']->update([
+            'defence_date' => '2026-11-23',
+            'defence_time' => '10:00',
+            'status' => 'in_progress',
+            'approvals' => [
+                'presentation_concluded' => [
+                    'concluded_at' => '2026-11-25 15:26:20',
+                    'concluded_by' => $this->admin->id,
+                    'grading_outcome' => 'pass',
+                ],
+            ],
+        ]);
+        $concludedCand['event']->update([
+            'schedule_start' => '2026-11-23 10:00:00',
+            'schedule_end' => '2026-11-23 10:30:00',
+            'outcome' => 'pass',
+        ]);
+
+        $gradedCand = $this->createScheduledCandidate('GradedOld');
+        $gradedCand['milestone']->update([
+            'defence_date' => '2026-11-25',
+            'defence_time' => '10:00',
+            'status' => 'in_progress',
+        ]);
+        $gradedCand['event']->update([
+            'schedule_start' => '2026-11-25 10:00:00',
+            'schedule_end' => '2026-11-25 10:30:00',
+        ]);
+        $examinerUser = User::factory()->create(['is_active' => true]);
+        $examinerUser->assignRole('Internal Examiner');
+        \App\Models\Evaluation::create([
+            'defence_event_id' => $gradedCand['event']->id,
+            'evaluator_id' => $examinerUser->id,
+            'role' => 'internal_examiner',
+            'score' => ['total' => 78],
+            'recommendation' => 'pass',
+            'comments' => 'Already graded in previous session.',
+        ]);
+
+        $recentCand = $this->createScheduledCandidate('RecentUpcoming');
+        $recentCand['milestone']->update([
+            'defence_date' => '2026-11-30',
+            'defence_time' => '10:30',
+            'status' => 'submitted',
+        ]);
+        $recentCand['event']->update([
+            'schedule_start' => '2026-11-30 10:30:00',
+            'schedule_end' => '2026-11-30 11:00:00',
+            'outcome' => 'pending',
+        ]);
+
+        $capturedViewData = null;
+        \Illuminate\Support\Facades\View::composer('pdf.scheduled-presentation', function ($view) use (&$capturedViewData) {
+            $capturedViewData = $view->getData();
+        });
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.milestone-templates.export-scheduled-pdf', $this->internalTpl));
+
+        $response->assertOk();
+        $response->assertHeader('Pragma', 'no-cache');
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+
+        $this->assertNotNull($capturedViewData);
+        $exportedIds = $capturedViewData['scheduledMilestones']->pluck('id')->all();
+        $this->assertSame([$recentCand['milestone']->id], $exportedIds);
+        $this->assertStringContainsString('Nov 30, 2026', $capturedViewData['startingDate']);
+        $this->assertStringContainsString('Nov 30, 2026', $capturedViewData['endingDate']);
+    }
 }

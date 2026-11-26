@@ -1418,6 +1418,16 @@ class MilestoneTemplateController extends Controller
             foreach ($milestones as $sm) {
                 $reason = $workflow->getEndSessionBlockReason($sm);
                 if ($reason) {
+                    if ($workflow->isInternalDefence($sm) && !$workflow->hasBeenGraded($sm)) {
+                        $workflow->resetInternalDefenceForRepeat(
+                            $sm,
+                            'Internal Defence presentation session ended without examiner grading. Candidate must re-upload thesis for supervisor approval and be rescheduled.',
+                            false
+                        );
+                        $skipped[] = ($sm->thesis?->student?->user?->name ?? 'Unknown student') . ' — not graded (previous upload deleted; must re-upload thesis for supervisor approval and reschedule)';
+                        continue;
+                    }
+
                     $skipped[] = ($sm->thesis?->student?->user?->name ?? 'Unknown student') . ' — ' . $reason;
                     // End of presentation session: clear active schedule so presentation tab closes until rescheduled
                     $sm->update([
@@ -2539,15 +2549,34 @@ class MilestoneTemplateController extends Controller
                     };
                     $event = $eventType ? current($milestone->thesis->defenceEvents->where('type', $eventType)->all()) : null;
                     if ($event && $event->evaluations->count() > 0) {
-                        $passCount = 0;
-                        $failCount = 0;
-                        foreach($event->evaluations as $eval) {
-                            $verdict = strtolower($eval->verdict ?? $eval->recommendation ?? '');
-                            if (in_array($verdict, ['pass', 'minor_revisions', 'major_revisions'])) $passCount++;
-                            elseif ($verdict === 'fail') $failCount++;
+                        if ($template->slug === 'internal_defence') {
+                            $total = 0;
+                            $count = 0;
+                            foreach ($event->evaluations as $eval) {
+                                if (isset($eval->score['total'])) {
+                                    $total += (int) $eval->score['total'];
+                                    $count++;
+                                }
+                            }
+                            if ($count > 0) {
+                                $avgNum = (int) round($total / $count);
+                                $avgScore = ($avgNum >= 50 ? 'PASS' : 'FAIL') . " ({$avgNum}/100)";
+                            }
                         }
-                        if ($passCount + $failCount > 0) {
-                            $avgScore = ($passCount >= $failCount ? 'PASS' : 'FAIL') . " ({$passCount}/" . ($passCount + $failCount) . ")";
+
+                        if ($avgScore === 'N/A') {
+                            $passCount = 0;
+                            $failCount = 0;
+                            foreach($event->evaluations as $eval) {
+                                $verdict = strtolower($eval->verdict ?? $eval->recommendation ?? '');
+                                if ($verdict === 'pass') $passCount++;
+                                elseif ($verdict === 'fail') $failCount++;
+                            }
+                            if ($passCount + $failCount > 0) {
+                                $passLabel = $template->slug === 'proposal_defence' ? 'PROPOSAL ACCEPTED' : 'PASS';
+                                $failLabel = $template->slug === 'proposal_defence' ? 'FAIL (REPEAT)' : 'FAIL';
+                                $avgScore = ($passCount >= $failCount ? $passLabel : $failLabel) . " ({$passCount}/" . ($passCount + $failCount) . ")";
+                            }
                         }
                     }
                 }
@@ -2722,15 +2751,34 @@ class MilestoneTemplateController extends Controller
                 $event = current($milestone->thesis->defenceEvents->where('type', $eventType)->all());
                 if ($event && $event->evaluations->count() > 0) {
                     if ($isPassFail) {
-                        $passCount = 0;
-                        $failCount = 0;
-                        foreach($event->evaluations as $eval) {
-                            $verdict = strtolower($eval->verdict ?? $eval->recommendation ?? '');
-                            if ($verdict === 'pass') $passCount++;
-                            elseif ($verdict === 'fail') $failCount++;
+                        if ($template->slug === 'internal_defence') {
+                            $total = 0;
+                            $count = 0;
+                            foreach ($event->evaluations as $eval) {
+                                if (isset($eval->score['total'])) {
+                                    $total += (int) $eval->score['total'];
+                                    $count++;
+                                }
+                            }
+                            if ($count > 0) {
+                                $avgNum = (int) round($total / $count);
+                                $avgScore = ($avgNum >= 50 ? 'PASS' : 'FAIL') . " ({$avgNum}/100)";
+                            }
                         }
-                        if ($passCount + $failCount > 0) {
-                            $avgScore = ($passCount >= $failCount ? 'PASS' : 'FAIL') . " ({$passCount}/" . ($passCount + $failCount) . ")";
+
+                        if ($avgScore === 'N/A') {
+                            $passCount = 0;
+                            $failCount = 0;
+                            foreach($event->evaluations as $eval) {
+                                $verdict = strtolower($eval->verdict ?? $eval->recommendation ?? '');
+                                if ($verdict === 'pass') $passCount++;
+                                elseif ($verdict === 'fail') $failCount++;
+                            }
+                            if ($passCount + $failCount > 0) {
+                                $passLabel = $template->slug === 'proposal_defence' ? 'PROPOSAL ACCEPTED' : 'PASS';
+                                $failLabel = $template->slug === 'proposal_defence' ? 'FAIL (REPEAT)' : 'FAIL';
+                                $avgScore = ($passCount >= $failCount ? $passLabel : $failLabel) . " ({$passCount}/" . ($passCount + $failCount) . ")";
+                            }
                         }
                     } else {
                         $total = 0;
@@ -2847,6 +2895,7 @@ class MilestoneTemplateController extends Controller
             ->whereNotNull('defence_date')
             ->where('status', '!=', 'approved')
             ->with([
+                'template',
                 'thesis.student.user',
                 'thesis.student.program',
                 'thesis.student.level',
@@ -2855,6 +2904,7 @@ class MilestoneTemplateController extends Controller
                 'thesis.internalExaminer.user',
                 'thesis.examinerAssignments.examiner',
                 'thesis.defenceEvents.panelMembers.user',
+                'thesis.defenceEvents.evaluations',
             ]);
 
         if ($isCoordinator) {
@@ -2863,8 +2913,11 @@ class MilestoneTemplateController extends Controller
             });
         }
 
+        $workflow = app(\App\Services\MilestoneWorkflowService::class);
         $milestones = $query->get()
-            ->reject(fn($m) => $m->thesis && $m->thesis->isExemptFromMilestone($template))
+            ->reject(fn($m) => ($m->thesis && $m->thesis->isExemptFromMilestone($template))
+                || $workflow->hasBeenGraded($m)
+                || $workflow->isPostDefencePhase($m))
             ->values();
 
         $selectedGroup = request()->query('discipline_group');
@@ -3031,7 +3084,11 @@ class MilestoneTemplateController extends Controller
         $fileName = str_replace([' ', '—', '-'], '_', strtolower($title)) . '_' . now()->format('Ymd_His') . '.pdf';
         $fileName = preg_replace('/_+/', '_', $fileName);
 
-        return $pdf->download($fileName);
+        return $pdf->download($fileName)->withHeaders([
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ]);
     }
 
     /**

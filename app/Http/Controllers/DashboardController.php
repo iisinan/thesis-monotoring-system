@@ -36,7 +36,13 @@ class DashboardController extends Controller
 
             $data['document_templates'] = \App\Models\DocumentTemplate::where('is_active', true)->latest()->get();
 
-            $requestedRole = $request->query('role') ?? $request->cookie('active_dashboard_role');
+            $rawCookieRole = $request->cookie('active_dashboard_role');
+            $cookieRole = is_string($rawCookieRole) && $rawCookieRole !== '' ? urldecode($rawCookieRole) : null;
+            $requestedRole = $request->query('role') ?: $cookieRole;
+
+            if ($request->query('role') && $user->hasRole($request->query('role'))) {
+                \Illuminate\Support\Facades\Cookie::queue('active_dashboard_role', $request->query('role'), 60 * 24 * 365);
+            }
 
             if ($requestedRole && $user->hasRole($requestedRole)) {
                 $data['announcements'] = \App\Models\Announcement::active()
@@ -165,7 +171,9 @@ class DashboardController extends Controller
         $data['facultyRoleCount'] = $facultyRoleCount;
 
         // Determine default tab based on roles or requested active role
-        $requestedRole = request()->query('role') ?? request()->cookie('active_dashboard_role');
+        $rawCookieTabRole = request()->cookie('active_dashboard_role');
+        $cookieTabRole = is_string($rawCookieTabRole) && $rawCookieTabRole !== '' ? urldecode($rawCookieTabRole) : null;
+        $requestedRole = request()->query('role') ?: $cookieTabRole;
         if ($requestedRole === 'Supervisor' && $isSupervisor) {
             $data['defaultTab'] = 'supervision';
         } elseif ($requestedRole === 'Program Coordinator' && $isCoordinator) {

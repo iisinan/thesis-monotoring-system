@@ -1126,9 +1126,14 @@ class MilestoneWorkflowService
 
         $passCount = 0;
         $failCount = 0;
+        $numericTotals = [];
 
         foreach ($events as $event) {
             foreach ($event->evaluations as $eval) {
+                if (isset($eval->score['total']) && is_numeric($eval->score['total'])) {
+                    $numericTotals[] = (float) $eval->score['total'];
+                }
+
                 $verdict = strtolower($eval->score['verdict'] ?? $eval->recommendation ?? '');
                 if (in_array($verdict, ['pass', 'minor_revisions', 'major_revisions'])) {
                     $passCount++;
@@ -1144,6 +1149,11 @@ class MilestoneWorkflowService
             }
         }
 
+        if ($this->isInternalDefence($milestone) && !empty($numericTotals)) {
+            $avgTotal = array_sum($numericTotals) / count($numericTotals);
+            return $avgTotal >= 50 ? 'pass' : 'fail';
+        }
+
         if ($passCount === 0 && $failCount === 0) {
             return null;
         }
@@ -1153,10 +1163,17 @@ class MilestoneWorkflowService
 
     /**
      * Mark a milestone as failed, requiring candidate to repeat this milestone.
-     * Status is set to revision_required, schedule cleared, and notifications sent.
+     * For Internal Defence, deletes previous uploads, resets supervisor approvals,
+     * and clears schedule/evaluations so candidate must re-upload for supervisor
+     * approval before being rescheduled.
      */
     public function failAndRepeatMilestone(StudentMilestone $milestone, string $reason): void
     {
+        if ($this->isInternalDefence($milestone)) {
+            $this->resetInternalDefenceForRepeat($milestone, $reason, true);
+            return;
+        }
+
         $approvals = $milestone->approvals ?? [];
         $approvals[] = [
             'user_id' => auth()->id(),
@@ -1191,9 +1208,17 @@ class MilestoneWorkflowService
         };
 
         if ($type && $milestone->thesis_project_id) {
-            \App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)
+            $events = \App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)
                 ->where('type', $type)
-                ->update(['outcome' => 'fail']);
+                ->get();
+
+            foreach ($events as $event) {
+                if (in_array($type, ['proposal', 'progress_report_1', 'progress_report_2'], true)) {
+                    \App\Models\Evaluation::where('defence_event_id', $event->id)->delete();
+                    \App\Models\PanelMember::where('defence_event_id', $event->id)->update(['is_present' => false]);
+                }
+                $event->update(['outcome' => 'fail']);
+            }
         }
 
         $studentUserId = $milestone->thesis?->student?->user_id;
@@ -1235,6 +1260,122 @@ class MilestoneWorkflowService
         }
 
         $this->notifyUpdate($milestone, "Milestone evaluation outcome: FAIL. The candidate is required to repeat this stage: {$reason}");
+    }
+
+    /**
+     * Reset an Internal Defence milestone when the candidate failed or was not graded:
+     * deletes all previous uploads, clears supervisor approvals and prior evaluations,
+     * clears the defence schedule, and notifies the student to re-upload for supervisor approval.
+     */
+    public function resetInternalDefenceForRepeat(StudentMilestone $milestone, string $reason, bool $isFailure = false): void
+    {
+        $milestone->loadMissing(['submissions', 'thesis.student.user', 'thesis.assignments.supervisor', 'template']);
+
+        foreach ($milestone->submissions as $sub) {
+            if ($sub->file_url) {
+                \Illuminate\Support\Facades\Storage::delete($sub->file_url);
+                \Illuminate\Support\Facades\Storage::disk('public')->delete($sub->file_url);
+                \Illuminate\Support\Facades\Storage::disk('local')->delete($sub->file_url);
+            }
+            $sub->delete();
+        }
+
+        $approvals = $milestone->approvals ?? [];
+        if (is_string($approvals)) {
+            $approvals = json_decode($approvals, true) ?: [];
+        }
+        unset(
+            $approvals['supervisor_reviews'],
+            $approvals['presentation_concluded'],
+            $approvals['presentation_concluded_at'],
+            $approvals['presentation_concluded_by'],
+            $approvals['post_defence_submission_id'],
+            $approvals['post_defence_submitted_at'],
+            $approvals['internal_examiner_review']
+        );
+        $approvals[] = [
+            'user_id' => auth()->id(),
+            'role' => $isFailure ? 'ExaminerPanel' : 'Admin',
+            'note' => $reason,
+            'approved_at' => now()->toDateTimeString(),
+            'verdict' => $isFailure ? 'fail' : 'not_graded',
+        ];
+
+        $updateData = [
+            'status' => 'revision_required',
+            'submitted_at' => null,
+            'approved_at' => null,
+            'defence_date' => null,
+            'defence_time' => null,
+            'meeting_link' => null,
+            'approvals' => $approvals,
+            'remark' => $isFailure
+                ? "Internal Defence outcome: FAIL. Previous thesis upload removed — re-upload for supervisor approval and rescheduling: {$reason}"
+                : "Internal Defence presentation ended without grading. Previous thesis upload removed — re-upload for supervisor approval and rescheduling: {$reason}",
+        ];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('student_milestones', 'is_supervisor_approved')) {
+            $updateData['is_supervisor_approved'] = false;
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('student_milestones', 'is_submission_unlocked')
+            && $milestone->template?->submission_requires_approval) {
+            $updateData['is_submission_unlocked'] = true;
+        }
+
+        $milestone->update($updateData);
+
+        if ($milestone->thesis_project_id) {
+            $events = \App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)
+                ->where('type', 'internal')
+                ->get();
+
+            foreach ($events as $event) {
+                \App\Models\Evaluation::where('defence_event_id', $event->id)->delete();
+                \App\Models\PanelMember::where('defence_event_id', $event->id)->update(['is_present' => false]);
+                $event->update([
+                    'outcome' => $isFailure ? 'fail' : 'retry',
+                    'location' => null,
+                ]);
+            }
+        }
+
+        $studentUserId = $milestone->thesis?->student?->user_id;
+        if ($studentUserId) {
+            \Illuminate\Support\Facades\Cache::forget('user_thesis_' . $studentUserId);
+
+            try {
+                $milestoneTitle = $milestone->template?->title ?? $milestone->template?->name ?? 'Internal Defence';
+                $studentName = $milestone->thesis?->student?->user?->name ?? 'Candidate';
+                $statusText = $isFailure ? 'FAIL (Repeat Required)' : 'Not Graded (Reschedule & Re-upload Required)';
+                $introText = $isFailure
+                    ? "Following the examiner panel evaluation for your \"{$milestoneTitle}\", your average grading outcome was recorded as FAIL."
+                    : "Your scheduled \"{$milestoneTitle}\" presentation session has ended without an examiner evaluation grade recorded.";
+
+                $inboxMsg = \App\Models\InboxMessage::create([
+                    'sender_id' => auth()->id() ?? $studentUserId,
+                    'subject' => "Milestone Update: {$milestoneTitle} - {$statusText}",
+                    'body' => "Dear {$studentName},\n\n"
+                        . "{$introText}\n\n"
+                        . "Details: {$reason}\n\n"
+                        . "In accordance with institutional guidelines, your previous uploaded thesis manuscript has been cleared. You are required to re-upload your thesis manuscript for fresh supervisor review and approval before you can be scheduled for another Internal Defence.\n\n"
+                        . "Academic Portal Administration",
+                    'delivery_method' => 'in_app',
+                ]);
+
+                $inboxMsg->recipients()->attach($studentUserId, [
+                    'id' => (string) \Illuminate\Support\Str::uuid(),
+                    'recipient_type' => 'to',
+                ]);
+
+                \App\Events\MessageReceived::dispatch($inboxMsg, $studentUserId);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Failed to create inbox message on internal defence reset: ' . $e->getMessage());
+            }
+        }
+
+        $notice = $isFailure
+            ? "Internal Defence outcome: FAIL. Previous upload deleted; candidate must re-upload for supervisor approval and reschedule."
+            : "Internal Defence ended without grade. Previous upload deleted; candidate must re-upload for supervisor approval and reschedule.";
+        $this->notifyUpdate($milestone, $notice);
     }
 
     /**

@@ -55,6 +55,12 @@
             ? $milestone->thesis->defenceEvents->firstWhere('type', $checklistEventType) 
             : null;
         $evaluatorId = $checklistEvent?->evaluations?->first()?->evaluator_id;
+        $checklistInternalScores = $isInternalDefence && $checklistEvent
+            ? $checklistEvent->evaluations->map(fn($e) => data_get($e->score, 'total'))->filter(fn($v) => $v !== null)
+            : collect();
+        $checklistInternalAvg = $checklistInternalScores->isNotEmpty()
+            ? (int) round($checklistInternalScores->avg())
+            : null;
 
         $totalSteps = $isSeminar ? 3 : ($isInternalDefence ? 6 : 5);
         $completedSteps = 0;
@@ -351,9 +357,9 @@
                         <h4 class="text-sm font-bold text-slate-900">3. Presentation & Grading</h4>
                         <p class="text-xs text-slate-500 mt-1 mb-3">
                             @if($isPostDefence || $isApproved || ($isGraded && $isPass))
-                                Candidate passed internal defence evaluation.
+                                Candidate passed internal defence evaluation{{ $checklistInternalAvg !== null ? " ({$checklistInternalAvg}/100)" : '' }}.
                             @elseif($isGraded && $isFail)
-                                Candidate received a FAIL grade and must repeat internal defence.
+                                Candidate scored {{ $checklistInternalAvg !== null ? "{$checklistInternalAvg}/100 (less than 50% required)" : 'a FAIL grade' }} and must repeat internal defence.
                             @elseif($hasSchedule)
                                 Scheduled for {{ $defenceDate->format('d M Y') }} {{ $milestone->defence_time ? '• ' . \Carbon\Carbon::parse($milestone->defence_time)->format('g:i A') : '' }}
                             @else
@@ -683,19 +689,19 @@
                         <p class="text-xs text-slate-500 mt-1 mb-3">
                             @if($isGraded)
                                 @if($isPass)
-                                    Candidate passed examiner evaluation. Comments delivered to student inbox.
+                                    {{ $slug === 'proposal_defence' ? 'Proposal accepted by examiners.' : 'Candidate passed examiner evaluation.' }} Comments delivered to student inbox.
                                 @else
-                                    Candidate failed examiner evaluation. Must repeat milestone.
+                                    {{ $slug === 'proposal_defence' ? 'Proposal defence failed. Must repeat proposal defence.' : 'Candidate failed examiner evaluation. Must repeat milestone.' }}
                                 @endif
                             @else
-                                Assigned examiners must submit Pass or Fail grade.
+                                {{ $slug === 'proposal_defence' ? 'Assigned examiners must record Proposal Accepted or Fail (Repeat).' : 'Assigned examiners must submit Pass or Fail grade.' }}
                             @endif
                         </p>
                     </div>
 
                     @if($isGraded)
                         <div class="p-2.5 rounded-xl {{ $isPass ? 'bg-emerald-100/70 text-emerald-900 border border-emerald-200' : 'bg-rose-100/70 text-rose-900 border border-rose-200' }} text-center">
-                            <span class="text-xs font-black uppercase tracking-wider">Verdict: {{ strtoupper($gradingOutcome ?? 'Graded') }}</span>
+                            <span class="text-xs font-black uppercase tracking-wider">Verdict: {{ $slug === 'proposal_defence' ? ($isPass ? 'PROPOSAL ACCEPTED' : 'FAIL — REPEAT PROPOSAL DEFENCE') : strtoupper($gradingOutcome ?? 'Graded') }}</span>
                         </div>
                         @if(auth()->user()->hasRole('Student'))
                             <a href="{{ $evaluatorId ? route('inbox.index', ['user_id' => $evaluatorId]) : route('inbox.index') }}" class="mt-2 inline-flex items-center justify-center gap-1.5 w-full py-1.5 px-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-[10px] font-bold transition-colors">

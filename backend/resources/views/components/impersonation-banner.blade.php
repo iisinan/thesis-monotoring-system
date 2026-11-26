@@ -16,14 +16,23 @@
                 </p>
                 <div class="flex flex-wrap items-center gap-1.5">
                     @php
+                        $rawBannerCookie = request()->cookie('active_dashboard_role');
+                        $decodedBannerCookie = is_string($rawBannerCookie) && $rawBannerCookie !== '' ? urldecode($rawBannerCookie) : null;
                         $activeBannerRole = request()->query('role')
-                            ?? request()->cookie('active_dashboard_role')
-                            ?? $impersonatedRoles->first();
+                            ?: $decodedBannerCookie
+                            ?: $impersonatedRoles->first();
+                        $roleTabMap = [
+                            'Supervisor' => 'supervision',
+                            'Program Coordinator' => 'coordination',
+                            'Internal Examiner' => 'internal_exam',
+                            'External Examiner' => 'external_exam',
+                        ];
                     @endphp
                     @foreach($impersonatedRoles as $impRole)
                         @if(in_array($impRole, ['Student', 'Supervisor', 'Internal Examiner', 'External Examiner', 'Program Coordinator', 'Director', 'Admin']))
+                            @php $mappedTab = $roleTabMap[$impRole] ?? null; @endphp
                             <a href="{{ route('dashboard', ['role' => $impRole]) }}"
-                               onclick="localStorage.setItem('activeDashboardRole', '{{ $impRole }}'); document.cookie = 'active_dashboard_role={{ $impRole }}; path=/; max-age=31536000';"
+                               onclick="localStorage.setItem('activeDashboardRole', @js($impRole)); document.cookie = 'active_dashboard_role=' + encodeURIComponent(@js($impRole)) + '; path=/; max-age=31536000'; {{ $mappedTab ? "localStorage.setItem('facultyDashboardTab', " . \Illuminate\Support\Js::from($mappedTab) . ");" : "localStorage.removeItem('facultyDashboardTab');" }}"
                                class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border transition-colors {{ $activeBannerRole === $impRole ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700' }}"
                                title="Switch to {{ $impRole }} dashboard view">
                                 {{ $impRole }}
@@ -42,7 +51,7 @@
                     User Dashboard
                 </a>
                 <form method="POST" action="{{ route('impersonation.leave') }}" class="inline"
-                      onsubmit="localStorage.removeItem('activeDashboardRole'); document.cookie = 'active_dashboard_role=; path=/; max-age=0';">
+                      onsubmit="localStorage.removeItem('activeDashboardRole'); localStorage.removeItem('facultyDashboardTab'); document.cookie = 'active_dashboard_role=; path=/; max-age=0';">
                     @csrf
                     <button type="submit" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black uppercase tracking-wider transition-all shadow-sm cursor-pointer">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11 15l-3-3m0 0l3-3m-3 3h8M3 12a9 9 0 1118 0 9 9 0 01-18 0z" /></svg>

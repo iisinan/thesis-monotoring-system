@@ -2606,7 +2606,9 @@
                                                                 if ($count > 0) {
                                                                     $avgScore = (int) round($total / $count);
                                                                 }
-                                                                if (($passCount + $failCount) > 0) {
+                                                                if ($template->slug === 'internal_defence' && $avgScore !== null) {
+                                                                    $gradingOutcome = ($avgScore >= 50) ? 'pass' : 'fail';
+                                                                } elseif (($passCount + $failCount) > 0) {
                                                                     $gradingOutcome = ($passCount >= $failCount) ? 'pass' : 'fail';
                                                                 }
                                                             }
@@ -2923,14 +2925,22 @@
                                                                 @if($gradingOutcome === 'pass')
                                                                     <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
                                                                         <svg class="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                                                        <span>PASS</span>
-                                                                        <span class="text-[10px] text-emerald-700 font-bold ml-1">({{ $passCount }}/{{ $passCount + $failCount }})</span>
+                                                                        <span>{{ $template->slug === 'proposal_defence' ? 'ACCEPTED' : 'PASS' }}</span>
+                                                                        @if($template->slug === 'internal_defence' && $avgScore !== null)
+                                                                            <span class="text-[10px] text-emerald-700 font-bold ml-1">({{ $avgScore }}/100)</span>
+                                                                        @else
+                                                                            <span class="text-[10px] text-emerald-700 font-bold ml-1">({{ $passCount }}/{{ $passCount + $failCount }})</span>
+                                                                        @endif
                                                                     </span>
                                                                 @elseif($gradingOutcome === 'fail')
                                                                     <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-200">
                                                                         <svg class="w-3 h-3 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                                                                         <span>FAIL</span>
-                                                                        <span class="text-[10px] text-rose-700 font-bold ml-1">({{ $failCount }}/{{ $passCount + $failCount }})</span>
+                                                                        @if($template->slug === 'internal_defence' && $avgScore !== null)
+                                                                            <span class="text-[10px] text-rose-700 font-bold ml-1">({{ $avgScore }}/100)</span>
+                                                                        @else
+                                                                            <span class="text-[10px] text-rose-700 font-bold ml-1">({{ $failCount }}/{{ $passCount + $failCount }})</span>
+                                                                        @endif
                                                                     </span>
                                                                 @else
                                                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-500">

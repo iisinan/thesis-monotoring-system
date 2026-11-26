@@ -70,22 +70,221 @@
     </x-card>
 
     @php
-        $isPassFail = in_array($defenceEvent->type, ['proposal', 'progress_report_1', 'progress_report_2', 'internal']);
+        $isInternalRubric = in_array($defenceEvent->type, ['internal', 'internal_defence'], true);
+        $isPassFail = in_array($defenceEvent->type, ['proposal', 'progress_report_1', 'progress_report_2'], true);
+        $isProposal = $defenceEvent->type === 'proposal';
         $eventTypeLabel = match($defenceEvent->type) {
             'proposal' => 'Proposal Defence',
             'progress_report_1' => 'Progress Report 1 Defence',
             'progress_report_2' => 'Progress Report 2 Defence',
-            'internal' => 'Internal Defence',
+            'internal', 'internal_defence' => 'Internal Defence',
             'seminar' => 'Seminar as a Course',
             default => ucfirst(str_replace('_', ' ', $defenceEvent->type)),
         };
+        $internalSections = $isInternalRubric ? \App\Models\Evaluation::internalDefenceRubricSections() : [];
+        $initialRubricValues = [];
+        foreach ($internalSections as $sec) {
+            foreach ($sec['items'] as $itm) {
+                $initialRubricValues[$itm['key']] = old('rubric.' . $itm['key'], '');
+            }
+        }
     @endphp
+
+    @if ($errors->any())
+        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold space-y-1">
+            <p class="font-black uppercase tracking-wider text-rose-700">Please check your grading inputs:</p>
+            <ul class="list-disc list-inside space-y-0.5">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
 
     <form action="{{ route('evaluations.store', $defenceEvent) }}" method="POST" class="space-y-8">
         @csrf
 
-        @if($isPassFail)
-            {{-- Pass / Fail Grading Card for Proposal & Progress Reports --}}
+        @if($isInternalRubric)
+            <x-card title="Internal Defence Grading Rubric (100 Marks)">
+                <div x-data="{
+                        scores: {{ \Illuminate\Support\Js::from($initialRubricValues) }},
+                        sections: {{ \Illuminate\Support\Js::from($internalSections) }},
+                        warnings: {},
+                        updateScore(key, max, rawVal, el) {
+                            if (rawVal === '' || rawVal === null || rawVal === undefined) {
+                                this.scores[key] = '';
+                                delete this.warnings[key];
+                                return;
+                            }
+                            let num = parseFloat(rawVal);
+                            if (isNaN(num)) {
+                                this.scores[key] = '';
+                                if (el) el.value = '';
+                                delete this.warnings[key];
+                                return;
+                            }
+                            if (num < 0) {
+                                num = 0;
+                                this.warnings[key] = 'Min mark is 0';
+                            } else if (num > max) {
+                                num = max;
+                                this.warnings[key] = 'Max mark is ' + max;
+                            } else {
+                                delete this.warnings[key];
+                            }
+                            this.scores[key] = String(num);
+                            if (el && String(el.value) !== String(num)) {
+                                el.value = num;
+                            }
+                        },
+                        validateBeforeSubmit(event) {
+                            for (const sec of this.sections) {
+                                for (const item of sec.items) {
+                                    const raw = this.scores[item.key];
+                                    const val = parseFloat(raw);
+                                    if (raw === '' || isNaN(val) || val < 0 || val > item.max) {
+                                        this.updateScore(item.key, item.max, raw);
+                                        event.preventDefault();
+                                        alert(item.label + ' must be between 0 and ' + item.max + ' marks.');
+                                        return false;
+                                    }
+                                }
+                            }
+                            if (this.grandTotal > 100) {
+                                event.preventDefault();
+                                alert('Overall total score cannot exceed 100 marks.');
+                                return false;
+                            }
+                            return true;
+                        },
+                        sectionTotal(sec) {
+                            return sec.items.reduce((sum, item) => {
+                                const val = Math.min(item.max, Math.max(0, parseFloat(this.scores[item.key]) || 0));
+                                return sum + val;
+                            }, 0);
+                        },
+                        get grandTotal() {
+                            const total = Math.round(this.sections.reduce((sum, sec) => sum + this.sectionTotal(sec), 0) * 100) / 100;
+                            return Math.min(100, total);
+                        },
+                        get isPass() {
+                            return this.grandTotal >= 50;
+                        }
+                    }"
+                    class="space-y-6 p-1 sm:p-2">
+
+                    <div class="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div class="text-xs text-indigo-950 space-y-1">
+                            <p class="font-black uppercase tracking-wider text-indigo-800">Grading Rule (Internal Defence)</p>
+                            <p class="text-indigo-700 font-medium">Award points for each criterion below (100 total). <strong>Less than 50% (&lt; 50) = FAIL</strong>; <strong>at least 50% (&ge; 50) = PASS</strong> (candidate proceeds to upload corrections).</p>
+                            <p class="text-[11px] font-semibold text-emerald-700">✔ Submitting this evaluation will officially record your attendance as Present.</p>
+                        </div>
+                        <div class="flex items-center gap-3 shrink-0 bg-white px-4 py-2.5 rounded-2xl border border-indigo-200 shadow-xs">
+                            <div class="text-right">
+                                <p class="text-[10px] font-black uppercase tracking-wider text-slate-400">Live Total</p>
+                                <p class="text-2xl font-black text-slate-900 leading-none"><span x-text="grandTotal"></span><span class="text-sm text-slate-400"> / 100</span></p>
+                            </div>
+                            <span :class="isPass ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-100 text-rose-800 border-rose-300'"
+                                  class="px-3 py-1.5 rounded-xl border text-xs font-black uppercase tracking-wider"
+                                  x-text="isPass ? 'PASS' : 'FAIL'"></span>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200 shadow-xs">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-900 text-white text-[11px] font-black uppercase tracking-wider">
+                                    <th class="px-4 py-3 border-r border-slate-700 w-14 text-center">S/N</th>
+                                    <th class="px-4 py-3 border-r border-slate-700">Grading of the Project</th>
+                                    <th class="px-4 py-3 border-r border-slate-700 w-36 text-center">Maximum Points</th>
+                                    <th class="px-4 py-3 w-40 text-center">Points Awarded</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 text-xs bg-white">
+                                @foreach($internalSections as $secIdx => $section)
+                                    <tr class="bg-slate-50/90">
+                                        <td class="px-4 py-3 font-black text-slate-800 text-center border-r border-slate-200 align-top">{{ $section['sn'] }}</td>
+                                        <td class="px-4 py-3 font-black text-slate-900 border-r border-slate-200">{{ $section['title'] }}</td>
+                                        <td class="px-4 py-3 font-black text-slate-900 text-center border-r border-slate-200">{{ $section['max'] }}</td>
+                                        <td class="px-4 py-3 font-black text-indigo-700 text-center">
+                                            <span x-text="Math.round(sectionTotal(sections[{{ $secIdx }}]) * 100) / 100"></span> / {{ $section['max'] }}
+                                        </td>
+                                    </tr>
+                                    @foreach($section['items'] as $item)
+                                        <tr class="hover:bg-slate-50/50 transition-colors">
+                                            <td class="px-4 py-2.5 border-r border-slate-200"></td>
+                                            <td class="px-4 py-2.5 text-slate-700 font-medium border-r border-slate-200">
+                                                <div class="flex items-center justify-between gap-3">
+                                                    <span>{{ $item['label'] }}</span>
+                                                    <span class="text-[11px] font-bold text-slate-400 shrink-0">({{ $item['max'] }})</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-2.5 text-center font-bold text-slate-400 border-r border-slate-200">Max {{ $item['max'] }}</td>
+                                            <td class="px-4 py-2 text-center">
+                                                <div class="inline-flex flex-col items-center">
+                                                    <input type="number"
+                                                           name="rubric[{{ $item['key'] }}]"
+                                                           :value="scores['{{ $item['key'] }}']"
+                                                           @input="updateScore('{{ $item['key'] }}', {{ $item['max'] }}, $event.target.value, $event.target)"
+                                                           @change="updateScore('{{ $item['key'] }}', {{ $item['max'] }}, $event.target.value, $event.target)"
+                                                           @keydown="if (['-', '+', 'e', 'E'].includes($event.key)) $event.preventDefault()"
+                                                           @wheel.prevent
+                                                           min="0"
+                                                           max="{{ $item['max'] }}"
+                                                           step="0.5"
+                                                           required
+                                                           placeholder="0–{{ $item['max'] }}"
+                                                           :class="warnings['{{ $item['key'] }}'] ? 'border-rose-500 ring-2 ring-rose-200' : 'border-slate-300'"
+                                                           class="w-24 text-center font-black text-sm bg-white border rounded-xl py-1.5 px-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors">
+                                                    <span x-show="warnings['{{ $item['key'] }}']"
+                                                          x-text="warnings['{{ $item['key'] }}']"
+                                                          x-cloak
+                                                          class="mt-1 text-[10px] font-bold text-rose-600 leading-tight"></span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                @endforeach
+                                <tr class="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                                    <td class="px-4 py-3.5 border-r border-slate-200"></td>
+                                    <td class="px-4 py-3.5 text-sm uppercase tracking-wider border-r border-slate-200 text-right">TOTAL</td>
+                                    <td class="px-4 py-3.5 text-base text-center border-r border-slate-200">100</td>
+                                    <td class="px-4 py-3.5 text-center">
+                                        <div class="text-base font-black" :class="isPass ? 'text-emerald-700' : 'text-rose-700'">
+                                            <span x-text="grandTotal"></span> / 100
+                                        </div>
+                                        <div class="text-[10px] font-black uppercase tracking-wider mt-0.5" :class="isPass ? 'text-emerald-700' : 'text-rose-700'">
+                                            GRADE: <span x-text="isPass ? 'PASS' : 'FAIL'"></span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-xs font-black text-slate-700 uppercase tracking-wider">General Comments <span class="text-slate-400 font-semibold">(Optional)</span></label>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                Sent to Student Inbox
+                            </span>
+                        </div>
+                        <textarea name="comments" rows="5"
+                            class="w-full bg-slate-50 border border-slate-200 rounded-2xl text-sm p-4 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all placeholder:text-slate-400 font-medium"
+                            placeholder="Enter general comments, observations, or required corrections for the candidate (optional)...">{{ old('comments') }}</textarea>
+                    </div>
+
+                    <div class="mt-8 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4 border-t border-slate-100 pt-6">
+                        <a href="{{ route('dashboard') }}" class="w-full sm:w-auto text-center px-6 py-3 text-xs font-black text-slate-600 uppercase tracking-widest hover:bg-slate-100 rounded-xl transition-colors">Cancel</a>
+                        <button type="submit" @click="validateBeforeSubmit($event)" class="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary-500/20 transition-all active:scale-95 cursor-pointer">
+                            Submit Internal Defence Score &amp; Mark Attendance
+                        </button>
+                    </div>
+                </div>
+            </x-card>
+        @elseif($isPassFail)
+            {{-- Pass / Fail Grading Card for Proposal Defence & Progress Reports 1 & 2 --}}
             <x-card title="Official Grading & Verdict: {{ $eventTypeLabel }}">
                 <div class="space-y-6 p-2">
                     <div class="p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl flex items-start gap-3">
@@ -94,7 +293,11 @@
                         </div>
                         <div class="text-xs text-indigo-950">
                             <p class="font-bold">Grading Protocol:</p>
-                            <p class="mt-0.5 text-indigo-700">Please assign either <strong>PASS</strong> or <strong>FAIL</strong> for this defence session. An average grade of Pass across examiners is required for the candidate to advance to the next milestone. If the average is Fail, the candidate must repeat this milestone.</p>
+                            @if($isProposal)
+                                <p class="mt-0.5 text-indigo-700">Select <strong>Proposal Accepted</strong> if the candidate's proposal passes, or <strong>Fail — Repeat Proposal Defence</strong> if the candidate must repeat this stage.</p>
+                            @else
+                                <p class="mt-0.5 text-indigo-700">Select <strong>PASS</strong> to proceed to the next milestone once Admin ends the presentation, or <strong>FAIL</strong> to repeat this presentation without moving to the next milestone.</p>
+                            @endif
                             <p class="mt-1 text-[11px] font-semibold text-emerald-700">✔ Submitting this evaluation will officially record your attendance as Present.</p>
                         </div>
                     </div>
@@ -102,32 +305,40 @@
                     <div>
                         <label class="block text-xs font-black text-slate-700 uppercase tracking-wider mb-3">Select Verdict <span class="text-rose-500">*</span></label>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {{-- PASS Option --}}
+                            {{-- PASS / ACCEPTED Option --}}
                             <label class="cursor-pointer group relative flex flex-col items-center justify-center p-6 border-2 border-slate-200 rounded-3xl hover:border-emerald-500 transition-all bg-white has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50/70 has-[:checked]:ring-4 has-[:checked]:ring-emerald-500/20 shadow-sm">
-                                <input type="radio" name="verdict" value="pass" class="peer sr-only" required>
+                                <input type="radio" name="verdict" value="pass" {{ old('verdict') === 'pass' ? 'checked' : '' }} class="peer sr-only" required>
                                 <div class="w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </div>
-                                <span class="text-lg font-black text-slate-800 uppercase tracking-wider peer-checked:text-emerald-700">PASS</span>
-                                <span class="text-xs font-semibold text-slate-500 mt-1 text-center">Candidate meets requirements and is recommended to advance</span>
+                                <span class="text-lg font-black text-slate-800 uppercase tracking-wider peer-checked:text-emerald-700 text-center">
+                                    {{ $isProposal ? 'Proposal Accepted' : 'PASS' }}
+                                </span>
+                                <span class="text-xs font-semibold text-slate-500 mt-1 text-center">
+                                    {{ $isProposal ? 'Proposal accepted — proceeds to next milestone after Admin ends presentation' : 'Proceed to next milestone after Admin has ended the presentation' }}
+                                </span>
                             </label>
 
                             {{-- FAIL Option --}}
                             <label class="cursor-pointer group relative flex flex-col items-center justify-center p-6 border-2 border-slate-200 rounded-3xl hover:border-rose-500 transition-all bg-white has-[:checked]:border-rose-600 has-[:checked]:bg-rose-50/70 has-[:checked]:ring-4 has-[:checked]:ring-rose-500/20 shadow-sm">
-                                <input type="radio" name="verdict" value="fail" class="peer sr-only" required>
+                                <input type="radio" name="verdict" value="fail" {{ old('verdict') === 'fail' ? 'checked' : '' }} class="peer sr-only" required>
                                 <div class="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                 </div>
-                                <span class="text-lg font-black text-slate-800 uppercase tracking-wider peer-checked:text-rose-700">FAIL</span>
-                                <span class="text-xs font-semibold text-slate-500 mt-1 text-center">Candidate requires major revisions and must repeat this milestone</span>
+                                <span class="text-lg font-black text-slate-800 uppercase tracking-wider peer-checked:text-rose-700 text-center">
+                                    {{ $isProposal ? 'Fail — Repeat Proposal Defence' : 'FAIL' }}
+                                </span>
+                                <span class="text-xs font-semibold text-slate-500 mt-1 text-center">
+                                    {{ $isProposal ? 'Proposal not accepted — candidate must repeat proposal defence' : 'Candidate must repeat this presentation and will not move to the next milestone' }}
+                                </span>
                             </label>
                         </div>
                     </div>
 
-                    {{-- Examiner Comments --}}
+                    {{-- Examiner Comments (Optional) --}}
                     <div>
                         <div class="flex items-center justify-between mb-2">
-                            <label class="block text-xs font-black text-slate-700 uppercase tracking-wider">Examiner Comments & Feedback</label>
+                            <label class="block text-xs font-black text-slate-700 uppercase tracking-wider">Comments <span class="text-slate-400 font-semibold">(Optional)</span></label>
                             <span class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                                 <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                 Sent to Student Inbox
@@ -135,13 +346,13 @@
                         </div>
                         <textarea name="comments" rows="6" 
                             class="w-full bg-slate-50 border border-slate-200 rounded-2xl text-sm p-4 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all placeholder:text-slate-400 font-medium" 
-                            placeholder="Provide your constructive feedback, corrections, and observations. These comments will appear directly in the student's personal message inbox..."></textarea>
+                            placeholder="Optional constructive feedback, corrections, and observations...">{{ old('comments') }}</textarea>
                     </div>
 
                     <div class="mt-8 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4 border-t border-slate-100 pt-6">
                         <a href="{{ route('dashboard') }}" class="w-full sm:w-auto text-center px-6 py-3 text-xs font-black text-slate-600 uppercase tracking-widest hover:bg-slate-100 rounded-xl transition-colors">Cancel</a>
                         <button type="submit" class="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary-500/20 transition-all active:scale-95 cursor-pointer">
-                            Submit Grade & Mark Attendance
+                            Submit Grade &amp; Mark Attendance
                         </button>
                     </div>
                 </div>
@@ -157,7 +368,7 @@
                             <p class="text-[10px] font-medium text-slate-500 max-w-sm">Does the thesis provide a novel contribution to the field of study?</p>
                         </div>
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <input type="number" name="score[originality]" min="0" max="25" required class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
+                            <input type="number" name="score[originality]" min="0" max="25" required oninput="if(this.value !== '' && parseFloat(this.value) > 25) this.value = 25; if(this.value !== '' && parseFloat(this.value) < 0) this.value = 0;" onwheel="return false;" class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
                             <span class="text-xs font-black text-slate-400">/ 25</span>
                         </div>
                     </div>
@@ -168,7 +379,7 @@
                             <p class="text-[10px] font-medium text-slate-500 max-w-sm">Are the research methods appropriate, correctly applied, and rigorous?</p>
                         </div>
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <input type="number" name="score[methodology]" min="0" max="25" required class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
+                            <input type="number" name="score[methodology]" min="0" max="25" required oninput="if(this.value !== '' && parseFloat(this.value) > 25) this.value = 25; if(this.value !== '' && parseFloat(this.value) < 0) this.value = 0;" onwheel="return false;" class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
                             <span class="text-xs font-black text-slate-400">/ 25</span>
                         </div>
                     </div>
@@ -179,7 +390,7 @@
                             <p class="text-[10px] font-medium text-slate-500 max-w-sm">Is the thesis well-written, structured logically, and correctly formatted?</p>
                         </div>
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <input type="number" name="score[presentation]" min="0" max="25" required class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
+                            <input type="number" name="score[presentation]" min="0" max="25" required oninput="if(this.value !== '' && parseFloat(this.value) > 25) this.value = 25; if(this.value !== '' && parseFloat(this.value) < 0) this.value = 0;" onwheel="return false;" class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
                             <span class="text-xs font-black text-slate-400">/ 25</span>
                         </div>
                     </div>
@@ -190,7 +401,7 @@
                             <p class="text-[10px] font-medium text-slate-500 max-w-sm">How well did the candidate defend their work against panel questions?</p>
                         </div>
                         <div class="flex items-center gap-2 self-end sm:self-auto">
-                            <input type="number" name="score[qa]" min="0" max="25" required class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
+                            <input type="number" name="score[qa]" min="0" max="25" required oninput="if(this.value !== '' && parseFloat(this.value) > 25) this.value = 25; if(this.value !== '' && parseFloat(this.value) < 0) this.value = 0;" onwheel="return false;" class="w-20 text-center text-lg font-black bg-white border-slate-200 rounded-xl focus:ring-primary-500" placeholder="0-25">
                             <span class="text-xs font-black text-slate-400">/ 25</span>
                         </div>
                     </div>

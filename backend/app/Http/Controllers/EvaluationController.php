@@ -44,9 +44,69 @@ class EvaluationController extends Controller
             abort(403);
         }
 
-        $isPassFail = in_array($defenceEvent->type, ['proposal', 'progress_report_1', 'progress_report_2', 'internal']) || $request->has('verdict');
+        $isInternalRubric = in_array($defenceEvent->type, ['internal', 'internal_defence'], true) && !$request->has('verdict');
+        $isPassFail = in_array($defenceEvent->type, ['proposal', 'progress_report_1', 'progress_report_2'], true) || $request->has('verdict');
 
-        if ($isPassFail) {
+        if ($isInternalRubric) {
+            $sections = Evaluation::internalDefenceRubricSections();
+            $rules = [
+                'comments' => 'nullable|string|max:5000',
+            ];
+            $attributes = [];
+            $messages = [];
+            foreach ($sections as $section) {
+                foreach ($section['items'] as $item) {
+                    $field = 'rubric.' . $item['key'];
+                    $rules[$field] = 'required|numeric|min:0|max:' . $item['max'];
+                    $attributes[$field] = $item['label'];
+                    $messages[$field . '.max'] = "{$item['label']} cannot exceed {$item['max']} marks.";
+                    $messages[$field . '.min'] = "{$item['label']} cannot be less than 0 marks.";
+                }
+            }
+
+            $validated = $request->validate($rules, $messages, $attributes);
+            $rubricInput = $validated['rubric'] ?? [];
+
+            $score = [
+                'rubric_version' => 'internal_defence_v1',
+                'sections' => [],
+            ];
+            $total = 0.0;
+
+            foreach ($sections as $section) {
+                $sectionSum = 0.0;
+                foreach ($section['items'] as $item) {
+                    $val = round((float) ($rubricInput[$item['key']] ?? 0), 2);
+                    if ($val < 0 || $val > $item['max']) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'rubric.' . $item['key'] => "{$item['label']} cannot exceed {$item['max']} marks.",
+                        ]);
+                    }
+                    $score[$item['key']] = $val;
+                    $sectionSum += $val;
+                }
+                $sectionSum = round($sectionSum, 2);
+                if ($sectionSum > $section['max']) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'rubric' => "{$section['title']} total ({$sectionSum}) cannot exceed {$section['max']} marks.",
+                    ]);
+                }
+                $score['sections'][$section['key']] = $sectionSum;
+                $total += $sectionSum;
+            }
+
+            $total = round($total, 2);
+            if ($total > 100) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'rubric' => "Overall total score ({$total}) cannot exceed 100 marks.",
+                ]);
+            }
+            $verdict = $total >= 50 ? 'pass' : 'fail';
+            $score['total'] = $total;
+            $score['verdict'] = $verdict;
+            $recommendation = $verdict;
+            $comments = $validated['comments'] ?? null;
+        } elseif ($isPassFail) {
             $validated = $request->validate([
                 'verdict' => 'required|in:pass,fail',
                 'comments' => 'nullable|string|max:5000',
@@ -124,11 +184,19 @@ class EvaluationController extends Controller
                 default => ucfirst(str_replace('_', ' ', $defenceEvent->type)),
             };
 
-            $verdictUpper = strtoupper($recommendation);
+            if ($defenceEvent->type === 'proposal') {
+                $verdictUpper = $recommendation === 'pass' ? 'PROPOSAL ACCEPTED' : 'FAIL (REPEAT PROPOSAL DEFENCE)';
+            } elseif ($isInternalRubric) {
+                $verdictUpper = strtoupper($recommendation) . " ({$score['total']}/100)";
+            } else {
+                $verdictUpper = strtoupper($recommendation);
+            }
             $subject = "Evaluation Feedback: {$milestoneLabel} - {$verdictUpper}";
 
+            $scoreLine = $isInternalRubric ? "Total Score: {$score['total']} / 100\n" : '';
             $body = "Dear {$studentUser->name},\n\n"
                   . "Your {$milestoneLabel} defence has been evaluated by examiner {$examiner->name}.\n\n"
+                  . $scoreLine
                   . "Result: {$verdictUpper}\n\n"
                   . "Examiner Comments & Feedback:\n"
                   . (!empty($comments) ? $comments : "No additional written comments provided.") . "\n\n"
@@ -219,8 +287,9 @@ class EvaluationController extends Controller
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.evaluation', compact('evaluation'));
         
-        $filename = 'Evaluation_' . $evaluation->defenceEvent->thesis->student->user->name . '_' . $evaluation->id . '.pdf';
-        
-        return $pdf->download(str_replace(' ', '_', $filename));
+        $studentNameSlug = preg_replace('/[^A-Za-z0-9._-]+/', '_', $evaluation->defenceEvent->thesis->student->user->name ?? 'Candidate');
+        $filename = 'Evaluation_' . trim($studentNameSlug, '_') . '_' . $evaluation->id . '.pdf';
+
+        return $pdf->download($filename);
     }
 }

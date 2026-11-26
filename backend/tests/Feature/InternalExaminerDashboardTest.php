@@ -663,4 +663,39 @@ class InternalExaminerDashboardTest extends TestCase
             ->assertSee('Submitted Evaluation Records')
             ->assertSee('1 Completed');
     }
+
+    #[Test]
+    public function role_switcher_redirects_from_coordinator_subpages_and_switches_dashboard_tab(): void
+    {
+        $ctx = $this->setupInternalExaminerScenario(false);
+        $ctx['examinerUser']->assignRole(['Supervisor', 'Program Coordinator']);
+
+        $assignedPage = $this->actingAs($ctx['examinerUser'])
+            ->get(route('coordinator.assigned-supervisors.index'));
+        $assignedPage->assertOk();
+        $assignedPage->assertSee('My Roles');
+        $assignedPage->assertDontSee("window.location.pathname.endsWith('/dashboard')");
+
+        $supDash = $this->actingAs($ctx['examinerUser'])
+            ->get(route('dashboard', ['role' => 'Supervisor']));
+        $supDash->assertOk();
+        $supDash->assertSee("activeTab: 'supervision'", false);
+
+        $ieDash = $this->actingAs($ctx['examinerUser'])
+            ->get(route('dashboard', ['role' => 'Internal Examiner']));
+        $ieDash->assertOk();
+        $ieDash->assertSee("activeTab: 'internal_exam'", false);
+
+        $coordDash = $this->actingAs($ctx['examinerUser'])
+            ->get(route('dashboard', ['role' => 'Program Coordinator']));
+        $coordDash->assertOk();
+        $coordDash->assertSee("activeTab: 'coordination'", false);
+
+        // Plain-text cookie written by JS (active_dashboard_role) is respected by Laravel unencrypted
+        $cookieDash = $this->actingAs($ctx['examinerUser'])
+            ->withUnencryptedCookie('active_dashboard_role', 'Internal%20Examiner')
+            ->get(route('dashboard'));
+        $cookieDash->assertOk();
+        $cookieDash->assertSee("activeTab: 'internal_exam'", false);
+    }
 }

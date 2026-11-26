@@ -2,7 +2,9 @@
     $userRoles = Auth::user()->getRoleNames();
     $hasMultipleRoles = $userRoles->count() > 1;
     $rolesJson = json_encode($userRoles->values());
-    $requestedRole = request('role') ?? request()->cookie('active_dashboard_role');
+    $rawCookieRole = request()->cookie('active_dashboard_role');
+    $cookieRole = is_string($rawCookieRole) && $rawCookieRole !== '' ? urldecode($rawCookieRole) : null;
+    $requestedRole = request('role') ?: $cookieRole;
     $primaryRole = ($requestedRole && $userRoles->contains($requestedRole))
         ? $requestedRole
         : ($userRoles->first() ?? 'Student');
@@ -18,14 +20,14 @@ x-init="
     if (urlParam && roles.includes(urlParam)) {
         activeRole = urlParam;
         localStorage.setItem('activeDashboardRole', urlParam);
-        document.cookie = 'active_dashboard_role=' + urlParam + '; path=/; max-age=31536000';
+        document.cookie = 'active_dashboard_role=' + encodeURIComponent(urlParam) + '; path=/; max-age=31536000';
     } else {
         const saved = localStorage.getItem('activeDashboardRole');
-        activeRole = (saved && roles.includes(saved)) ? saved : '{{ $primaryRole }}';
+        activeRole = (saved && roles.includes(saved)) ? saved : @js($primaryRole);
     }
     $watch('activeRole', val => { 
         localStorage.setItem('activeDashboardRole', val); 
-        document.cookie = 'active_dashboard_role=' + val + '; path=/; max-age=31536000';
+        document.cookie = 'active_dashboard_role=' + encodeURIComponent(val) + '; path=/; max-age=31536000';
         window.dispatchEvent(new CustomEvent('role-changed', {detail: val})); 
     });
 ">
@@ -35,13 +37,23 @@ x-init="
         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 block">My Roles</label>
         <div class="flex flex-col gap-1.5">
             @foreach($userRoles as $role)
-                <button @click="
-                        activeRole = '{{ $role }}';
-                        document.cookie = 'active_dashboard_role={{ $role }}; path=/; max-age=31536000';
-                        localStorage.setItem('activeDashboardRole', '{{ $role }}');
-                        if (window.location.pathname.endsWith('/dashboard') || window.location.pathname === '/dashboard') {
-                            window.location.href = '{{ route('dashboard') }}?role={{ $role }}';
+                <button type="button" @click="
+                        const targetRole = @js($role);
+                        activeRole = targetRole;
+                        document.cookie = 'active_dashboard_role=' + encodeURIComponent(targetRole) + '; path=/; max-age=31536000';
+                        localStorage.setItem('activeDashboardRole', targetRole);
+                        const roleTabMap = {
+                            'Supervisor': 'supervision',
+                            'Program Coordinator': 'coordination',
+                            'Internal Examiner': 'internal_exam',
+                            'External Examiner': 'external_exam'
+                        };
+                        if (roleTabMap[targetRole]) {
+                            localStorage.setItem('facultyDashboardTab', roleTabMap[targetRole]);
+                        } else {
+                            localStorage.removeItem('facultyDashboardTab');
                         }
+                        window.location.href = @js(route('dashboard')) + '?role=' + encodeURIComponent(targetRole);
                     "
                     :class="activeRole === '{{ $role }}' ? 'bg-green-600 text-white border-green-700 shadow-md' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-green-50 hover:text-green-700'"
                     class="w-full text-left px-3 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center justify-between">
