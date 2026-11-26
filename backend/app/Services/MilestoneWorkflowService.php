@@ -1126,9 +1126,14 @@ class MilestoneWorkflowService
 
         $passCount = 0;
         $failCount = 0;
+        $numericTotals = [];
 
         foreach ($events as $event) {
             foreach ($event->evaluations as $eval) {
+                if (isset($eval->score['total']) && is_numeric($eval->score['total'])) {
+                    $numericTotals[] = (float) $eval->score['total'];
+                }
+
                 $verdict = strtolower($eval->score['verdict'] ?? $eval->recommendation ?? '');
                 if (in_array($verdict, ['pass', 'minor_revisions', 'major_revisions'])) {
                     $passCount++;
@@ -1142,6 +1147,11 @@ class MilestoneWorkflowService
                     }
                 }
             }
+        }
+
+        if ($this->isInternalDefence($milestone) && !empty($numericTotals)) {
+            $avgTotal = array_sum($numericTotals) / count($numericTotals);
+            return $avgTotal >= 50 ? 'pass' : 'fail';
         }
 
         if ($passCount === 0 && $failCount === 0) {
@@ -1198,9 +1208,17 @@ class MilestoneWorkflowService
         };
 
         if ($type && $milestone->thesis_project_id) {
-            \App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)
+            $events = \App\Models\DefenceEvent::where('thesis_project_id', $milestone->thesis_project_id)
                 ->where('type', $type)
-                ->update(['outcome' => 'fail']);
+                ->get();
+
+            foreach ($events as $event) {
+                if (in_array($type, ['proposal', 'progress_report_1', 'progress_report_2'], true)) {
+                    \App\Models\Evaluation::where('defence_event_id', $event->id)->delete();
+                    \App\Models\PanelMember::where('defence_event_id', $event->id)->update(['is_present' => false]);
+                }
+                $event->update(['outcome' => 'fail']);
+            }
         }
 
         $studentUserId = $milestone->thesis?->student?->user_id;

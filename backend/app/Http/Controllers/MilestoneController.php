@@ -910,14 +910,29 @@ class MilestoneController extends Controller
             }
         }
 
-        // Send Portal Inbox notification to assigned Supervisors (or Internal Examiner for post-defence)
+        // Send Portal Inbox notification (and email to Internal Examiner for post-defence corrections)
         try {
             $studentUser = Auth::user();
             $milestoneTitle = $milestone->template?->name ?? 'Milestone Submission';
             $inboxRecipientIds = collect();
+            $internalExaminerUsers = collect();
 
-            if ($isPostDefenceStage && $milestone->thesis->internalExaminer && $milestone->thesis->internalExaminer->user_id) {
-                $inboxRecipientIds->push($milestone->thesis->internalExaminer->user_id);
+            if ($isPostDefenceStage) {
+                if ($milestone->thesis->internalExaminer && $milestone->thesis->internalExaminer->user) {
+                    $internalExaminerUsers->push($milestone->thesis->internalExaminer->user);
+                }
+                $assignedInternalExaminerIds = \App\Models\ExaminerAssignment::where('thesis_project_id', $milestone->thesis_project_id)
+                    ->where('type', 'internal_examiner')
+                    ->pluck('examiner_id')
+                    ->filter()
+                    ->all();
+                if (!empty($assignedInternalExaminerIds)) {
+                    $internalExaminerUsers = $internalExaminerUsers->merge(
+                        \App\Models\User::whereIn('id', $assignedInternalExaminerIds)->get()
+                    );
+                }
+                $internalExaminerUsers = $internalExaminerUsers->unique('id')->filter();
+                $inboxRecipientIds = $internalExaminerUsers->pluck('id');
             } else {
                 foreach ($milestone->thesis->assignments as $assignment) {
                     if ($assignment->status === 'active' && $assignment->supervisor?->user_id) {
@@ -928,27 +943,49 @@ class MilestoneController extends Controller
 
             $inboxRecipientIds = $inboxRecipientIds->unique()->filter();
             if ($inboxRecipientIds->isNotEmpty() && $studentUser) {
-                $inboxMsg = \App\Models\InboxMessage::create([
-                    'sender_id' => $studentUser->id,
-                    'subject' => "Thesis Submission Ready for Review: {$studentUser->name} ({$milestoneTitle})",
-                    'body' => "Dear Supervisor,\n\n"
+                if ($isPostDefenceStage && $createdManuscriptSub) {
+                    $subject = "Post-Defence Correction Uploaded for Review: {$studentUser->name}";
+                    $body = "Dear Internal Examiner,\n\n"
+                        . "{$studentUser->name} ({$milestone->thesis?->student?->student_id_number}) has uploaded a corrected thesis manuscript"
+                        . (!empty($milestone->thesis?->title) ? " titled \"{$milestone->thesis->title}\"" : "") . " for post-defence review.\n\n"
+                        . "Please open your Internal Examiner Dashboard or the candidate's dossier to review and Approve for Viva or Request Further Corrections.\n\n"
+                        . "ACETEL Academic Portal";
+                } else {
+                    $subject = "Thesis Submission Ready for Review: {$studentUser->name} ({$milestoneTitle})";
+                    $body = "Dear Supervisor,\n\n"
                         . "{$studentUser->name} ({$milestone->thesis?->student?->student_id_number}) has uploaded a submission for \"{$milestoneTitle}\""
                         . (!empty($milestone->thesis?->title) ? " titled \"{$milestone->thesis->title}\"" : "") . ".\n\n"
                         . "Please open your Supervisor Dashboard or the candidate's Milestones page to review and Approve or Reject (Request Revision) the uploaded thesis manuscript.\n\n"
-                        . "ACETEL Academic Portal",
+                        . "ACETEL Academic Portal";
+                }
+
+                $inboxMsg = \App\Models\InboxMessage::create([
+                    'sender_id' => $studentUser->id,
+                    'subject' => $subject,
+                    'body' => $body,
                     'delivery_method' => 'in_app',
                 ]);
 
-                foreach ($inboxRecipientIds as $supUserId) {
-                    $inboxMsg->recipients()->attach($supUserId, [
+                foreach ($inboxRecipientIds as $recipientUserId) {
+                    $inboxMsg->recipients()->attach($recipientUserId, [
                         'id' => (string) \Illuminate\Support\Str::uuid(),
                         'recipient_type' => 'to',
                     ]);
-                    \App\Events\MessageReceived::dispatch($inboxMsg, $supUserId);
+                    \App\Events\MessageReceived::dispatch($inboxMsg, $recipientUserId);
+                }
+            }
+
+            if ($isPostDefenceStage && $createdManuscriptSub && $internalExaminerUsers->isNotEmpty()) {
+                foreach ($internalExaminerUsers as $examinerUser) {
+                    try {
+                        $examinerUser->notify(new \App\Notifications\PostDefenceCorrectionUploaded($milestone, $createdManuscriptSub));
+                    } catch (\Throwable $mailErr) {
+                        \Illuminate\Support\Facades\Log::warning("Failed to email internal examiner on post-defence correction upload: " . $mailErr->getMessage());
+                    }
                 }
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning("Failed to send supervisor inbox notification on milestone submission: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning("Failed to send inbox/email notification on milestone submission: " . $e->getMessage());
         }
 
         // Invalidate student dashboard query cache

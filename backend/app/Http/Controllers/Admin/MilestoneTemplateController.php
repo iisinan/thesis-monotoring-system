@@ -2549,15 +2549,34 @@ class MilestoneTemplateController extends Controller
                     };
                     $event = $eventType ? current($milestone->thesis->defenceEvents->where('type', $eventType)->all()) : null;
                     if ($event && $event->evaluations->count() > 0) {
-                        $passCount = 0;
-                        $failCount = 0;
-                        foreach($event->evaluations as $eval) {
-                            $verdict = strtolower($eval->verdict ?? $eval->recommendation ?? '');
-                            if (in_array($verdict, ['pass', 'minor_revisions', 'major_revisions'])) $passCount++;
-                            elseif ($verdict === 'fail') $failCount++;
+                        if ($template->slug === 'internal_defence') {
+                            $total = 0;
+                            $count = 0;
+                            foreach ($event->evaluations as $eval) {
+                                if (isset($eval->score['total'])) {
+                                    $total += (int) $eval->score['total'];
+                                    $count++;
+                                }
+                            }
+                            if ($count > 0) {
+                                $avgNum = (int) round($total / $count);
+                                $avgScore = ($avgNum >= 50 ? 'PASS' : 'FAIL') . " ({$avgNum}/100)";
+                            }
                         }
-                        if ($passCount + $failCount > 0) {
-                            $avgScore = ($passCount >= $failCount ? 'PASS' : 'FAIL') . " ({$passCount}/" . ($passCount + $failCount) . ")";
+
+                        if ($avgScore === 'N/A') {
+                            $passCount = 0;
+                            $failCount = 0;
+                            foreach($event->evaluations as $eval) {
+                                $verdict = strtolower($eval->verdict ?? $eval->recommendation ?? '');
+                                if ($verdict === 'pass') $passCount++;
+                                elseif ($verdict === 'fail') $failCount++;
+                            }
+                            if ($passCount + $failCount > 0) {
+                                $passLabel = $template->slug === 'proposal_defence' ? 'PROPOSAL ACCEPTED' : 'PASS';
+                                $failLabel = $template->slug === 'proposal_defence' ? 'FAIL (REPEAT)' : 'FAIL';
+                                $avgScore = ($passCount >= $failCount ? $passLabel : $failLabel) . " ({$passCount}/" . ($passCount + $failCount) . ")";
+                            }
                         }
                     }
                 }
@@ -2732,15 +2751,34 @@ class MilestoneTemplateController extends Controller
                 $event = current($milestone->thesis->defenceEvents->where('type', $eventType)->all());
                 if ($event && $event->evaluations->count() > 0) {
                     if ($isPassFail) {
-                        $passCount = 0;
-                        $failCount = 0;
-                        foreach($event->evaluations as $eval) {
-                            $verdict = strtolower($eval->verdict ?? $eval->recommendation ?? '');
-                            if ($verdict === 'pass') $passCount++;
-                            elseif ($verdict === 'fail') $failCount++;
+                        if ($template->slug === 'internal_defence') {
+                            $total = 0;
+                            $count = 0;
+                            foreach ($event->evaluations as $eval) {
+                                if (isset($eval->score['total'])) {
+                                    $total += (int) $eval->score['total'];
+                                    $count++;
+                                }
+                            }
+                            if ($count > 0) {
+                                $avgNum = (int) round($total / $count);
+                                $avgScore = ($avgNum >= 50 ? 'PASS' : 'FAIL') . " ({$avgNum}/100)";
+                            }
                         }
-                        if ($passCount + $failCount > 0) {
-                            $avgScore = ($passCount >= $failCount ? 'PASS' : 'FAIL') . " ({$passCount}/" . ($passCount + $failCount) . ")";
+
+                        if ($avgScore === 'N/A') {
+                            $passCount = 0;
+                            $failCount = 0;
+                            foreach($event->evaluations as $eval) {
+                                $verdict = strtolower($eval->verdict ?? $eval->recommendation ?? '');
+                                if ($verdict === 'pass') $passCount++;
+                                elseif ($verdict === 'fail') $failCount++;
+                            }
+                            if ($passCount + $failCount > 0) {
+                                $passLabel = $template->slug === 'proposal_defence' ? 'PROPOSAL ACCEPTED' : 'PASS';
+                                $failLabel = $template->slug === 'proposal_defence' ? 'FAIL (REPEAT)' : 'FAIL';
+                                $avgScore = ($passCount >= $failCount ? $passLabel : $failLabel) . " ({$passCount}/" . ($passCount + $failCount) . ")";
+                            }
                         }
                     } else {
                         $total = 0;

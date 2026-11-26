@@ -40,12 +40,55 @@
 
             @php
                 $scores = $evaluation->score ?? [];
-                $isPassFail = isset($scores['verdict']) || in_array($evaluation->defenceEvent->type, ['proposal', 'progress_report_1', 'progress_report_2']);
+                $isInternalRubric = ($scores['rubric_version'] ?? null) === 'internal_defence_v1';
+                $isProposal = $evaluation->defenceEvent->type === 'proposal';
+                $isPassFail = !$isInternalRubric && (isset($scores['verdict']) || in_array($evaluation->defenceEvent->type, ['proposal', 'progress_report_1', 'progress_report_2', 'internal']));
                 $verdict = strtolower($scores['verdict'] ?? $evaluation->recommendation ?? 'fail');
                 $isPass = ($verdict === 'pass');
+                $total = $scores['total'] ?? (array_sum($scores) > 0 ? array_sum($scores) / 2 : 0);
+                $internalSections = $isInternalRubric ? \App\Models\Evaluation::internalDefenceRubricSections() : [];
             @endphp
 
-            @if($isPassFail)
+            @if($isInternalRubric)
+                <x-card title="Internal Defence Grading Rubric Breakdown">
+                    <div class="overflow-x-auto rounded-2xl border border-slate-200">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-900 text-white text-[10px] font-black uppercase tracking-wider">
+                                    <th class="px-3 py-2.5 border-r border-slate-700 w-10 text-center">S/N</th>
+                                    <th class="px-3 py-2.5 border-r border-slate-700">Grading of the Project</th>
+                                    <th class="px-3 py-2.5 border-r border-slate-700 w-24 text-center">Max Pts</th>
+                                    <th class="px-3 py-2.5 w-28 text-center">Awarded</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-200 bg-white">
+                                @foreach($internalSections as $section)
+                                    <tr class="bg-slate-50">
+                                        <td class="px-3 py-2 font-black text-slate-800 text-center border-r border-slate-200">{{ $section['sn'] }}</td>
+                                        <td class="px-3 py-2 font-black text-slate-900 border-r border-slate-200">{{ $section['title'] }}</td>
+                                        <td class="px-3 py-2 font-black text-slate-900 text-center border-r border-slate-200">{{ $section['max'] }}</td>
+                                        <td class="px-3 py-2 font-black text-indigo-700 text-center">{{ $scores['sections'][$section['key']] ?? 0 }} / {{ $section['max'] }}</td>
+                                    </tr>
+                                    @foreach($section['items'] as $item)
+                                        <tr>
+                                            <td class="px-3 py-1.5 border-r border-slate-200"></td>
+                                            <td class="px-3 py-1.5 text-slate-600 border-r border-slate-200">{{ $item['label'] }} ({{ $item['max'] }})</td>
+                                            <td class="px-3 py-1.5 text-center text-slate-400 border-r border-slate-200">{{ $item['max'] }}</td>
+                                            <td class="px-3 py-1.5 text-center font-bold text-slate-800">{{ $scores[$item['key']] ?? 0 }}</td>
+                                        </tr>
+                                    @endforeach
+                                @endforeach
+                                <tr class="bg-slate-100 font-black border-t-2 border-slate-300">
+                                    <td class="px-3 py-3 border-r border-slate-200"></td>
+                                    <td class="px-3 py-3 text-right uppercase tracking-wider border-r border-slate-200">TOTAL</td>
+                                    <td class="px-3 py-3 text-center border-r border-slate-200">100</td>
+                                    <td class="px-3 py-3 text-center {{ $isPass ? 'text-emerald-700' : 'text-rose-700' }}">{{ $total }} / 100 ({{ $isPass ? 'PASS' : 'FAIL' }})</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </x-card>
+            @elseif($isPassFail)
                 <x-card title="Defence Outcome">
                     <div class="p-6 rounded-2xl {{ $isPass ? 'bg-emerald-50/70 border border-emerald-200' : 'bg-rose-50/70 border border-rose-200' }} flex flex-col sm:flex-row items-center gap-6">
                         <div class="w-20 h-20 rounded-3xl {{ $isPass ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600' }} flex items-center justify-center shrink-0 shadow-sm">
@@ -57,13 +100,17 @@
                         </div>
                         <div class="text-center sm:text-left">
                             <span class="inline-flex px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider {{ $isPass ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900' }}">
-                                Result: {{ strtoupper($verdict) }}
+                                Result: {{ $isProposal ? ($isPass ? 'PROPOSAL ACCEPTED' : 'FAIL — REPEAT PROPOSAL DEFENCE') : strtoupper($verdict) }}
                             </span>
                             <h3 class="text-xl font-black text-slate-900 mt-2">
-                                {{ $isPass ? 'Candidate Cleared & Recommended to Advance' : 'Candidate Failed & Must Repeat Milestone' }}
+                                @if($isProposal)
+                                    {{ $isPass ? 'Proposal Accepted — Proceeds to Next Milestone After Session Ends' : 'Proposal Not Accepted — Must Repeat Proposal Defence' }}
+                                @else
+                                    {{ $isPass ? 'Passed — Proceeds to Next Milestone After Admin Ends Presentation' : 'Failed — Must Repeat Presentation (Does Not Advance)' }}
+                                @endif
                             </h3>
                             <p class="text-xs font-semibold text-slate-500 mt-1">
-                                {{ $isPass ? 'The candidate demonstrated required knowledge and research progress for this stage.' : 'The candidate did not meet the criteria. Revisions are required and this milestone must be repeated.' }}
+                                {{ $isPass ? 'The candidate demonstrated required knowledge and research progress for this stage.' : 'The candidate did not meet the criteria and must repeat this presentation.' }}
                             </p>
                         </div>
                     </div>
@@ -71,9 +118,6 @@
             @else
                 <x-card title="Scoring Breakdown">
                     <div class="space-y-4 p-2">
-                        @php
-                            $total = $scores['total'] ?? (array_sum($scores) > 0 ? array_sum($scores) / 2 : 0);
-                        @endphp
                         
                         <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
                             <span class="text-sm font-black text-slate-700">Originality & Contribution</span>
@@ -98,10 +142,20 @@
 
         <div class="space-y-6">
             <x-card title="Final Verdict" color="indigo">
-                @if($isPassFail)
+                @if($isInternalRubric)
+                    <div class="flex flex-col items-center justify-center p-6 {{ $isPass ? 'bg-emerald-50/60 border border-emerald-100' : 'bg-rose-50/60 border border-rose-100' }} rounded-2xl mb-4">
+                        <p class="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-1">Total Score (&ge; 50% Pass)</p>
+                        <p class="text-5xl font-black text-slate-900 tracking-tighter">{{ $total }}<span class="text-2xl text-slate-400">/100</span></p>
+                        <span class="mt-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider {{ $isPass ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900' }}">
+                            GRADE: {{ $isPass ? 'PASS' : 'FAIL' }}
+                        </span>
+                    </div>
+                @elseif($isPassFail)
                     <div class="flex flex-col items-center justify-center p-6 {{ $isPass ? 'bg-emerald-50/60 border border-emerald-100' : 'bg-rose-50/60 border border-rose-100' }} rounded-2xl mb-4">
                         <p class="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-1">Official Result</p>
-                        <p class="text-4xl font-black {{ $isPass ? 'text-emerald-700' : 'text-rose-700' }} tracking-tight">{{ strtoupper($verdict) }}</p>
+                        <p class="text-2xl font-black text-center {{ $isPass ? 'text-emerald-700' : 'text-rose-700' }} tracking-tight">
+                            {{ $isProposal ? ($isPass ? 'PROPOSAL ACCEPTED' : 'FAIL') : strtoupper($verdict) }}
+                        </p>
                     </div>
                 @else
                     <div class="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl mb-4">
@@ -114,7 +168,7 @@
                     <p class="text-[10px] uppercase font-black tracking-widest text-slate-500">Recommendation</p>
                     @if($evaluation->recommendation === 'pass')
                         <div class="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl">
-                            <span class="text-sm font-black uppercase tracking-widest">Clear Pass</span>
+                            <span class="text-sm font-black uppercase tracking-widest">{{ $isProposal ? 'Proposal Accepted' : ($isInternalRubric ? 'Pass (Upload Corrections)' : 'Clear Pass') }}</span>
                         </div>
                     @elseif($evaluation->recommendation === 'minor_revisions')
                         <div class="flex items-center gap-3 p-4 bg-acetel-50 border border-acetel-200 text-acetel-700 rounded-xl">
@@ -126,7 +180,7 @@
                         </div>
                     @else
                         <div class="flex items-center gap-3 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl">
-                            <span class="text-sm font-black uppercase tracking-widest">{{ $isPassFail ? 'Failed (Must Repeat)' : 'Fail / Retake' }}</span>
+                            <span class="text-sm font-black uppercase tracking-widest">{{ $isProposal ? 'Fail (Repeat Proposal Defence)' : ($isPassFail || $isInternalRubric ? 'Failed (Must Repeat)' : 'Fail / Retake') }}</span>
                         </div>
                     @endif
                 </div>

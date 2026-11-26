@@ -156,21 +156,65 @@
         </tr>
         <tr>
             <th>Event Date</th>
-            <td>{{ $evaluation->defenceEvent->event_date->format('F d, Y') }} at {{ $evaluation->defenceEvent->location }}</td>
+            <td>{{ ($evaluation->defenceEvent->schedule_start ?? $evaluation->submitted_at ?? now())->format('F d, Y') }}@if($evaluation->defenceEvent->location) at {{ $evaluation->defenceEvent->location }}@endif</td>
         </tr>
     </table>
 
     @php
         $scores = $evaluation->score ?? [];
-        $isPassFail = isset($scores['verdict']) || in_array($evaluation->defenceEvent->type, ['proposal', 'progress_report_1', 'progress_report_2']);
+        $isInternalRubric = ($scores['rubric_version'] ?? null) === 'internal_defence_v1';
+        $isProposal = $evaluation->defenceEvent->type === 'proposal';
+        $isPassFail = !$isInternalRubric && (isset($scores['verdict']) || in_array($evaluation->defenceEvent->type, ['proposal', 'progress_report_1', 'progress_report_2', 'internal']));
         $verdict = strtolower($scores['verdict'] ?? $evaluation->recommendation ?? 'fail');
         $isPass = ($verdict === 'pass');
+        $total = $scores['total'] ?? (array_sum($scores) > 0 ? array_sum($scores) / 2 : 0);
+        $internalSections = $isInternalRubric ? \App\Models\Evaluation::internalDefenceRubricSections() : [];
     @endphp
 
-    @if($isPassFail)
+    @if($isInternalRubric)
+        <h3>Internal Defence Grading Sheet</h3>
+        <table style="border: 1px solid #cbd5e1; font-size: 12px;">
+            <thead>
+                <tr style="background-color: #1e293b; color: #ffffff;">
+                    <th style="width: 8%; text-align: center; color: #ffffff;">S/N</th>
+                    <th style="width: 62%; color: #ffffff;">Grading of the Project</th>
+                    <th style="width: 15%; text-align: center; color: #ffffff;">Maximum Points</th>
+                    <th style="width: 15%; text-align: center; color: #ffffff;">Points Awarded</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($internalSections as $section)
+                    <tr style="background-color: #f8fafc;">
+                        <td style="text-align: center;">{{ $section['sn'] }}</td>
+                        <td><strong>{{ $section['title'] }}</strong></td>
+                        <td style="text-align: center;"><strong>{{ $section['max'] }}</strong></td>
+                        <td style="text-align: center;"><strong>{{ $scores['sections'][$section['key']] ?? 0 }} / {{ $section['max'] }}</strong></td>
+                    </tr>
+                    @foreach($section['items'] as $item)
+                        <tr>
+                            <td></td>
+                            <td style="font-weight: normal;">{{ $item['label'] }} ({{ $item['max'] }})</td>
+                            <td style="text-align: center; font-weight: normal; color: #64748b;">{{ $item['max'] }}</td>
+                            <td style="text-align: center;">{{ $scores[$item['key']] ?? 0 }}</td>
+                        </tr>
+                    @endforeach
+                @endforeach
+                <tr style="background-color: #eff6ff;">
+                    <td></td>
+                    <td style="text-align: right;"><strong>TOTAL</strong></td>
+                    <td style="text-align: center;"><strong>100</strong></td>
+                    <td style="text-align: center;"><strong>{{ $total }} / 100</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="verdict {{ $isPass ? 'verdict-pass' : 'verdict-fail' }}">
+            TOTAL SCORE: {{ $total }} / 100 &nbsp;|&nbsp; GRADE: {{ $isPass ? 'PASS' : 'FAIL' }}
+        </div>
+    @elseif($isPassFail)
         <h3>Evaluation Outcome</h3>
         <div class="verdict {{ $isPass ? 'verdict-pass' : 'verdict-fail' }}" style="font-size: 24px; padding: 20px;">
-            Result: {{ strtoupper($verdict) }}
+            Result: {{ $isProposal ? ($isPass ? 'PROPOSAL ACCEPTED' : 'FAIL — REPEAT PROPOSAL DEFENCE') : strtoupper($verdict) }}
         </div>
         <div style="text-align: center; margin-top: 10px; font-weight: bold; color: {{ $isPass ? '#065f46' : '#9f1239' }};">
             {{ $isPass ? 'Candidate meets requirements and is cleared to advance to the next milestone.' : 'Candidate did not meet criteria and is required to repeat this milestone.' }}
@@ -178,9 +222,6 @@
     @else
         <h3>Scoring</h3>
         <div class="score-grid">
-            @php
-                $total = $scores['total'] ?? (array_sum($scores) > 0 ? array_sum($scores) / 2 : 0);
-            @endphp
             <div class="score-item">
                 <div class="score-label">Originality & Contribution</div>
                 <div class="score-value">{{ $scores['originality'] ?? 0 }} / 25</div>

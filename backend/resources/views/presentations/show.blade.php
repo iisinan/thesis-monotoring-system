@@ -550,17 +550,34 @@
                                                     $todayPassCount = $todayDefEvent->evaluations->where('verdict', 'pass')->count();
                                                     $todayFailCount = $todayDefEvent->evaluations->where('verdict', 'fail')->count();
                                                     $todayTotal = $todayPassCount + $todayFailCount;
+                                                    $todayScores = $todayDefEvent->evaluations->map(fn($e) => data_get($e->score, 'total'))->filter(fn($v) => $v !== null);
+                                                    $todayAvgScore = $todayScores->isNotEmpty() ? (int) round($todayScores->avg()) : null;
+                                                    $todayIsInternal = ($template->slug === 'internal_defence');
+                                                    $todayIsProposal = ($template->slug === 'proposal_defence');
+                                                    $todayPassedOutcome = ($todayIsInternal && $todayAvgScore !== null)
+                                                        ? ($todayAvgScore >= 50)
+                                                        : ($todayPassCount >= $todayFailCount);
                                                 @endphp
-                                                @if($todayTotal > 0)
-                                                    @if($todayPassCount >= $todayFailCount)
+                                                @if($todayTotal > 0 || ($todayIsInternal && $todayAvgScore !== null))
+                                                    @if($todayPassedOutcome)
                                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300/80 shadow-2xs">
                                                             <svg class="w-2.5 h-2.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                                            Pass ({{ $todayPassCount }}/{{ $todayTotal }})
+                                                            @if($todayIsInternal && $todayAvgScore !== null)
+                                                                Pass ({{ $todayAvgScore }}/100)
+                                                            @elseif($todayIsProposal)
+                                                                Accepted ({{ $todayPassCount }}/{{ $todayTotal }})
+                                                            @else
+                                                                Pass ({{ $todayPassCount }}/{{ $todayTotal }})
+                                                            @endif
                                                         </span>
                                                     @else
                                                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300/80 shadow-2xs">
                                                             <svg class="w-2.5 h-2.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                                            Fail ({{ $todayFailCount }}/{{ $todayTotal }})
+                                                            @if($todayIsInternal && $todayAvgScore !== null)
+                                                                Fail ({{ $todayAvgScore }}/100)
+                                                            @else
+                                                                Fail ({{ $todayFailCount }}/{{ $todayTotal }})
+                                                            @endif
                                                         </span>
                                                     @endif
                                                 @endif
@@ -685,10 +702,19 @@
                                     <div class="flex items-center gap-1.5 shrink-0">
                                         @if($todayCanEval)
                                             @if($todayEval && $todayEval->submitted_at)
+                                                @php
+                                                    $todayEvalTotal = data_get($todayEval->score, 'total');
+                                                    $todayEvalVerdict = strtolower($todayEval->verdict ?? '');
+                                                    $todayEvalLabel = ($template->slug === 'internal_defence' && $todayEvalTotal !== null)
+                                                        ? strtoupper($todayEvalVerdict ?: ((int)$todayEvalTotal >= 50 ? 'pass' : 'fail')) . ' (' . (int)$todayEvalTotal . '/100)'
+                                                        : ($template->slug === 'proposal_defence'
+                                                            ? ($todayEvalVerdict === 'pass' ? 'ACCEPTED' : ($todayEvalVerdict === 'fail' ? 'FAIL (REPEAT)' : 'Graded'))
+                                                            : ($todayEval->verdict ? strtoupper($todayEval->verdict) : 'Graded'));
+                                                @endphp
                                                 <a href="{{ route('evaluations.show', $todayEval->id) }}" 
-                                                   class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider {{ strtolower($todayEval->verdict ?? '') === 'fail' ? 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200' : 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-200' }} transition-all shadow-2xs active:scale-95">
-                                                    <svg class="w-3.5 h-3.5 {{ strtolower($todayEval->verdict ?? '') === 'fail' ? 'text-rose-600' : 'text-purple-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                                    <span>{{ $todayEval->verdict ? strtoupper($todayEval->verdict) : 'Graded' }}</span>
+                                                   class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider {{ $todayEvalVerdict === 'fail' ? 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200' : 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-200' }} transition-all shadow-2xs active:scale-95">
+                                                    <svg class="w-3.5 h-3.5 {{ $todayEvalVerdict === 'fail' ? 'text-rose-600' : 'text-purple-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                    <span>{{ $todayEvalLabel }}</span>
                                                 </a>
                                             @else
                                                 <a href="{{ route('evaluations.create', $todayDefEvent->id) }}" 
@@ -939,8 +965,17 @@
                                     <div class="flex items-center gap-1.5 shrink-0">
                                         @if($tableCanEval)
                                             @if($tableEval && $tableEval->submitted_at)
-                                                <a href="{{ route('evaluations.show', $tableEval->id) }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider {{ strtolower($tableEval->verdict ?? '') === 'fail' ? 'bg-rose-100 text-rose-800' : 'bg-purple-100 text-purple-800' }}">
-                                                    {{ $tableEval->verdict ? strtoupper($tableEval->verdict) : 'Graded' }}
+                                                @php
+                                                    $mobEvalTotal = data_get($tableEval->score, 'total');
+                                                    $mobEvalVerdict = strtolower($tableEval->verdict ?? '');
+                                                    $mobEvalLabel = ($template->slug === 'internal_defence' && $mobEvalTotal !== null)
+                                                        ? strtoupper($mobEvalVerdict ?: ((int)$mobEvalTotal >= 50 ? 'pass' : 'fail')) . ' (' . (int)$mobEvalTotal . '/100)'
+                                                        : ($template->slug === 'proposal_defence'
+                                                            ? ($mobEvalVerdict === 'pass' ? 'ACCEPTED' : ($mobEvalVerdict === 'fail' ? 'FAIL (REPEAT)' : 'Graded'))
+                                                            : ($tableEval->verdict ? strtoupper($tableEval->verdict) : 'Graded'));
+                                                @endphp
+                                                <a href="{{ route('evaluations.show', $tableEval->id) }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider {{ $mobEvalVerdict === 'fail' ? 'bg-rose-100 text-rose-800' : 'bg-purple-100 text-purple-800' }}">
+                                                    {{ $mobEvalLabel }}
                                                 </a>
                                             @elseif($canScore)
                                                 <a href="{{ route('evaluations.create', $tableDefEvent->id) }}" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider bg-purple-600 text-white shadow-2xs active:scale-95">
@@ -1143,17 +1178,34 @@
                                                             $rowPassCount = $tableDefEvent->evaluations->where('verdict', 'pass')->count();
                                                             $rowFailCount = $tableDefEvent->evaluations->where('verdict', 'fail')->count();
                                                             $rowTotal = $rowPassCount + $rowFailCount;
+                                                            $rowScores = $tableDefEvent->evaluations->map(fn($e) => data_get($e->score, 'total'))->filter(fn($v) => $v !== null);
+                                                            $rowAvgScore = $rowScores->isNotEmpty() ? (int) round($rowScores->avg()) : null;
+                                                            $rowIsInternal = ($template->slug === 'internal_defence');
+                                                            $rowIsProposal = ($template->slug === 'proposal_defence');
+                                                            $rowPassedOutcome = ($rowIsInternal && $rowAvgScore !== null)
+                                                                ? ($rowAvgScore >= 50)
+                                                                : ($rowPassCount >= $rowFailCount);
                                                         @endphp
-                                                        @if($rowTotal > 0)
-                                                            @if($rowPassCount >= $rowFailCount)
+                                                        @if($rowTotal > 0 || ($rowIsInternal && $rowAvgScore !== null))
+                                                            @if($rowPassedOutcome)
                                                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300/80 shadow-2xs">
                                                                     <svg class="w-2.5 h-2.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                                                    Pass ({{ $rowPassCount }}/{{ $rowTotal }})
+                                                                    @if($rowIsInternal && $rowAvgScore !== null)
+                                                                        Pass ({{ $rowAvgScore }}/100)
+                                                                    @elseif($rowIsProposal)
+                                                                        Accepted ({{ $rowPassCount }}/{{ $rowTotal }})
+                                                                    @else
+                                                                        Pass ({{ $rowPassCount }}/{{ $rowTotal }})
+                                                                    @endif
                                                                 </span>
                                                             @else
                                                                 <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300/80 shadow-2xs">
                                                                     <svg class="w-2.5 h-2.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                                                                    Fail ({{ $rowFailCount }}/{{ $rowTotal }})
+                                                                    @if($rowIsInternal && $rowAvgScore !== null)
+                                                                        Fail ({{ $rowAvgScore }}/100)
+                                                                    @else
+                                                                        Fail ({{ $rowFailCount }}/{{ $rowTotal }})
+                                                                    @endif
                                                                 </span>
                                                             @endif
                                                         @endif
@@ -1301,10 +1353,19 @@
                                         <div class="inline-flex items-center justify-center gap-2">
                                             @if($tableCanEval)
                                                 @if($tableEval && $tableEval->submitted_at)
+                                                    @php
+                                                        $deskEvalTotal = data_get($tableEval->score, 'total');
+                                                        $deskEvalVerdict = strtolower($tableEval->verdict ?? '');
+                                                        $deskEvalLabel = ($template->slug === 'internal_defence' && $deskEvalTotal !== null)
+                                                            ? strtoupper($deskEvalVerdict ?: ((int)$deskEvalTotal >= 50 ? 'pass' : 'fail')) . ' (' . (int)$deskEvalTotal . '/100)'
+                                                            : ($template->slug === 'proposal_defence'
+                                                                ? ($deskEvalVerdict === 'pass' ? 'ACCEPTED' : ($deskEvalVerdict === 'fail' ? 'FAIL (REPEAT)' : 'Graded'))
+                                                                : ($tableEval->verdict ? strtoupper($tableEval->verdict) : 'Graded'));
+                                                    @endphp
                                                     <a href="{{ route('evaluations.show', $tableEval->id) }}" 
-                                                       class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider {{ strtolower($tableEval->verdict ?? '') === 'fail' ? 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200' : 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-200' }} transition-all shadow-2xs active:scale-95">
-                                                        <svg class="w-3.5 h-3.5 {{ strtolower($tableEval->verdict ?? '') === 'fail' ? 'text-rose-600' : 'text-purple-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                                                        <span>{{ $tableEval->verdict ? strtoupper($tableEval->verdict) : 'Graded' }}</span>
+                                                       class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider {{ $deskEvalVerdict === 'fail' ? 'bg-rose-100 hover:bg-rose-200 text-rose-800 border border-rose-200' : 'bg-purple-100 hover:bg-purple-200 text-purple-800 border border-purple-200' }} transition-all shadow-2xs active:scale-95">
+                                                        <svg class="w-3.5 h-3.5 {{ $deskEvalVerdict === 'fail' ? 'text-rose-600' : 'text-purple-600' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                        <span>{{ $deskEvalLabel }}</span>
                                                     </a>
                                                 @else
                                                     @if($canScore)
